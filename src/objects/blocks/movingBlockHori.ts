@@ -29,13 +29,13 @@ export class movingBlockHori extends objectBase{
         super.logic(l);
         //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
         if(this.switch){
-            super.setNewForce(5, 0);
+            super.setNewForce(1, 0);
         }else{
-            super.setNewForce(-5, 0);
+            super.setNewForce(-1, 0);
         }
 
 
-        if(l.getTicks() % 40 == 0){
+        if(l.getTicks() % 20 == 0){
             this.switch = !this.switch;
         }
     };

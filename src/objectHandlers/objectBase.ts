@@ -8,6 +8,7 @@ import { movementOperations } from "../movementOperations";
 import { iObject } from "./iObject";
 import { iVector } from "../dataModules/vector/iVector";
 import { nulliObject } from "./nulliObject";
+import { calculations } from "../calculations";
 
 
 export class objectBase implements iObject{
@@ -139,14 +140,14 @@ export class objectBase implements iObject{
 
     setNewForceAngleMagnitude(angle: number, magnitude: number){
         this._force.Dx = Math.cos(angle) * magnitude;
-        this._force.Dy = Math.sin(angle) * magnitude;
+        this._force.Dy = calculations.flippedSin(angle) * magnitude;
         //this._force.angle = angle;
         //this._force.magnitude = magnitude;
     }
 
     addForceAngleMagnitude(angle: number, magnitude: number){
         this._force.Dx += Math.cos(angle) * magnitude;
-        this._force.Dy += Math.sin(angle) * magnitude;
+        this._force.Dy += calculations.flippedSin(angle) * magnitude;
     }
 
 }

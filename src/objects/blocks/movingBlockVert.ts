@@ -29,9 +29,9 @@ export class movingBlockVert extends objectBase{
     logic(l: roomEvent){
         super.logic(l);
         if(this.switch){
-            super.setNewForceAngleMagnitude(calculations.degreesToRadians(90), 2);
+            super.setNewForceAngleMagnitude(calculations.degreesToRadians(90), 1);
         }else{
-            super.setNewForceAngleMagnitude(calculations.degreesToRadians(270), 2);
+            super.setNewForceAngleMagnitude(calculations.degreesToRadians(270), 1);
         }
 
         if(l.getTicks() % 55 == 0){

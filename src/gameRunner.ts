@@ -17,7 +17,8 @@ export class gameRunner {
     gameContainerElement: HTMLElement;
     objContainer: objectContainer;
     generateObjects: objectGenerator = new objectGenerator();
-    readonly targetFps: number = 60;
+    readonly targetFps: number = 30;
+    
 
     constructor(gameContainer: string, gameProperties: gameSettings, app: PIXI.Application){
         this.app = new PIXI.Application();

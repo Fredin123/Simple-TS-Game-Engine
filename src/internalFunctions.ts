@@ -24,8 +24,8 @@ export class internalFunction{
             
         return (
             x1 < x2 + collisionTarget.collisionBox.width &&
-            x1-0.5 + initiadorCollisionBox.width > x2 &&
-            y1+0.5 < y2 + collisionTarget.collisionBox.height &&
+            x1 + initiadorCollisionBox.width > x2 &&
+            y1 < y2 + collisionTarget.collisionBox.height &&
             y1 + initiadorCollisionBox.height > y2
           );
     }

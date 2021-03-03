@@ -209,6 +209,9 @@
             var dist = mod_diff > 180.0 ? 360.0 - mod_diff : mod_diff;
             return dist;
         };
+        calculations.flippedSin = function (delta) {
+            return Math.sin(delta + calculations.PI /*We need to flip sin since our coordinate system Y goes from 0 to positive numbers when you do down*/);
+        };
         calculations.PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
         calculations.EPSILON = 8.8541878128;
         return calculations;
@@ -357,8 +360,8 @@
                 y1 < y2 + collisionTarget.collisionBox.height &&
                 y1 + initiator.collisionBox.height > y2);*/
             return (x1 < x2 + collisionTarget.collisionBox.width &&
-                x1 - 0.5 + initiadorCollisionBox.width > x2 &&
-                y1 + 0.5 < y2 + collisionTarget.collisionBox.height &&
+                x1 + initiadorCollisionBox.width > x2 &&
+                y1 < y2 + collisionTarget.collisionBox.height &&
                 y1 + initiadorCollisionBox.height > y2);
         };
         return internalFunction;
@@ -376,11 +379,11 @@
             }
             var xdiff = force.Dx;
             var ydiff = force.Dy;
-            this.moveForceHorizontal(~~xdiff, 1, target, collisionNames, objContainer);
-            this.moveForceHorizontal(xdiff - ~~xdiff, 0.01, target, collisionNames, objContainer);
+            this.moveForceHorizontal(Math.round(xdiff), 1, target, collisionNames, objContainer);
+            //this.moveForceHorizontal(xdiff - ~~xdiff, 0.01, target, collisionNames, objContainer);
             //this.moveOutFromCollider(xdiff % 1, 0.01, target, collisionNames, objContainer);
-            this.moveForceVertical(~~ydiff, 1, target, collisionNames, objContainer);
-            this.moveForceVertical(ydiff - ~~ydiff, 0.01, target, collisionNames, objContainer);
+            this.moveForceVertical(Math.round(ydiff), 1, target, collisionNames, objContainer);
+            //this.moveForceVertical(ydiff - ~~ydiff, 0.01, target, collisionNames, objContainer);
             //this.moveForceVertical(ydiff - ~~ydiff, 0.001, target, collisionNames, objContainer);
             force.Dx *= target.airFriction;
             force.Dy *= target.airFriction;
@@ -391,19 +394,32 @@
             }
         };
         movementOperations.moveForceHorizontal = function (magnitude, iteretorSize, target, collisionNames, objContainer) {
-            var sign = magnitude ? magnitude < 0 ? -1 : 1 : 0;
+            if (magnitude == 0)
+                return;
+            var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
             for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
+                //target.collisionBox.shrink(0, 1);
                 target.g.x += iteretorSize * sign;
-                target.collisionBox.shrink(0, 1);
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
-                    var collisionTarget_1 = void 0;
-                    while ((collisionTarget_1 = this.boxIntersectionSpecific(target, target.collisionBox, objectBase.objectsThatCollideWithKeyObjectName[target.objectName], objContainer)) != objectBase.null) {
-                        objectsThatWereCollidingThisObjectWhileMoving.push(collisionTarget_1);
-                        collisionTarget_1.g.x += iteretorSize * sign;
-                    }
+                    objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                        if (sign > 0) {
+                            //Move right
+                            if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                testCollisionWith.g.x += iteretorSize * sign;
+                            }
+                        }
+                        else {
+                            //Move left
+                            if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                testCollisionWith.g.x += iteretorSize * sign;
+                            }
+                        }
+                        return false;
+                    });
                 }
-                target.collisionBox.expand(0, 1);
                 var collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
@@ -427,21 +443,61 @@
                     break;
                 }
             }
+            //Sticky draging
+            if (target.stickyness > 0) {
+                var checkDistance = Math.abs(magnitude) + 2;
+                var stickyCheck_1;
+                if (sign > 0) {
+                    //Moving right, check left
+                    stickyCheck_1 = new boxCollider(target.collisionBox.x - checkDistance, target.collisionBox.y, checkDistance, target.collisionBox.height);
+                }
+                else {
+                    //Moving left, check right
+                    stickyCheck_1 = new boxCollider(target.collisionBox.x - target.collisionBox.width, target.collisionBox.y, checkDistance, target.collisionBox.height);
+                }
+                objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                    if (sign > 0) {
+                        //Moving right
+                        if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                            testCollisionWith.g.x = target.g.x - testCollisionWith.collisionBox.x - testCollisionWith.collisionBox.width;
+                        }
+                    }
+                    else {
+                        //Moving left
+                        if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                            testCollisionWith.g.x = target.g.x + target.collisionBox.x + target.collisionBox.width - testCollisionWith.collisionBox.x;
+                        }
+                    }
+                    return false;
+                });
+            }
         };
         movementOperations.moveForceVertical = function (magnitude, iteretorSize, target, collisionNames, objContainer) {
-            var sign = magnitude ? magnitude > 0 ? -1 : 1 : 0;
+            if (magnitude == 0)
+                return;
+            var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
             for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
                 target.g.y += iteretorSize * sign;
-                target.collisionBox.shrink(1, 0);
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
-                    var collisionTarget_2 = void 0;
-                    while ((collisionTarget_2 = this.boxIntersectionSpecific(target, target.collisionBox, objectBase.objectsThatCollideWithKeyObjectName[target.objectName], objContainer)) != objectBase.null) {
-                        objectsThatWereCollidingThisObjectWhileMoving.push(collisionTarget_2);
-                        collisionTarget_2.g.y += iteretorSize * sign;
-                    }
+                    objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                        if (sign > 0) {
+                            //Move down
+                            if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                testCollisionWith.g.y += iteretorSize * sign;
+                            }
+                        }
+                        else {
+                            //Move up
+                            if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                testCollisionWith.g.y += iteretorSize * sign;
+                            }
+                        }
+                        return false;
+                    });
                 }
-                target.collisionBox.expand(1, 0);
                 var collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
@@ -468,13 +524,29 @@
                 }
             }
             //Sticky draging
-            if (target.stickyness > 0 && sign > 0) {
-                //Top test
+            if (target.stickyness > 0) {
                 var checkDistance = Math.abs(magnitude) + 2;
-                var stickyTop_1 = new boxCollider(target.collisionBox.x + 1, target.collisionBox.y - checkDistance, target.collisionBox.width - 2, checkDistance);
+                var stickyCheck_2;
+                if (sign > 0) {
+                    //Moving down, check up
+                    stickyCheck_2 = new boxCollider(target.collisionBox.x + 1, target.collisionBox.y - checkDistance, target.collisionBox.width - 2, checkDistance);
+                }
+                else {
+                    //Moving up, check down
+                    stickyCheck_2 = new boxCollider(target.collisionBox.x + 1, target.collisionBox.y + target.collisionBox.height, target.collisionBox.width - 2, checkDistance);
+                }
                 objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
-                    if (internalFunction.intersecting(target, stickyTop_1, testCollisionWith)) {
-                        testCollisionWith.g.y = target.g.y - testCollisionWith.collisionBox.height - (0.5);
+                    if (sign > 0) {
+                        //Moving down
+                        if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                            testCollisionWith.g.y = target.g.y - testCollisionWith.collisionBox.y - testCollisionWith.collisionBox.height;
+                        }
+                    }
+                    else {
+                        //Moving up
+                        if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                            testCollisionWith.g.y = target.g.y + target.collisionBox.y + target.collisionBox.height - testCollisionWith.collisionBox.y;
+                        }
                     }
                     return false;
                 });
@@ -705,13 +777,13 @@
         };
         objectBase.prototype.setNewForceAngleMagnitude = function (angle, magnitude) {
             this._force.Dx = Math.cos(angle) * magnitude;
-            this._force.Dy = Math.sin(angle) * magnitude;
+            this._force.Dy = calculations.flippedSin(angle) * magnitude;
             //this._force.angle = angle;
             //this._force.magnitude = magnitude;
         };
         objectBase.prototype.addForceAngleMagnitude = function (angle, magnitude) {
             this._force.Dx += Math.cos(angle) * magnitude;
-            this._force.Dy += Math.sin(angle) * magnitude;
+            this._force.Dy += calculations.flippedSin(angle) * magnitude;
         };
         objectBase.null = new nulliObject(0, 0);
         objectBase.objectsThatCollideWithKeyObjectName = {};
@@ -767,12 +839,12 @@
             _super.prototype.logic.call(this, l);
             //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
             if (this.switch) {
-                _super.prototype.setNewForce.call(this, 5, 0);
+                _super.prototype.setNewForce.call(this, 1, 0);
             }
             else {
-                _super.prototype.setNewForce.call(this, -5, 0);
+                _super.prototype.setNewForce.call(this, -1, 0);
             }
-            if (l.getTicks() % 40 == 0) {
+            if (l.getTicks() % 20 == 0) {
                 this.switch = !this.switch;
             }
         };
@@ -799,10 +871,10 @@
         movingBlockVert.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
             if (this.switch) {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 2);
+                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 1);
             }
             else {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 2);
+                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
             }
             if (l.getTicks() % 55 == 0) {
                 this.switch = !this.switch;
@@ -835,12 +907,12 @@
             //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
             //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;
             var newXAdd = Math.cos(this.delta) * addValue;
-            var newYAdd = Math.sin(this.delta) * addValue;
+            var newYAdd = calculations.flippedSin(this.delta) * addValue;
             if (Math.abs(newXAdd) > 0.00000000000001) {
-                this.Dx += Math.cos(this.delta) * addValue;
+                this.Dx += newXAdd;
             }
             if (Math.abs(newYAdd) > 0.00000000000001) {
-                this.Dy += Math.sin(this.delta) * addValue;
+                this.Dy += newYAdd;
             }
         };
         return vectorFixedDelta;
@@ -853,7 +925,7 @@
             _this.airFriction = 0.93;
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
             _this.weight = 0.03;
-            _this.maxRunSpeed = 1;
+            _this.maxRunSpeed = 2;
             _super.prototype.setCollision.call(_this, 0, 0, 16, 16);
             _super.prototype.style.call(_this, function (g) {
                 g.beginFill(0xFF3e50);
@@ -883,13 +955,13 @@
             //l.moveByForce(this, this.movement, block.objectName);
             //super.setNewForceAngleMagnitude(angleToMouse, speed);
             if (l.checkKeyHeld("a")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 0.2);
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 0.8);
             }
             if (l.checkKeyHeld("d")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 0.2);
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 0.8);
             }
             if (l.checkKeyPressed("w")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 8);
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 12);
             }
             this.force.limitHorizontalMagnitude(this.maxRunSpeed);
         };
@@ -997,7 +1069,7 @@
         return objectGenerator;
     }());
 
-    var room1 = "NobwRAHmBcBsAsAaMBPG8AcyD2AjAVgKYDGALgMIA2AhgM60By1AtoTGLpdsQNZgC+icFGgYADMjTRMOAiQo16TVu07c+g4TACcsSeixg8RMlTqMWbaBy68BQyDACMTgEz7ph4-LNLLq2w0HETdDKRkjOVNFCxVrNTtNR08PCO9o82UrG3V7LRTUGARZEwVM-3jAvOSIqXESnxisgNykkVqdPUjS31jshKD8jugXd27G8ricxOCDD1CGjL8pgeqResLRCXGlvpaZ-N0PDfSy5f6qtpgNqQWds73K1tnoI827097mp4OasOd4Eh7l8KtNBsliu9YNtPk1Qasrlt5tDFg9vmC1p1kTComj4ZcXsMnCjgXCVgT8qNsaiQeTnpTXP8RiTYZMLvTkk5AdTSWz9uCQiTbizcbT2b8QgB2LrCnE9MnigXObRjWU0hX8zHQVxiJnEuUTc6axGuVxAtW8o0-JXas3zbmWx4Yk1296M9V861a03m5xuD1W50vH0eN6swMI4OuuoG3boyP5EObSHhp0J5JJ8JeUUar0m3WpbPyz1BykqwsBtMUznSiuO+PVwXbLOVhsckIOlv1-Ht5Wq66xvF0iXOWubE45kvpkLlt1Fw1V3sjMe3d3d4c2u6r+dx0HMACW2AEAF0gA";
+    var room1 = "NobwRAHmBcDMBMAaMBPGDkHsBGArApgMYAuAwgDYCGAztQHKUC2+MYjmAbgJYB2A5gCFymQgGsAavgBOxMAF9E4KHCSoYAFgAcWPETJVaDZq3bd+QkROmyFS9KrTQAbOp0ESFGvSYtobTryCwmKSMvKKkPbIjpoADG56noY+JgHmwVZhtpEq0TAAnE4JHgbexn6mgRYh1uF2uWrQAIxNqjju+l5Gvv5mQZahNhHKGI2t2mDtiaXdqX3VmUP1o45N6q6TuiVdKRVp-TVZw1FjTvGbHUllPZXpA7XZylp5zWfFncnlvVUZg3U5LheTTeF2mOy+twOi3+yjiQJBU22nxu+wWf0eBSKp3OiI+1zmP3uR3qLQcMGBOK2eNme3mvwex2a8AmqwRVKuNO+d0OSxyaw2rMplxmuy5UPRjOejVGuI5oshaIZ9UB0ra7JFENR9OJOThqvecs1dKJvOUhReMvV4JRxp5MPJrQtauF1oJ3OhGOcApgKtlGpthLtnpVMSFYORbvFSt150cvqtEdpgY9jJDDud4fxSfdEuV3qZEz9ruzUZ1sNj5OZBv9kcVZfJIMF1eLYrrpvJAHYsU3QUis63te3ml2getm4mByb7cPu5XCwn+wrB9OmiOxo7e9T5Vqp57V7PoObN4aAzno8p9y89UWJ0vd4zL414y7bzugw+144pTfF2+UyTPxOH9OTvd8SUbICFxAv9cz5Md9WPGsSzbFcqwQ4Dt1tf8+TQuMNgwo1k1gi94Lw8dfyw4jyVImBrygzCiPPOcgTQgjT1LId+RY+cXwoxj62aGjmg3Nja2XT0j1WET6IhLhMHkABdIA";
 
     var objectContainer = /** @class */ (function () {
         function objectContainer() {
@@ -1068,7 +1140,7 @@
         function gameRunner(gameContainer, gameProperties, app) {
             var _this = this;
             this.generateObjects = new objectGenerator();
-            this.targetFps = 60;
+            this.targetFps = 30;
             this.app = new PIXI$1.Application();
             this.objContainer = new objectContainer();
             gameProperties.applySettings(this.app);
@@ -1143,6 +1215,7 @@
             for (var _i = 0; _i < arguments.length; _i++) {
                 s[_i] = arguments[_i];
             }
+            logger.container.style.display = "inline";
             var newLog = "";
             s.forEach(function (text) {
                 newLog += text;

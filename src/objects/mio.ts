@@ -19,7 +19,7 @@ export class mio extends objectBase{
     gravity: iVector = new vectorFixedDelta(calculations.degreesToRadians(270), 0);//vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
     weight:number =  0.03;
 
-    maxRunSpeed = 1;
+    maxRunSpeed = 2;
 
     constructor(xp: number, yp: number) {
         super(xp, yp, mio.objectName);
@@ -59,18 +59,17 @@ export class mio extends objectBase{
 
         
         if(l.checkKeyHeld("a")){
-            super.addForceAngleMagnitude(calculations.degreesToRadians(180), 0.2);
+            super.addForceAngleMagnitude(calculations.degreesToRadians(180), 0.8);
         }
         if(l.checkKeyHeld("d")){
-            super.addForceAngleMagnitude(calculations.degreesToRadians(0), 0.2);
+            super.addForceAngleMagnitude(calculations.degreesToRadians(0), 0.8);
         }
 
         if(l.checkKeyPressed("w")){
-            super.addForceAngleMagnitude(calculations.degreesToRadians(90), 8);
+            super.addForceAngleMagnitude(calculations.degreesToRadians(90), 12);
         }
 
         this.force.limitHorizontalMagnitude(this.maxRunSpeed);
-        
         
     }
 

@@ -1,3 +1,4 @@
+import { calculations } from "../../calculations";
 import { iVector } from "./iVector";
 
 export class vectorFixedDelta implements iVector{
@@ -26,14 +27,14 @@ export class vectorFixedDelta implements iVector{
         //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
         //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;
         let newXAdd = Math.cos(this.delta) * addValue;
-        let newYAdd = Math.sin(this.delta) * addValue;
+        let newYAdd = calculations.flippedSin(this.delta) * addValue;
 
         if(Math.abs(newXAdd) > 0.00000000000001){
-            this.Dx += Math.cos(this.delta) * addValue;
+            this.Dx += newXAdd;
         }
 
         if(Math.abs(newYAdd) > 0.00000000000001){
-            this.Dy += Math.sin(this.delta) * addValue;
+            this.Dy += newYAdd;
         }
         
         

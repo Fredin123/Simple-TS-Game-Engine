@@ -24,6 +24,7 @@ export class logger{
     }
 
     static showMessage(...s: any[]){
+        logger.container.style.display = "inline";
         let newLog: string = "";
         s.forEach(text => {
             newLog += text;
