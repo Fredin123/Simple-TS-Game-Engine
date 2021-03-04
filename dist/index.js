@@ -44,7 +44,6 @@
             this.gameKeysPressed = {};
             this.gameKeysReleased = {};
             this.gameKeysHeld = {};
-            this.ticks = 0;
             this.objContainer = objContainer;
             this.container = con;
             this.keysDown = {};
@@ -53,13 +52,13 @@
             document.addEventListener("keydown", this.keyDownListener.bind(this), false);
             document.addEventListener("keyup", this.keyUpListener.bind(this), false);
         }
-        roomEvent.prototype.tick = function () {
-            if (this.ticks >= Number.MAX_VALUE) {
-                this.ticks = 0;
+        roomEvent.tick = function () {
+            if (roomEvent.ticks >= Number.MAX_VALUE) {
+                roomEvent.ticks = 0;
             }
-            this.ticks++;
+            roomEvent.ticks++;
         };
-        roomEvent.prototype.getTicks = function () {
+        roomEvent.getTicks = function () {
             return this.ticks;
         };
         roomEvent.prototype.queryKey = function () {
@@ -147,6 +146,7 @@
             });
             return returnResult;
         };
+        roomEvent.ticks = 0;
         return roomEvent;
     }());
 
@@ -304,6 +304,23 @@
             this.width = width;
             this.height = height;
         }
+        boxCollider.copy = function (copyTarget) {
+            return new boxCollider(copyTarget.x, copyTarget.y, copyTarget.width, copyTarget.height);
+        };
+        boxCollider.prototype.expandTop = function (value) {
+            this.y -= value;
+            this.height += value;
+        };
+        boxCollider.prototype.expandBottom = function (value) {
+            this.height += value;
+        };
+        boxCollider.prototype.expandLeftSide = function (value) {
+            this.x -= value;
+            this.width += value;
+        };
+        boxCollider.prototype.expandRightSide = function (value) {
+            this.width += value;
+        };
         boxCollider.prototype.shrink = function (amountX, amountY) {
             this.x += amountX;
             this.y += amountY;
@@ -398,10 +415,13 @@
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
-            for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
-                //target.collisionBox.shrink(0, 1);
+            console.log("Start itteration");
+            var _loop_1 = function (i) {
+                console.log("i = ", i);
+                objectsThatWereCollidingThisObjectWhileMoving.length = 0;
                 target.g.x += iteretorSize * sign;
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
+                    //Push object
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
                         if (sign > 0) {
                             //Move right
@@ -419,8 +439,48 @@
                         }
                         return false;
                     });
+                    //Sticky draging
+                    var stickyCheck_1 = boxCollider.copy(target.collisionBox);
+                    var checkDistance_1 = Math.abs(magnitude) + 2;
+                    if (target.stickyTop) {
+                        stickyCheck_1.expandTop(checkDistance_1);
+                    }
+                    if (target.stickyBottom) {
+                        stickyCheck_1.expandBottom(checkDistance_1);
+                    }
+                    if (target.stickyTop || target.stickyBottom) {
+                        //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
+                        objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                            //console.log("Check object: ", testCollisionWith);
+                            if (sign > 0) {
+                                //Move right
+                                if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                                    if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
+                                        objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                        testCollisionWith.g.x += iteretorSize * sign;
+                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                            testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                        }
+                                    }
+                                }
+                            }
+                            else {
+                                //Move left
+                                if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                                    if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
+                                        objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                        testCollisionWith.g.x += iteretorSize * sign;
+                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                            testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                        }
+                                    }
+                                }
+                            }
+                            return false;
+                        });
+                    }
                 }
-                var collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                var collisionTarget = this_1.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
                     target.g.x += 1 * iteretorSize * sign;
@@ -440,31 +500,35 @@
                         target.gravity.Dx *= 1 - (distance / 90);
                     }
                     target.force.Dy *= collisionTarget.friction;
-                    break;
+                    return "break";
                 }
+            };
+            var this_1 = this;
+            for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
+                var state_1 = _loop_1(i);
+                if (state_1 === "break")
+                    break;
             }
             //Sticky draging
-            if (target.stickyness > 0) {
-                var checkDistance = Math.abs(magnitude) + 2;
-                var stickyCheck_1;
-                if (sign > 0) {
-                    //Moving right, check left
-                    stickyCheck_1 = new boxCollider(target.collisionBox.x - checkDistance, target.collisionBox.y, checkDistance, target.collisionBox.height);
-                }
-                else {
-                    //Moving left, check right
-                    stickyCheck_1 = new boxCollider(target.collisionBox.x - target.collisionBox.width, target.collisionBox.y, checkDistance, target.collisionBox.height);
-                }
+            var stickyCheck = boxCollider.copy(target.collisionBox);
+            var checkDistance = Math.abs(magnitude) + 2;
+            if (target.stickyLeftSide) {
+                stickyCheck.expandLeftSide(checkDistance);
+            }
+            if (target.stickyRightSide) {
+                stickyCheck.expandRightSide(checkDistance);
+            }
+            if (target.stickyLeftSide || target.stickyRightSide) {
                 objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
                     if (sign > 0) {
                         //Moving right
-                        if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                        if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
                             testCollisionWith.g.x = target.g.x - testCollisionWith.collisionBox.x - testCollisionWith.collisionBox.width;
                         }
                     }
                     else {
                         //Moving left
-                        if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                        if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
                             testCollisionWith.g.x = target.g.x + target.collisionBox.x + target.collisionBox.width - testCollisionWith.collisionBox.x;
                         }
                     }
@@ -477,7 +541,7 @@
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
-            for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
+            var _loop_2 = function (i) {
                 target.g.y += iteretorSize * sign;
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
@@ -497,8 +561,42 @@
                         }
                         return false;
                     });
+                    var stickyCheck_2 = boxCollider.copy(target.collisionBox);
+                    var checkDistance_2 = Math.abs(magnitude) + 2;
+                    //Sticky draging
+                    if (target.stickyLeftSide) {
+                        stickyCheck_2.expandLeftSide(checkDistance_2);
+                    }
+                    if (target.stickyRightSide) {
+                        stickyCheck_2.expandRightSide(checkDistance_2);
+                    }
+                    if (target.stickyLeftSide || target.stickyRightSide) {
+                        objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                            if (sign > 0) {
+                                //Move down
+                                if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                                    if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
+                                        objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                        testCollisionWith.g.y += iteretorSize * sign;
+                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                    }
+                                }
+                            }
+                            else {
+                                //Move up
+                                if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                                    if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
+                                        objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                        testCollisionWith.g.y += iteretorSize * sign;
+                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                    }
+                                }
+                            }
+                            return false;
+                        });
+                    }
                 }
-                var collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                var collisionTarget = this_2.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
                     target.g.y += iteretorSize * sign;
@@ -520,31 +618,35 @@
                     //target.gravity.Dy = 0;
                     //target.force.Dy *= collisionTarget.friction;
                     target.force.Dx *= collisionTarget.friction;
-                    break;
+                    return "break";
                 }
+            };
+            var this_2 = this;
+            for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
+                var state_2 = _loop_2();
+                if (state_2 === "break")
+                    break;
+            }
+            var stickyCheck = boxCollider.copy(target.collisionBox);
+            var checkDistance = Math.abs(magnitude) + 2;
+            if (target.stickyTop) {
+                stickyCheck.expandTop(checkDistance);
+            }
+            if (target.stickyBottom) {
+                stickyCheck.expandBottom(checkDistance);
             }
             //Sticky draging
-            if (target.stickyness > 0) {
-                var checkDistance = Math.abs(magnitude) + 2;
-                var stickyCheck_2;
-                if (sign > 0) {
-                    //Moving down, check up
-                    stickyCheck_2 = new boxCollider(target.collisionBox.x + 1, target.collisionBox.y - checkDistance, target.collisionBox.width - 2, checkDistance);
-                }
-                else {
-                    //Moving up, check down
-                    stickyCheck_2 = new boxCollider(target.collisionBox.x + 1, target.collisionBox.y + target.collisionBox.height, target.collisionBox.width - 2, checkDistance);
-                }
+            if (target.stickyTop || target.stickyBottom) {
                 objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
                     if (sign > 0) {
                         //Moving down
-                        if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                        if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
                             testCollisionWith.g.y = target.g.y - testCollisionWith.collisionBox.y - testCollisionWith.collisionBox.height;
                         }
                     }
                     else {
                         //Moving up
-                        if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                        if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
                             testCollisionWith.g.y = target.g.y + target.collisionBox.y + target.collisionBox.height - testCollisionWith.collisionBox.y;
                         }
                     }
@@ -588,7 +690,10 @@
         function nulliObject(xp, yp) {
             this.friction = 0;
             this.airFriction = 0;
-            this.stickyness = 0;
+            this.stickyBottom = false;
+            this.stickyTop = false;
+            this.stickyLeftSide = false;
+            this.stickyRightSide = false;
             this.gravity = new vector(0, 0);
             this.weight = 0;
             this.ID = "";
@@ -598,6 +703,7 @@
             this._objectName = "nulliObject";
             this.collisionTargets = [];
             this.force = new vector(0, 0);
+            this._hasBeenMoved_Tick = 0;
             this.objectName = "";
             this.collisionBox = new boxCollider(0, 0, 0, 0);
             this.x = 0;
@@ -647,9 +753,13 @@
             this._g = new PIXI.Graphics();
             this.friction = 0.5;
             this.airFriction = 0.8;
-            this.stickyness = 0.0;
+            this.stickyBottom = false;
+            this.stickyTop = false;
+            this.stickyLeftSide = false;
+            this.stickyRightSide = false;
             this.gravity = vector.null;
             this.weight = 0.4;
+            this._hasBeenMoved_Tick = 0;
             this._collisionBox = new boxCollider(0, 0, 0, 0);
             this._spriteSheet = null;
             this._objectName = "iObject";
@@ -711,8 +821,12 @@
                     if (objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] == null) {
                         objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] = new Array();
                     }
-                    objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].push(this.objectName);
-                    this.collisionTargets.push(collNames[i]);
+                    if (objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1) {
+                        objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].push(this.objectName);
+                    }
+                    if (this.collisionTargets.indexOf(collNames[i]) == -1) {
+                        this.collisionTargets.push(collNames[i]);
+                    }
                 }
             }
         };
@@ -826,6 +940,7 @@
             var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
             _this.switch = false;
             _this.friction = 0.873;
+            _this.stickyTop = true;
             _super.prototype.setCollision.call(_this, 0, 0, 16, 16);
             _super.prototype.style.call(_this, function (g) {
                 g.beginFill(0x000000);
@@ -839,12 +954,12 @@
             _super.prototype.logic.call(this, l);
             //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
             if (this.switch) {
-                _super.prototype.setNewForce.call(this, 1, 0);
+                _super.prototype.setNewForce.call(this, 2, 0);
             }
             else {
-                _super.prototype.setNewForce.call(this, -1, 0);
+                _super.prototype.setNewForce.call(this, -2, 0);
             }
-            if (l.getTicks() % 20 == 0) {
+            if (roomEvent.getTicks() % 20 == 0) {
                 this.switch = !this.switch;
             }
         };
@@ -858,7 +973,7 @@
             var _this = _super.call(this, xp, yp, movingBlockVert.objectName) || this;
             _this.switch = false;
             _this.friction = 0.873;
-            _this.stickyness = 1;
+            _this.stickyTop = true;
             _super.prototype.setCollision.call(_this, 0, 0, 16, 16);
             _super.prototype.style.call(_this, function (g) {
                 g.beginFill(0x000000);
@@ -876,7 +991,7 @@
             else {
                 _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
             }
-            if (l.getTicks() % 55 == 0) {
+            if (roomEvent.getTicks() % 55 == 0) {
                 this.switch = !this.switch;
             }
         };
@@ -1069,7 +1184,7 @@
         return objectGenerator;
     }());
 
-    var room1 = "NobwRAHmBcDMBMAaMBPGDkHsBGArApgMYAuAwgDYCGAztQHKUC2+MYjmAbgJYB2A5gCFymQgGsAavgBOxMAF9E4KHCSoYAFgAcWPETJVaDZq3bd+QkROmyFS9KrTQAbOp0ESFGvSYtobTryCwmKSMvKKkPbIjpoADG56noY+JgHmwVZhtpEq0TAAnE4JHgbexn6mgRYh1uF2uWrQAIxNqjju+l5Gvv5mQZahNhHKGI2t2mDtiaXdqX3VmUP1o45N6q6TuiVdKRVp-TVZw1FjTvGbHUllPZXpA7XZylp5zWfFncnlvVUZg3U5LheTTeF2mOy+twOi3+yjiQJBU22nxu+wWf0eBSKp3OiI+1zmP3uR3qLQcMGBOK2eNme3mvwex2a8AmqwRVKuNO+d0OSxyaw2rMplxmuy5UPRjOejVGuI5oshaIZ9UB0ra7JFENR9OJOThqvecs1dKJvOUhReMvV4JRxp5MPJrQtauF1oJ3OhGOcApgKtlGpthLtnpVMSFYORbvFSt150cvqtEdpgY9jJDDud4fxSfdEuV3qZEz9ruzUZ1sNj5OZBv9kcVZfJIMF1eLYrrpvJAHYsU3QUis63te3ml2getm4mByb7cPu5XCwn+wrB9OmiOxo7e9T5Vqp57V7PoObN4aAzno8p9y89UWJ0vd4zL414y7bzugw+144pTfF2+UyTPxOH9OTvd8SUbICFxAv9cz5Md9WPGsSzbFcqwQ4Dt1tf8+TQuMNgwo1k1gi94Lw8dfyw4jyVImBrygzCiPPOcgTQgjT1LId+RY+cXwoxj62aGjmg3Nja2XT0j1WET6IhLhMHkABdIA";
+    var room1 = "NobwRAHmBcCMsCYA0YCeMAsAOFB7ARgFYCmAxgC4DCANgIYDO9AcrQLbExisCWuYAvknBQ4iFOmgA2DHiJkqdRi3adWuAG7cAdgHMAQtVykA1gAlcAJ24CAukA";
 
     var objectContainer = /** @class */ (function () {
         function objectContainer() {
@@ -1141,6 +1256,8 @@
             var _this = this;
             this.generateObjects = new objectGenerator();
             this.targetFps = 30;
+            this.fpsLimiter = 0;
+            this.frameDelay = 0;
             this.app = new PIXI$1.Application();
             this.objContainer = new objectContainer();
             gameProperties.applySettings(this.app);
@@ -1149,10 +1266,16 @@
             //this.graphicsModule = new graphics(this.canvasContext);
             this.logicModule = new roomEvent(this.gameContainerElement, this.objContainer);
             this.app.ticker.add(function () {
-                _this.logicModule.tick();
-                _this.logicModule.queryKey();
-                _this.objContainer.loopThrough(_this.logicModule);
-                _this.objContainer.purgeObjects();
+                if (_this.fpsLimiter == 0) {
+                    roomEvent.tick();
+                    _this.logicModule.queryKey();
+                    _this.objContainer.loopThrough(_this.logicModule);
+                    _this.objContainer.purgeObjects();
+                    _this.fpsLimiter = _this.frameDelay;
+                }
+                if (_this.fpsLimiter > 0) {
+                    _this.fpsLimiter--;
+                }
             });
             this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(room1)));
             //this.loadRoom(JSON.parse(LZString.decompressFromUTF16(room1)));

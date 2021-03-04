@@ -23,7 +23,7 @@ export class roomEvent {
     private gameKeysReleased: Record<string, boolean> = {};
     private gameKeysHeld: Record<string, boolean> = {};
 
-    private ticks: number = 0;
+    private static ticks: number = 0;
 
     constructor(con: HTMLElement, objContainer: objectContainer){
         this.objContainer = objContainer;
@@ -36,14 +36,14 @@ export class roomEvent {
         document.addEventListener("keyup", this.keyUpListener.bind(this), false);
     }
 
-    tick(){
-        if(this.ticks >= Number.MAX_VALUE){
-            this.ticks = 0;
+    static tick(){
+        if(roomEvent.ticks >= Number.MAX_VALUE){
+            roomEvent.ticks = 0;
         }
-        this.ticks++;
+        roomEvent.ticks++;
     }
 
-    getTicks(){
+    static getTicks(){
         return this.ticks;
     }
 

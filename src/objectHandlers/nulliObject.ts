@@ -9,7 +9,10 @@ export class nulliObject implements iObject{
     static objectName = "nulliObject";
     friction: number = 0;
     airFriction: number = 0;
-    stickyness: number = 0;
+    stickyBottom: boolean = false;
+    stickyTop: boolean = false;
+    stickyLeftSide: boolean = false;
+    stickyRightSide: boolean = false;
     gravity: vector = new vector(0, 0);
     weight: number = 0;
     ID: string = "";
@@ -19,6 +22,7 @@ export class nulliObject implements iObject{
     _objectName: string = "nulliObject";
     collisionTargets: string[] = [];
     force: vector = new vector(0, 0);
+    _hasBeenMoved_Tick: number = 0;
 
     constructor(xp: number, yp: number) {
 

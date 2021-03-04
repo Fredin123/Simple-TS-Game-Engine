@@ -10,7 +10,7 @@ export class movingBlockVert extends objectBase{
     switch: boolean = false;
     static objectName = "movingBlockVert";
     friction = 0.873;
-    stickyness: number = 1;
+    stickyTop: boolean = true;
 
     constructor(xp: number, yp: number) {
         super(xp, yp, movingBlockVert.objectName);
@@ -34,7 +34,7 @@ export class movingBlockVert extends objectBase{
             super.setNewForceAngleMagnitude(calculations.degreesToRadians(270), 1);
         }
 
-        if(l.getTicks() % 55 == 0){
+        if(roomEvent.getTicks() % 55 == 0){
             this.switch = !this.switch;
         }
     };

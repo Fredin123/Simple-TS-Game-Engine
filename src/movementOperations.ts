@@ -7,6 +7,7 @@ import { iObject } from "./objectHandlers/iObject";
 import { objectBase } from "./objectHandlers/objectBase";
 import { objectContainer } from "./objectHandlers/objectContainer";
 import { movingBlockVert } from "./objects/blocks/movingBlockVert";
+import { roomEvent } from "./roomEvent";
 
 
 export class movementOperations{
@@ -55,13 +56,15 @@ export class movementOperations{
         let sign: number = magnitude>0?1:-1;
         let objectsThatWereCollidingThisObjectWhileMoving = new Array<iObject>();
 
+        
         for(let i=0; i<Math.abs(magnitude); i+=iteretorSize){
-            //target.collisionBox.shrink(0, 1);
+            objectsThatWereCollidingThisObjectWhileMoving.length = 0;
             
 
             target.g.x += iteretorSize*sign;
 
             if(objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null){
+                //Push object
                 objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], (testCollisionWith: iObject)=>{
                     if(sign > 0){
                         //Move right
@@ -79,7 +82,50 @@ export class movementOperations{
                     
                     return false;
                 });
+
+
+                //Sticky draging
+                let stickyCheck: boxCollider = boxCollider.copy(target.collisionBox);
+                let checkDistance = Math.abs(magnitude) + 2;
+                if(target.stickyTop){
+                    stickyCheck.expandTop(checkDistance);
+                }
+                if(target.stickyBottom){
+                    stickyCheck.expandBottom(checkDistance);
+                }
+                if(target.stickyTop || target.stickyBottom){
+                    //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
+                    objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], (testCollisionWith: iObject)=>{
+                        //console.log("Check object: ", testCollisionWith);
+                        if(sign > 0){
+                            //Move right
+                            if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
+                                if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.x += iteretorSize*sign;
+                                    if(i >= Math.abs(magnitude)-iteretorSize){
+                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                    }
+                                }
+                            }
+                        }else{
+                            //Move left
+                            if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
+                                if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.x += iteretorSize*sign;
+                                    if(i >= Math.abs(magnitude)-iteretorSize){
+                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                    }
+                                }
+                            }
+                        }
+                        return false;
+                    });
+                }
+
             }
+            
             
 
             let collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
@@ -114,18 +160,19 @@ export class movementOperations{
         }
 
 
+
         //Sticky draging
-        if(target.stickyness > 0){
-            let checkDistance = Math.abs(magnitude) + 2;
-            let stickyCheck: boxCollider;
-            
-            if(sign > 0){
-                //Moving right, check left
-                stickyCheck = new boxCollider(target.collisionBox.x-checkDistance, target.collisionBox.y, checkDistance, target.collisionBox.height);
-            }else{
-                //Moving left, check right
-                stickyCheck = new boxCollider(target.collisionBox.x-target.collisionBox.width, target.collisionBox.y, checkDistance, target.collisionBox.height);
-            }
+        let stickyCheck: boxCollider = boxCollider.copy(target.collisionBox);
+        let checkDistance = Math.abs(magnitude) + 2;
+        
+        if(target.stickyLeftSide){
+            stickyCheck.expandLeftSide(checkDistance);
+        }
+        if(target.stickyRightSide){
+            stickyCheck.expandRightSide(checkDistance);
+        }
+
+        if(target.stickyLeftSide || target.stickyRightSide){
             
             objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], (testCollisionWith: iObject)=>{
                 if(sign > 0){
@@ -133,7 +180,6 @@ export class movementOperations{
                     if(testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x+target.collisionBox.width && internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
                         testCollisionWith.g.x = target.g.x-testCollisionWith.collisionBox.x-testCollisionWith.collisionBox.width;
                     }
-                    
                 }else{
                     //Moving left
                     if(testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
@@ -177,6 +223,50 @@ export class movementOperations{
                     
                     return false;
                 });
+
+
+                //Sticky draging
+                let stickyCheck: boxCollider = boxCollider.copy(target.collisionBox);
+                let checkDistance = Math.abs(magnitude) + 2;
+                if(target.stickyLeftSide){
+                    stickyCheck.expandLeftSide(checkDistance);
+                }
+                if(target.stickyRightSide){
+                    stickyCheck.expandRightSide(checkDistance);
+                }
+                if(target.stickyLeftSide || target.stickyRightSide){
+                    //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
+                    objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], (testCollisionWith: iObject)=>{
+                        //console.log("Check object: ", testCollisionWith);
+                        if(sign > 0){
+                            //Move down
+                            if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
+                                if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.y += iteretorSize*sign;
+                                    if(i >= Math.abs(magnitude)-iteretorSize){
+                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                    }
+                                }
+                            }
+                        }else{
+                            //Move up
+                            if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
+                                if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.y += iteretorSize*sign;
+                                    if(i >= Math.abs(magnitude)-iteretorSize){
+                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                    }
+                                }
+                            }
+                        }
+                        return false;
+                    });
+                }
+
+
+
             }
 
 
@@ -212,19 +302,18 @@ export class movementOperations{
 
 
 
+        let stickyCheck: boxCollider = boxCollider.copy(target.collisionBox);
+        let checkDistance = Math.abs(magnitude) + 2;
+        if(target.stickyTop){
+            stickyCheck.expandTop(checkDistance);
+        }
+        if(target.stickyBottom){
+            stickyCheck.expandBottom(checkDistance);
+        }
+
+
         //Sticky draging
-        if(target.stickyness > 0){
-            let checkDistance = Math.abs(magnitude) + 2;
-            let stickyCheck: boxCollider;
-            
-            if(sign > 0){
-                //Moving down, check up
-                stickyCheck = new boxCollider(target.collisionBox.x+1, target.collisionBox.y-checkDistance, target.collisionBox.width-2, checkDistance);
-            }else{
-                //Moving up, check down
-                stickyCheck = new boxCollider(target.collisionBox.x+1, target.collisionBox.y+target.collisionBox.height, target.collisionBox.width-2, checkDistance);
-            }
-            
+        if(target.stickyTop || target.stickyBottom){
             objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], (testCollisionWith: iObject)=>{
                 if(sign > 0){
                     //Moving down

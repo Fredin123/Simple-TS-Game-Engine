@@ -17,10 +17,15 @@ export class objectBase implements iObject{
     private _g: PIXI.Graphics = new PIXI.Graphics();
     friction: number = 0.5;
     airFriction: number = 0.8;
-    stickyness: number = 0.0;
+
+    stickyBottom: boolean = false;
+    stickyTop: boolean = false;
+    stickyLeftSide: boolean = false;
+    stickyRightSide: boolean = false;
+
     gravity: iVector = vector.null;
     weight: number = 0.4;
-
+    _hasBeenMoved_Tick: number = 0;
 
     static objectsThatCollideWithKeyObjectName: {[key: string]: Array<string>} = {};
 
@@ -62,9 +67,14 @@ export class objectBase implements iObject{
                 if(objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] == null){
                     objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] = new Array<string>();
                 }
-                objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].push(this.objectName);
+                if(objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1){
+                    objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].push(this.objectName);
+                }
 
-                this.collisionTargets.push(collNames[i]);
+                if(this.collisionTargets.indexOf(collNames[i]) == -1){
+                    this.collisionTargets.push(collNames[i]);
+                }
+                
             }
         }
     }

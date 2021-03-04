@@ -18,11 +18,15 @@ export interface iObject{
     collisionTargets: Array<string>;
     force: iVector;
     friction: number;
-    stickyness: number;
+    stickyBottom: boolean;
+    stickyTop: boolean;
+    stickyLeftSide: boolean;
+    stickyRightSide: boolean;
     airFriction: number;
     gravity: iVector;
     weight: number;
 
+    _hasBeenMoved_Tick : number;
 
 
     addCollisionTarget(...collNames:string[]): void;

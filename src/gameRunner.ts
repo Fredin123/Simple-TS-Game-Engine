@@ -18,7 +18,8 @@ export class gameRunner {
     objContainer: objectContainer;
     generateObjects: objectGenerator = new objectGenerator();
     readonly targetFps: number = 30;
-    
+    fpsLimiter: number = 0;
+    frameDelay: number = 0;
 
     constructor(gameContainer: string, gameProperties: gameSettings, app: PIXI.Application){
         this.app = new PIXI.Application();
@@ -31,10 +32,17 @@ export class gameRunner {
         this.logicModule = new roomEvent(this.gameContainerElement, this.objContainer);
 
         this.app.ticker.add(() => {
-            this.logicModule.tick();
-            this.logicModule.queryKey();
-            this.objContainer.loopThrough(this.logicModule);
-            this.objContainer.purgeObjects();
+            if(this.fpsLimiter == 0){
+                roomEvent.tick();
+                this.logicModule.queryKey();
+                this.objContainer.loopThrough(this.logicModule);
+                this.objContainer.purgeObjects();
+                this.fpsLimiter = this.frameDelay;
+            }
+            if(this.fpsLimiter > 0){
+                this.fpsLimiter--;
+            }
+            
         });
 
         this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(room1)));

@@ -10,6 +10,7 @@ export class movingBlockHori extends objectBase{
     switch: boolean = false;
     static objectName = "movingBlockHori";
     friction = 0.873;
+    stickyTop: boolean = true;
 
     constructor(xp: number, yp: number) {
         super(xp, yp, movingBlockHori.objectName);
@@ -29,13 +30,13 @@ export class movingBlockHori extends objectBase{
         super.logic(l);
         //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
         if(this.switch){
-            super.setNewForce(1, 0);
+            super.setNewForce(2, 0);
         }else{
-            super.setNewForce(-1, 0);
+            super.setNewForce(-2, 0);
         }
 
 
-        if(l.getTicks() % 20 == 0){
+        if(roomEvent.getTicks() % 20 == 0){
             this.switch = !this.switch;
         }
     };
