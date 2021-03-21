@@ -6,11 +6,7 @@ Currently the projects exists of two parts:
 The engine and the room creator.
 
 They are built with:
-Engine:
     npm run build
-
-Room creator:
-    npm run build-tools
 
 To serve the project you run the nodejs server using:
     node simpleServer.js
