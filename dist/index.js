@@ -44,6 +44,10 @@
             this.gameKeysPressed = {};
             this.gameKeysReleased = {};
             this.gameKeysHeld = {};
+            this.deltaTime = 1;
+            this.useCamera = false;
+            this.cameraX = 0;
+            this.cameraY = 0;
             this.objContainer = objContainer;
             this.container = con;
             this.keysDown = {};
@@ -148,6 +152,77 @@
         };
         roomEvent.ticks = 0;
         return roomEvent;
+    }());
+
+    var tools = /** @class */ (function () {
+        function tools() {
+        }
+        /*download(filename: string, text:string) {
+            var element = document.createElement('a');
+            console.log(text)
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
+            element.setAttribute('download', filename);
+          
+            element.style.display = 'none';
+            document.body.appendChild(element);
+          
+            element.click();
+          
+            document.body.removeChild(element);
+        }*/
+        tools.download = function (filename, text, type) {
+            if (type === void 0) { type = "text/plain"; }
+            // Create an invisible A element
+            var a = document.createElement("a");
+            a.style.display = "none";
+            document.body.appendChild(a);
+            // Set the HREF to a Blob representation of the data to be downloaded
+            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
+            // Use download attribute to set set desired file name
+            a.setAttribute("download", filename);
+            // Trigger the download by simulating click
+            a.click();
+            // Cleanup
+            window.URL.revokeObjectURL(a.href);
+            document.body.removeChild(a);
+        };
+        tools.upload = function (callback) {
+            var _this = this;
+            var element = document.createElement("input");
+            element.type = "file";
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.onchange = function (e) {
+                _this.uploadOnChange(e, callback);
+            };
+            element.click();
+        };
+        tools.getClassNameFromConstructorName = function (constructorName) {
+            var funcNameOnly = constructorName.replace("function ", "");
+            var paramsStartIndex = funcNameOnly.indexOf("(");
+            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
+            return funcNameOnly;
+        };
+        tools.functionName = function (func) {
+            console.log(func.toString());
+            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
+            return result ? result[1] : ''; // for an anonymous function there won't be a match
+        };
+        tools.uploadOnChange = function (e, callback) {
+            var ev = e;
+            console.log(ev.target.files);
+            var reader = new FileReader();
+            reader.readAsText(ev.target.files[0], "UTF-8");
+            reader.onload = function (evt) {
+                var _a, _b;
+                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
+                callback(LZString.decompressFromEncodedURIComponent(t));
+            };
+            reader.onerror = function (evt) {
+                alert("Could not read file");
+            };
+        };
+        return tools;
     }());
 
     /*! *****************************************************************************
@@ -387,7 +462,9 @@
     var movementOperations = /** @class */ (function () {
         function movementOperations() {
         }
-        movementOperations.moveByForce = function (target, force, collisionNames, objContainer) {
+        movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
+            force.Dx = force.Dx * deltaTime;
+            force.Dy = force.Dy * deltaTime;
             if (Math.abs(force.Dx) <= 0.000000001) {
                 force.Dx = 0;
             }
@@ -415,9 +492,7 @@
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
-            console.log("Start itteration");
             var _loop_1 = function (i) {
-                console.log("i = ", i);
                 objectsThatWereCollidingThisObjectWhileMoving.length = 0;
                 target.g.x += iteretorSize * sign;
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
@@ -561,9 +636,9 @@
                         }
                         return false;
                     });
+                    //Sticky draging
                     var stickyCheck_2 = boxCollider.copy(target.collisionBox);
                     var checkDistance_2 = Math.abs(magnitude) + 2;
-                    //Sticky draging
                     if (target.stickyLeftSide) {
                         stickyCheck_2.expandLeftSide(checkDistance_2);
                     }
@@ -571,14 +646,18 @@
                         stickyCheck_2.expandRightSide(checkDistance_2);
                     }
                     if (target.stickyLeftSide || target.stickyRightSide) {
+                        //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                         objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                            //console.log("Check object: ", testCollisionWith);
                             if (sign > 0) {
                                 //Move down
                                 if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                         testCollisionWith.g.y += iteretorSize * sign;
-                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                            testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                        }
                                     }
                                 }
                             }
@@ -588,7 +667,9 @@
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                         testCollisionWith.g.y += iteretorSize * sign;
-                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                            testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                        }
                                     }
                                 }
                             }
@@ -623,7 +704,7 @@
             };
             var this_2 = this;
             for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
-                var state_2 = _loop_2();
+                var state_2 = _loop_2(i);
                 if (state_2 === "break")
                     break;
             }
@@ -699,7 +780,7 @@
             this.ID = "";
             this.g = new PIXI.Graphics();
             this._collisionBox = new boxCollider(0, 0, 0, 0);
-            this.spriteSheet = null;
+            this.resourcesNeeded = [];
             this._objectName = "nulliObject";
             this.collisionTargets = [];
             this.force = new vector(0, 0);
@@ -750,9 +831,10 @@
     var objectBase = /** @class */ (function () {
         function objectBase(x, y, childObjectName) {
             this.ID = uidGen.new();
-            this._g = new PIXI.Graphics();
+            this._g = new PIXI.Container();
             this.friction = 0.5;
             this.airFriction = 0.8;
+            this.resourcesNeeded = [];
             this.stickyBottom = false;
             this.stickyTop = false;
             this.stickyLeftSide = false;
@@ -761,7 +843,6 @@
             this.weight = 0.4;
             this._hasBeenMoved_Tick = 0;
             this._collisionBox = new boxCollider(0, 0, 0, 0);
-            this._spriteSheet = null;
             this._objectName = "iObject";
             this._collisionTargets = [];
             this._force = new vector(0, 0);
@@ -779,13 +860,6 @@
         Object.defineProperty(objectBase.prototype, "collisionBox", {
             get: function () {
                 return this._collisionBox;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        Object.defineProperty(objectBase.prototype, "spriteSheet", {
-            get: function () {
-                return this._spriteSheet;
             },
             enumerable: false,
             configurable: true
@@ -841,7 +915,7 @@
             this.collisionTargets.length = 0;
         };
         objectBase.prototype.style = function (newGraphics) {
-            var tempG = newGraphics(new PIXI.Graphics());
+            var tempG = newGraphics(new PIXI.Container());
             var oldX = this.g.x;
             var oldY = this.g.y;
             this._g = tempG;
@@ -849,7 +923,7 @@
             this._g.y = oldY;
         };
         objectBase.prototype.logic = function (l) {
-            movementOperations.moveByForce(this, this._force, this.collisionTargets, l.objContainer);
+            movementOperations.moveByForce(this, this._force, this.collisionTargets, l.objContainer, l.deltaTime);
         };
         objectBase.prototype.setCollision = function (xs, ys, width, height) {
             this.collisionBox.x = xs;
@@ -910,11 +984,13 @@
             var _this = _super.call(this, xp, yp, block.objectName) || this;
             _this.switch = false;
             _this.friction = 0.973;
-            _super.prototype.setCollision.call(_this, 0, 0, 16, 16);
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
             _super.prototype.style.call(_this, function (g) {
-                g.beginFill(0x000000);
-                g.drawRect(0, 0, 16, 16);
-                g.endFill();
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
                 return g;
             });
             return _this;
@@ -941,11 +1017,13 @@
             _this.switch = false;
             _this.friction = 0.873;
             _this.stickyTop = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 16, 16);
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
             _super.prototype.style.call(_this, function (g) {
-                g.beginFill(0x000000);
-                g.drawRect(0, 0, 16, 16);
-                g.endFill();
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
                 return g;
             });
             return _this;
@@ -974,11 +1052,13 @@
             _this.switch = false;
             _this.friction = 0.873;
             _this.stickyTop = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 16, 16);
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
             _super.prototype.style.call(_this, function (g) {
-                g.beginFill(0x000000);
-                g.drawRect(0, 0, 16, 16);
-                g.endFill();
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
                 return g;
             });
             return _this;
@@ -997,6 +1077,43 @@
         };
         movingBlockVert.objectName = "movingBlockVert";
         return movingBlockVert;
+    }(objectBase));
+
+    var marker = /** @class */ (function (_super) {
+        __extends(marker, _super);
+        function marker(xp, yp) {
+            var _this = _super.call(this, xp, yp, marker.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0xFF3e50);
+                newGraphics.drawRect(0, 0, 16, 16);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        marker.prototype.logic = function (l) {
+            this.life--;
+            if (this.life <= 0) {
+                l.objContainer.deleteObject(this);
+            }
+            //super.logic(l);
+            /*if(this.switch){
+                super.setNewForce(l.degreesToRadians(0), 3);
+            }else{
+                super.setNewForce(l.degreesToRadians(180), 3);
+            }*/
+        };
+        marker.objectName = "marker";
+        return marker;
     }(objectBase));
 
     var vectorFixedDelta = /** @class */ (function () {
@@ -1033,6 +1150,87 @@
         return vectorFixedDelta;
     }());
 
+    var resources = /** @class */ (function () {
+        function resources(app, onCompleteCallback, alternativePath) {
+            if (alternativePath === void 0) { alternativePath = ""; }
+            this.objectGen = new objectGenerator();
+            resources.app = app;
+            fetch(alternativePath + '/resources.txt', {
+                method: 'get'
+            })
+                .then(function (response) { return response.text(); })
+                .then(function (textData) { return resources.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
+                .catch(function (err) {
+                console.log(err);
+            });
+        }
+        resources.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
+            for (var _i = 0, loadedResources_1 = loadedResources; _i < loadedResources_1.length; _i++) {
+                var resource = loadedResources_1[_i];
+                //resource = alternativePath += resource;
+                console.log(resource);
+            }
+            resources.resourcesToLoad = loadedResources;
+            resources.resourcesToLoad.forEach(function (resourceDir) {
+                var resourceDirsSplit = resourceDir.split("/");
+                var resourceName = resourceDirsSplit[resourceDirsSplit.length - 1];
+                resources.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
+            });
+            resources.app.loader.load(function (e) {
+                resources.resourcesToLoad.forEach(function (resource) {
+                    var split = resource.split("/");
+                    var name = split[split.length - 1];
+                    if (name.indexOf(".json") != -1) {
+                        resources.storeAnimatedArray(name);
+                    }
+                });
+                onCompleteCallback();
+            });
+        };
+        resources.storeAnimatedArray = function (resourceName) {
+            var texturesTmp = resources.app.loader.resources[resourceName].textures;
+            if (resources.app.loader.resources[resourceName].textures != null) {
+                for (var key in texturesTmp) {
+                    if (texturesTmp.hasOwnProperty(key)) {
+                        if (resources.animatedSprite[resourceName] == null) {
+                            resources.animatedSprite[resourceName] = [];
+                        }
+                        resources.animatedSprite[resourceName].push(texturesTmp[key]);
+                    }
+                }
+            }
+            //const animeFromSheet = new PIXI.AnimatedSprite(animation);
+        };
+        resources.getAnimatedSprite = function (name) {
+            if (name.indexOf(".") != -1) {
+                name = name.split(".")[0];
+            }
+            name += ".json";
+            console.log("Name: ", name);
+            if (resources.animatedSprite[name] != null) {
+                return new PIXI.AnimatedSprite(resources.animatedSprite[name]);
+            }
+            return null;
+        };
+        resources.resourcePNG = function (resourceName) {
+            for (var _i = 0, _a = resources.resourcesToLoad; _i < _a.length; _i++) {
+                var resourceDir = _a[_i];
+                var splitDirs = resourceDir.split("/");
+                var nameAndMeta = splitDirs[splitDirs.length - 1];
+                if (nameAndMeta.toLocaleLowerCase().indexOf(".png") != -1) {
+                    nameAndMeta.split(".")[0];
+                    if (nameAndMeta == resourceName + ".png") {
+                        return resources.app.loader.resources[nameAndMeta].texture;
+                    }
+                }
+            }
+            throw new Error("PNG resource does not exist: " + resourceName);
+        };
+        resources.resourcesToLoad = [];
+        resources.animatedSprite = {};
+        return resources;
+    }());
+
     var mio = /** @class */ (function (_super) {
         __extends(mio, _super);
         function mio(xp, yp) {
@@ -1041,34 +1239,28 @@
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
             _this.weight = 0.03;
             _this.maxRunSpeed = 2;
-            _super.prototype.setCollision.call(_this, 0, 0, 16, 16);
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
             _super.prototype.style.call(_this, function (g) {
-                g.beginFill(0xFF3e50);
-                g.drawRect(0, 0, 16, 16);
-                g.endFill();
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0xFF3e50);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                var animation = resources.getAnimatedSprite("playerWalk");
+                if (animation != null) {
+                    animation.animationSpeed = 0.1;
+                    animation.play();
+                    g.addChild(animation);
+                }
+                g.filters = [];
+                g.calculateBounds();
                 return g;
             });
             _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName);
             return _this;
-            //this.spriteSheet = new resourceMeta("player.jpg", 16, 16);
         }
         mio.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
-            //logger.showMessage(JSON.stringify(this.gravity));
-            /*let angleToMouse = l.b.angleBetweenPoints(this.y - l.mouseY()+8, this.x - l.mouseX()+8);
-            
-            let distanceToMouse = l.b.distanceBetweenPoints(this.x, this.y, l.mouseX()+8, l.mouseY()+8);
-            let speed = distanceToMouse*0.08;
-            if(speed > 23){
-                speed = 23;
-            }*/
-            /*if(speed<1 && distanceToMouse > 1){
-                speed = 1;
-            }*/
-            //this.updatePosition();
-            //this.position = new vector(angleToMouse, speed);
-            //l.moveByForce(this, this.movement, block.objectName);
-            //super.setNewForceAngleMagnitude(angleToMouse, speed);
             if (l.checkKeyHeld("a")) {
                 _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 0.8);
             }
@@ -1079,91 +1271,24 @@
                 _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 12);
             }
             this.force.limitHorizontalMagnitude(this.maxRunSpeed);
+            l.useCamera = true;
+            l.cameraX = this.g.x;
+            l.cameraY = this.g.y;
         };
         mio.objectName = "mio";
         return mio;
     }(objectBase));
 
-    var tools = /** @class */ (function () {
-        function tools() {
-        }
-        /*download(filename: string, text:string) {
-            var element = document.createElement('a');
-            console.log(text)
-            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
-            element.setAttribute('download', filename);
-          
-            element.style.display = 'none';
-            document.body.appendChild(element);
-          
-            element.click();
-          
-            document.body.removeChild(element);
-        }*/
-        tools.download = function (filename, text, type) {
-            if (type === void 0) { type = "text/plain"; }
-            // Create an invisible A element
-            var a = document.createElement("a");
-            a.style.display = "none";
-            document.body.appendChild(a);
-            // Set the HREF to a Blob representation of the data to be downloaded
-            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
-            // Use download attribute to set set desired file name
-            a.setAttribute("download", filename);
-            // Trigger the download by simulating click
-            a.click();
-            // Cleanup
-            window.URL.revokeObjectURL(a.href);
-            document.body.removeChild(a);
-        };
-        tools.upload = function (callback) {
-            var _this = this;
-            var element = document.createElement("input");
-            element.type = "file";
-            element.style.display = "none";
-            document.body.appendChild(element);
-            element.onchange = function (e) {
-                _this.uploadOnChange(e, callback);
-            };
-            element.click();
-        };
-        tools.getClassNameFromConstructorName = function (constructorName) {
-            var funcNameOnly = constructorName.replace("function ", "");
-            var paramsStartIndex = funcNameOnly.indexOf("(");
-            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
-            return funcNameOnly;
-        };
-        tools.functionName = function (func) {
-            console.log(func.toString());
-            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
-            return result ? result[1] : ''; // for an anonymous function there won't be a match
-        };
-        tools.uploadOnChange = function (e, callback) {
-            var ev = e;
-            console.log(ev.target.files);
-            var reader = new FileReader();
-            reader.readAsText(ev.target.files[0], "UTF-8");
-            reader.onload = function (evt) {
-                var _a, _b;
-                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
-                callback(LZString.decompressFromEncodedURIComponent(t));
-            };
-            reader.onerror = function (evt) {
-                alert("Could not read file");
-            };
-        };
-        return tools;
-    }());
-
+    //{NEW IMPORTS END HERE}
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
-                function (xp, yp) { return new mio(xp, yp); },
+                //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
                 function (xp, yp) { return new block(xp, yp); },
                 function (xp, yp) { return new movingBlockHori(xp, yp); },
-                function (xp, yp) { return new movingBlockVert(xp, yp); }
-                //new mio(0, 0),
-                //new block(0, 0)
+                function (xp, yp) { return new movingBlockVert(xp, yp); },
+                function (xp, yp) { return new marker(xp, yp); },
+                function (xp, yp) { return new mio(xp, yp); },
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
@@ -1183,8 +1308,6 @@
         };
         return objectGenerator;
     }());
-
-    var room1 = "NobwRAHmBcCMsCYA0YCeMAsAOFB7ARgFYCmAxgC4DCANgIYDO9AcrQLbExisCWuYAvknBQ4iFOmgA2DHiJkqdRi3adWuAG7cAdgHMAQtVykA1gAlcAJ24CAukA";
 
     var objectContainer = /** @class */ (function () {
         function objectContainer() {
@@ -1265,27 +1388,33 @@
             this.gameContainerElement.appendChild(this.app.view);
             //this.graphicsModule = new graphics(this.canvasContext);
             this.logicModule = new roomEvent(this.gameContainerElement, this.objContainer);
-            this.app.ticker.add(function () {
+            this.app.ticker.add(function (delta) {
                 if (_this.fpsLimiter == 0) {
+                    _this.logicModule.deltaTime = delta;
                     roomEvent.tick();
                     _this.logicModule.queryKey();
                     _this.objContainer.loopThrough(_this.logicModule);
                     _this.objContainer.purgeObjects();
                     _this.fpsLimiter = _this.frameDelay;
+                    if (_this.logicModule.useCamera) {
+                        _this.app.stage.pivot.x = _this.logicModule.cameraX;
+                        _this.app.stage.pivot.y = _this.logicModule.cameraY;
+                        _this.app.stage.position.x = _this.app.renderer.width / 2;
+                        _this.app.stage.position.y = _this.app.renderer.height / 2;
+                    }
                 }
                 if (_this.fpsLimiter > 0) {
                     _this.fpsLimiter--;
                 }
             });
-            this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(room1)));
+            //this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(room1)));
             //this.loadRoom(JSON.parse(LZString.decompressFromUTF16(room1)));
         }
         gameRunner.prototype.loadRoom = function (roomData) {
-            console.log("Import this data: ", roomData);
             this.objContainer.removeObjects();
             for (var i = 0; i < roomData.length; i++) {
                 var objDTO = roomData[i];
-                var genObj = this.generateObjects.generateObject(objDTO.objectClassName, objDTO.x, objDTO.y);
+                var genObj = this.generateObjects.generateObject(objDTO.name, objDTO.x, objDTO.y);
                 if (genObj != null) {
                     this.objContainer.addObject(genObj, 0);
                     this.app.stage.addChild(genObj.g);
@@ -1293,26 +1422,6 @@
             }
         };
         return gameRunner;
-    }());
-
-    var preloader = /** @class */ (function () {
-        function preloader(app) {
-            var _this = this;
-            this.objectGen = new objectGenerator();
-            this.app = app;
-            var allObjects = this.objectGen.getAvailibleObjects();
-            allObjects.forEach(function (objGen) {
-                var obj = objGen(0, 0);
-                var spriteSheet = obj.spriteSheet;
-                if (spriteSheet != null) {
-                    _this.app.loader.add(spriteSheet === null || spriteSheet === void 0 ? void 0 : spriteSheet.resourceName, "resources\\" + (spriteSheet === null || spriteSheet === void 0 ? void 0 : spriteSheet.resourceName));
-                }
-            });
-            this.app.loader.load(function (e) {
-                console.log("Done loading", e);
-            });
-        }
-        return preloader;
     }());
 
     var logger = /** @class */ (function () {
@@ -1368,7 +1477,7 @@
         };
         logger.initialized = false;
         logger.container = document.createElement("div");
-        logger.inputWaiter = -1;
+        logger.inputWaiter = null;
         logger.debugPresses = 0;
         logger.showDebugger = false;
         return logger;
@@ -1376,10 +1485,11 @@
 
     (function () {
         var app = new PIXI.Application();
-        new preloader(app);
         var gameProperties = new gameSettings();
         gameProperties.stretchToWindow = true;
-        new gameRunner("game", gameProperties, app);
+        new resources(app, function () {
+            new gameRunner("game", gameProperties, app);
+        });
         logger.initialize();
     })();
 

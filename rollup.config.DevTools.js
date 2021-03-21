@@ -3,9 +3,9 @@ import typescript from '@rollup/plugin-typescript';
 
 
 const config = {
-    input: './src/developerTools/index.ts',
+    input: './src/developerTools/src/index.ts',
     output: {
-      dir: 'dist/dev',
+      dir: 'src/developerTools/electronApp/',
       format: 'iife',
       globals:{
         "pixi.js": "PIXI"

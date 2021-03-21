@@ -1,22 +1,26 @@
-import { objectBase } from "./objectHandlers/objectBase";
+import { objectBase } from "./engine/objectHandlers/objectBase";
+import { tools } from "./engine/tools/tools";
+//{NEW IMPORTS START HERE}
 import { block } from "./objects/blocks/block";
 import { movingBlockHori } from "./objects/blocks/movingBlockHori";
 import { movingBlockVert } from "./objects/blocks/movingBlockVert";
+import { marker } from "./objects/marker";
 import { mio } from "./objects/mio";
-import { tools } from "./tools/tools";
+//{NEW IMPORTS END HERE}
 
-interface objectFuncStore{
-    ():objectBase;
-}
+
+
 
 export class objectGenerator{
     private availibleObjects: Array<(xp: number, yp: number) => objectBase> = [
-        (xp: number, yp: number)=>{return new mio(xp, yp);},
-        (xp: number, yp: number)=>{return new block(xp, yp);},
-        (xp: number, yp: number)=>{return new movingBlockHori(xp, yp);},
-        (xp: number, yp: number)=>{return new movingBlockVert(xp, yp);}
-        //new mio(0, 0),
-        //new block(0, 0)
+        //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+		(xp: number, yp: number)=>{return new block(xp, yp);},
+		(xp: number, yp: number)=>{return new movingBlockHori(xp, yp);},
+		(xp: number, yp: number)=>{return new movingBlockVert(xp, yp);},
+		(xp: number, yp: number)=>{return new marker(xp, yp);},
+		(xp: number, yp: number)=>{return new mio(xp, yp);},
+//{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+
     ];
 
     getAvailibleObjects(){

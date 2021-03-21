@@ -1,0 +1,363 @@
+
+
+/*Actual size*/
+.fileExplorerSize{
+	/*Change this to get a different size on the file system*/
+	width: 265px;
+	display:flex;
+	
+	min-width: 256px;
+	min-height: 132px;
+}
+
+/*Container of bottom part, root/all files and folders*/
+.fileExplorerItemContainer{
+	overflow-y: auto;
+	/*Change this if you don't want to be able to resize the file system*/
+	resize: both;
+}
+
+/*Background image for content*/
+.fileExplorerImage{
+	background-image:  url('data:image/png;base64,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');
+}
+
+/*The class applied to target element filesystem is created on.
+This is the "root" element of the file system elements*/
+.fileExplorerContainer{
+	border: solid 1px #A8ED77;
+	-webkit-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.08);
+	-moz-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.08);
+	box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.08);
+}
+
+/*Style for file/folder container*/
+.fileExplorerItem{
+	font-family: courier-new;
+	border-bottom: solid 1px #e8e8e8;
+	min-height: 32px;
+	background-color: rgba(255, 255, 255, 0.45);
+	width: 100%;
+	overflow: hidden;
+	cursor: pointer;
+
+	/*KEEP!*/
+	justify-content: center;
+	display: flex;
+	flex-direction: row;
+}
+
+/*Style for file/folder container when selected*/
+.fileExplorerItemSelectedColor{
+	background-color:#F3FDEC;
+	font-family: courier-new;
+	border-bottom: solid 1px #e8e8e8;
+	min-height: 32px;
+	width: 100%;
+	overflow: hidden;
+	cursor: pointer;
+
+	/*KEEP!*/
+	flex-grow: 1;
+	display: flex;
+	flex-direction: row;
+    justify-content: center;
+}
+
+/*Style used for buttons like:
+Create File
+Create Folder
+
+and For moving items through mini menu:
+place
+cencel
+*/
+.fileOptionButton{
+	cursor: pointer;
+	border-radius:2px;
+	font-size: 13px;
+	background-color:#F17999;
+	color: white;
+	display: inline-block;
+	padding:4px;
+	padding-left:8px;
+	padding-right:8px;
+	margin-top: 4px;
+	margin-bottom: 4px;
+	margin-right: 4px;
+	margin-left: 4px;
+	-webkit-transition: background-color 0.12s ease-in-out; /* Safari */
+    transition: background-color 0.12s ease-in-out;
+    border: none;
+}
+
+/*Individual style for create file button*/
+.fileOptionCreateFile{
+	background-image: url('../icons/createNewFile.svg');
+	background-repeat: no-repeat;
+	background-position: 4px;
+	background-size: 20px;
+	padding-left: 28px;
+}
+
+/*Individual style for create folder button*/
+.fileOptionCreateFolder{
+	background-image: url('../icons/newFolder.svg');
+	background-repeat: no-repeat;
+	background-position: 4px;
+	background-size: 20px;
+	padding-left: 32px;
+}
+
+/*Source for folder closed icon*/
+.fileExplorerFolderClosed{
+	background-image: url("../icons/folderClosed.svg");
+}
+
+/*Source for folder opened icon*/
+.fileExplorerFolderOpened{
+	background-image: url("../icons/folderOpened.svg");
+}
+
+/*Source for file icon*/
+.fileExplorerFile{
+	background-image: url("../icons/file.svg");
+}
+/*####################################################################################################################*/
+
+
+
+
+/*These styles are a bit less user friendly to change*/
+
+/*Top container that contains option buttons*/
+.fileExplorerTopCon{
+	width: 100%;
+	height: 32px;
+	background-color: #A8ED77;
+	padding-top: 8px;
+	padding-bottom: 8px;
+
+	-webkit-box-shadow: inset 0px -92px 4px -85px rgba(0,0,0,0.06);
+	-moz-box-shadow: inset 0px -92px 4px -85px rgba(0,0,0,0.06);
+	box-shadow: inset 0px -92px 4px -85px rgba(0,0,0,0.06);
+}
+
+/*Container that contains only cancel and place button*/
+.fileExplorerMI{
+	padding-bottom: 4px;
+	display: none;
+	margin: 0px auto;
+	width: 100%;
+	text-align:center;
+}
+
+/*how icons should be displayed as backgrounds*/
+.fileExplorerContainBack{
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: contain;
+}
+
+
+
+/*Class name for file system's root element*/
+.fileExplorerRootCon{
+	-webkit-box-shadow: 0px 0px 29px 0px rgba(168,237,119,0.2);
+	-moz-box-shadow: 0px 0px 29px 0px rgba(168,237,119,0.2);
+	box-shadow: 0px 0px 29px 0px rgba(168,237,119,0.2);
+	height: 100%;
+	width:100%;
+}
+
+/*When draging an item to move it, a "copy" is created that follows
+the mouse as an indicator of what item was selected. This
+style is applied to it.*/
+.fileExplorerGhost{
+	font-family: courier-new;
+	border: solid 1px #e8e8e8;
+	min-height: 32px;
+	background-color: rgba(255, 255, 255, 0.85);
+	overflow: hidden;
+    padding-right: 8px;
+	position: absolute;
+	width: auto;
+	pointer-events: none;
+
+	/*KEEP!*/
+	display: flex;
+	flex-direction: row;
+    justify-content: center;
+}
+
+/*When dragin an item all other items get this style.
+The main idea is to have a hover effect when moving an item*/
+.fileExplorerDragLight{
+	font-family: courier-new;
+	border-bottom: solid 1px #e8e8e8;
+	min-height: 32px;
+	background-color: rgba(255, 255, 255, 0.45);
+	width: 100%;
+	overflow: hidden;
+	cursor: pointer;
+
+	/*KEEP!*/
+	display: flex;
+	flex-direction: row;
+    justify-content: center;
+}
+
+/*This hover effect is applied to items when an item is 
+being dragged to a different place*/
+.fileExplorerDragLight:hover{
+	border-top: solid 2px #f17a9b;
+}
+
+/*Span style for items*/
+.fileExplorerSpan{
+	-webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    font-family: helvetica, impact;
+	padding-top: 8px;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+	color:black;
+  	vertical-align: middle;
+
+  	/*KEEP!*/
+  	display: flex;
+	flex: 1; 
+}
+
+/*Hover style for span text*/
+.fileExplorerSpan:hover{
+	color: gray;
+}
+
+/*Style for mini menu button on items*/
+.fileExplorerMiniMenu{
+	margin-top: 4px;
+	margin-right: 8px;
+	width: 20px;
+	height: 24px;
+	background-image: url('../icons/menu.svg');
+	background-position: center;
+	background-size: contain;
+	background-repeat: no-repeat;
+	-webkit-background-repeat: no-repeat;
+	margin-left: 8px;
+
+	/*KEEP!*/
+	display: flex;
+	flex-grow: 0; 
+}
+
+/*style for mini image preview on files*/
+.fileExplorerImagePreview{
+	max-width: 24px;
+	max-height: 32px;
+
+	/*KEEP!*/
+	flex-grow: 1;
+	display: flex;
+}
+
+/*When clicking an item's mini menu button 
+a context menu is created. This style is applied to it.*/
+.fileExplorerMenu{
+	width: 100px;
+	height: auto;
+	position: absolute;
+	background-color: white;
+	overflow: hidden;
+	border: solid 1px #e8e8e8;
+	z-index: 500;
+}
+
+/*Context menu item style*/
+.fileExplorerMenuEntry{
+	background-color:white;
+	font-family: helvetica, impact, courier;
+	text-align: center;
+	display: block;
+	padding: 4px;
+	border-bottom: solid 1px #e8e8e8;
+	-webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/*Context menu item hmouse hover style*/
+.fileExplorerMenuEntry:hover{
+	background-color:#F17999;
+}
+
+
+
+
+
+
+/*CUSTOM IO*/
+.fileExplorerPromptContainer{
+	z-index: 9999990;
+	width: 37vw;
+	display: block;
+	margin: 0px auto;
+}
+
+/**/
+.fileExplorerPromptPara{
+	color: black;
+	font-family: courier, Trebuchet MS, Verdana;
+	font-size: 16px;
+	margin-bottom: 8px;
+}
+
+/**/
+.fileExplorerParaInputText{
+	display: block;
+	display: none;
+	border: solid 1px #e8e8e8;
+	border-bottom: solid 4px #e8e8e8;
+	width: 100%;
+	box-shadow: inset 0px 0px 5px 0px rgba(0,0,0,0.075);
+	padding: 8px;
+}
+
+/*Custom prompt backdrop*/
+.fileExplorerPromptBackdrop{
+	width: 100%;
+	height: 100%;
+	position: fixed;
+	left: 0px;
+	background: rgba(0, 0, 0, 0.67);
+	top: 0px;
+	z-index: 900000;
+	opacity: 0;
+	transition: opacity 0.5s;
+}
+
+.fileExplorerPromptHeader{
+	color: black;
+	font-family: Helvatica, Arial Black, Impact, Gadget;
+	font-size: 29px;
+}
+
+
+.fileExplorerPromptTopColor{
+	background-color: white;
+	position: absolute;
+	width: 100%;
+	padding-bottom: 8px;
+	transition: top 0.4s;
+	border-bottom-left-radius: 5%;
+	border-bottom-right-radius: 5%;
+}

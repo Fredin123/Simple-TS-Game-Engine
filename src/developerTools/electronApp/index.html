@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="./generalStyle.css">
+        <link rel="stylesheet" href="./filesystemStyle.css">
+
+        <link rel="stylesheet" href="vex.css" />
+        <link rel="stylesheet" href="vex-theme-os.css" />
+
+    </head>
+    <body>
+
+        <button id="hideiFrameButton" style="position: absolute; color:white; font-size: 30px; background-color: black; left: 0px; top: 0px; z-index: 100000;" onclick="hideCreateSprites()">Go back</button>
+        <iframe id="createSpritesiFrame" style="position: absolute; width:100%; height:100%;" src="https://www.piskelapp.com/p/create"></iframe>
+
+        <div id="createSprite" class="flexContainerFull">
+            <div class="flexItem" style="border: solid 1px blue;">
+                gridX:<input type="number" id="gridXInput">
+                gridY:<input type="number" id="gridYInput">
+                <button id="setSizeButton">Set</button>
+                <button id="saveButton">Save</button>
+
+                <button id="" onclick="showCreateSprites()">Create sprite</button>
+
+
+            </div>
+
+            <div class="flexItem" style="border: solid 1px blue;">
+                <div id="idCursorTypeContainer"></div>
+                <button id="zoomIn"> Zoom in</button>
+                <button id="zoomOut">Zoom out</button>
+                
+                
+                
+
+            </div>
+            
+            <div id="canvasAndFilesCon" class="flexContainerhori takeAllSpace">
+                <div class="flexItem" style="flex-direction: column;">
+                    Objects:
+                    <div id="fileSystemObjects"></div>
+                    Rooms:
+                    <div id="fileSystemRoom"></div>
+                    Resources:
+                    <div id="fileSystemResources"></div>
+                    Layers:
+                    <button id="createLayerButton">create layer</button>
+                    <button id="removeLayerButton">remove layer</button>
+                    <div id="layerContainer">
+
+                    </div>
+                </div>
+                
+                <div class="flexItem flex1" >
+                    <canvas id="game" >
+                    </canvas>
+                </div>
+            </div>
+            
+        </div>
+        
+        <script>
+            function hideCreateSprites(){
+                document.getElementById("createSpritesiFrame").style.display = "none";
+                document.getElementById("hideiFrameButton").style.display = "none";
+            }
+
+            function showCreateSprites(){
+                document.getElementById("createSpritesiFrame").style.display = "inline";
+                document.getElementById("hideiFrameButton").style.display = "inline";
+            }
+
+            hideCreateSprites();
+        </script>
+        <script src="./pixi.min.js"></script>
+        <script src="./prettyFileSystem.min.js"></script>
+        <script src="./lz-string.min.js"></script>
+        <script src="./index.js"></script>
+    </body>
+</html>

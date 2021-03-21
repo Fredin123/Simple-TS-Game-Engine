@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js'
-import { objectBase } from '../objectHandlers/objectBase';
-import { roomEvent } from '../roomEvent';
+import { objectBase } from '../engine/objectHandlers/objectBase';
+import { roomEvent } from '../engine/roomEvent';
+
 
 export class marker extends objectBase{
     switch: boolean = false;
@@ -14,10 +15,13 @@ export class marker extends objectBase{
         super(xp, yp, marker.objectName);
         super.setCollision(0, 0, 0, 0);
 
-        super.style((g: PIXI.Graphics) => {
-            g.beginFill(0xFF0000); 
-            g.drawRect(0, 0, 2, 2);
-            g.endFill();
+        super.style((g: PIXI.Container) => {
+            let newGraphics = new PIXI.Graphics();
+
+            newGraphics.beginFill(0xFF3e50); 
+            newGraphics.drawRect(0, 0, 16, 16);
+            newGraphics.endFill();
+            g.addChild(newGraphics);
             return g;
         });
         
