@@ -189,18 +189,7 @@ export class tileSelector{
         this.resourceName = resourceName;
 
         if(tileSelector.resourceNameAndImage[resourceName] == null){
-            tileSelector.resourceNameAndImage[resourceName] = new Image();
-            tileSelector.resourceNameAndImage[resourceName].onload = () => {
-                this.canvasRenderer.width = tileSelector.resourceNameAndImage[this.resourceName].width;
-                this.canvasRenderer.height = tileSelector.resourceNameAndImage[this.resourceName].height;
-                this.canvasRenderer.style.width = tileSelector.resourceNameAndImage[this.resourceName].width+"px";
-                this.canvasRenderer.style.height = tileSelector.resourceNameAndImage[this.resourceName].height+"px";
-                this.canvasContext?.drawImage(tileSelector.resourceNameAndImage[this.resourceName], 0, 0);
-    
-    
-                this.renderCanvas();
-            };
-            tileSelector.resourceNameAndImage[resourceName].src = imageSource;
+            this.loadResource(imageSource, resourceName);
         }else {
             this.renderCanvas();
         }
@@ -216,6 +205,22 @@ export class tileSelector{
         
         this.modal.style.display = "flex";
         
+    }
+
+
+    loadResource(imageSource: string, resourceName: string){
+        tileSelector.resourceNameAndImage[resourceName] = new Image();
+        tileSelector.resourceNameAndImage[resourceName].onload = () => {
+            this.canvasRenderer.width = tileSelector.resourceNameAndImage[resourceName].width;
+            this.canvasRenderer.height = tileSelector.resourceNameAndImage[resourceName].height;
+            this.canvasRenderer.style.width = tileSelector.resourceNameAndImage[resourceName].width+"px";
+            this.canvasRenderer.style.height = tileSelector.resourceNameAndImage[resourceName].height+"px";
+            this.canvasContext?.drawImage(tileSelector.resourceNameAndImage[resourceName], 0, 0);
+
+
+            this.renderCanvas();
+        };
+        tileSelector.resourceNameAndImage[resourceName].src = imageSource;
     }
 
 

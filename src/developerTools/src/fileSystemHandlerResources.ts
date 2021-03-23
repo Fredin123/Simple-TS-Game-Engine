@@ -75,6 +75,7 @@ export class fileSystemHandlerResources{
                         //It's a file
                         let nameOnly = item.split(".")[0];
                         newEntry = new fileSystemEntry("file", nameOnly, [], idCounter, [roomSrc, roomSrc]);
+                        this.tileHandler.loadResource("../../"+roomSrc, roomSrc);
                         //newEntry.image = this.savedImageDataUrls[nameOnly];
                         if(currentFolder == null){
                             dataToInsertIntoFileSystem.push(newEntry);

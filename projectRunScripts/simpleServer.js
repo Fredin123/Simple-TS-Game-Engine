@@ -1,7 +1,8 @@
-const express = require('express')
+const express = require('express');
 path = require('path');
-const app = express()
-const port = 3000
+const open = require('open');
+const app = express();
+const port = 8080;
 
 app.get('/', (req, res) => {
   //res.send('Hello World!')
@@ -11,7 +12,8 @@ app.get('/', (req, res) => {
 app.use(express.static(path.join(__dirname, '../') + '/dist'));
 
 app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`)
+  console.log(`Example app listening at http://localhost:${port}`);
+  open(`http://localhost:${port}`);
 })
 
 

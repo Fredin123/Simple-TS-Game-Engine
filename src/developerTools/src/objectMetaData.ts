@@ -13,7 +13,9 @@ export class objectMetaData{
         this.x = x;
         this.y = y;
         this.name = name;
-        this.tile = tile;
+        if(tile != null){
+            this.tile = tileAnimation.initFromJsonGeneratedObj(tile);
+        }
     }
 
 

@@ -166,11 +166,16 @@ export class canvasRenderer{
                     }else{
                         let tileToDraw = meta.tile.get(this.counter);
                         this.drawMouseOverSelection(meta, mouseX, mouseY);
-                        this.ctx?.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, 
-                            tileToDraw.startY, 
-                            tileToDraw.width, 
-                            tileToDraw.height,
-                            meta.x + this.gridXOffset, meta.y + this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                        if(tileSelector.resourceNameAndImage[tileToDraw.resourceName] != null){
+                            this.ctx?.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, 
+                                tileToDraw.startY, 
+                                tileToDraw.width, 
+                                tileToDraw.height,
+                                meta.x + this.gridXOffset, meta.y + this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                        }else{
+                            console.log(tileToDraw.resourceName+" has not been initialized");
+                        }
+                        
                     }
                 });
             }

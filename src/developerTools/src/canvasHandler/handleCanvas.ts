@@ -115,9 +115,8 @@ export class handleCanvas{
             return;
         }
 
-        let mouseGridX = Math.floor(this.mouseXPosition/this.canvasRenderPart.gridWidth)*this.canvasRenderPart.gridWidth;
-        let mouseGridY = Math.floor(this.mouseYPosition/this.canvasRenderPart.gridHeight)*this.canvasRenderPart.gridHeight;
-
+        let mouseGridX = (Math.floor(this.mouseXPosition/this.canvasRenderPart.gridWidth)*this.canvasRenderPart.gridWidth) + ((this.canvasRenderPart.gridXOffset) % this.canvasRenderPart.gridWidth);
+        let mouseGridY = (Math.floor(this.mouseYPosition/this.canvasRenderPart.gridHeight)*this.canvasRenderPart.gridHeight) + ((this.canvasRenderPart.gridYOffset) % this.canvasRenderPart.gridHeight);
         
         if(cursorData.cursorType == cursorType.pensil && this.canvasRenderPart.layerHandler.selectedLayer != null){
             if(this.cursor.objectSelected != null || this.cursor.currentSubTile != null){
@@ -126,13 +125,11 @@ export class handleCanvas{
                     nameOfMetaObject = this.cursor.currentSubTile?.name;
                 }
                 if(this.noGridMouse){
-                    console.log("here");
                     this.canvasRenderPart.layerHandler.addToLayer(new objectMetaData(this.mouseXPosition - this.canvasRenderPart.gridXOffset, 
                         this.mouseYPosition - this.canvasRenderPart.gridYOffset, nameOfMetaObject!, 
                         this.cursor.currentSubTile));
                 }else{
                     //check if there already is an item at the position
-                    console.log(this.canvasRenderPart.layerHandler.hasObjectPos(mouseGridX, mouseGridY));
                     if(this.canvasRenderPart.layerHandler.hasObjectPos(mouseGridX, mouseGridY) == false){
                         this.canvasRenderPart.layerHandler.addToLayer(new objectMetaData(mouseGridX - this.canvasRenderPart.gridXOffset, 
                             mouseGridY - this.canvasRenderPart.gridYOffset, nameOfMetaObject!, this.cursor.currentSubTile));

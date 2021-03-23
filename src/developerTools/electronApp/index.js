@@ -1374,13 +1374,36 @@
         return layer;
     }());
 
+    var tileAnimation = /** @class */ (function () {
+        function tileAnimation(tiles) {
+            if (tiles === void 0) { tiles = []; }
+            this.name = "";
+            this.movementSpeed = 30;
+            this.tiles = tiles;
+        }
+        tileAnimation.initFromJsonGeneratedObj = function (obj) {
+            var realObject = new tileAnimation(obj.tiles);
+            realObject.name = obj.name;
+            return realObject;
+        };
+        tileAnimation.prototype.get = function (index) {
+            return this.tiles[index % this.tiles.length];
+        };
+        tileAnimation.prototype.getAllTiles = function () {
+            return this.tiles;
+        };
+        return tileAnimation;
+    }());
+
     var objectMetaData = /** @class */ (function () {
         function objectMetaData(x, y, name, tile) {
             this.tile = null;
             this.x = x;
             this.y = y;
             this.name = name;
-            this.tile = tile;
+            if (tile != null) {
+                this.tile = tileAnimation.initFromJsonGeneratedObj(tile);
+            }
         }
         return objectMetaData;
     }());
@@ -1656,27 +1679,6 @@
             return new subTileMeta(this.resourceName, this.startX, this.startY, this.width, this.height);
         };
         return subTileMeta;
-    }());
-
-    var tileAnimation = /** @class */ (function () {
-        function tileAnimation(tiles) {
-            if (tiles === void 0) { tiles = []; }
-            this.name = "";
-            this.movementSpeed = 30;
-            this.tiles = tiles;
-        }
-        tileAnimation.initFromJsonGeneratedObj = function (obj) {
-            var realObject = new tileAnimation(obj.tiles);
-            realObject.name = obj.name;
-            return realObject;
-        };
-        tileAnimation.prototype.get = function (index) {
-            return this.tiles[index % this.tiles.length];
-        };
-        tileAnimation.prototype.getAllTiles = function () {
-            return this.tiles;
-        };
-        return tileAnimation;
     }());
 
     var animatedTypeCreator = /** @class */ (function () {
@@ -1955,21 +1957,10 @@
             this.modal.style.display = "none";
         };
         tileSelector.prototype.open = function (imageSource, resourceName, tileDoneCallback) {
-            var _this = this;
             this.callbackSubTile = tileDoneCallback;
             this.resourceName = resourceName;
             if (tileSelector.resourceNameAndImage[resourceName] == null) {
-                tileSelector.resourceNameAndImage[resourceName] = new Image();
-                tileSelector.resourceNameAndImage[resourceName].onload = function () {
-                    var _a;
-                    _this.canvasRenderer.width = tileSelector.resourceNameAndImage[_this.resourceName].width;
-                    _this.canvasRenderer.height = tileSelector.resourceNameAndImage[_this.resourceName].height;
-                    _this.canvasRenderer.style.width = tileSelector.resourceNameAndImage[_this.resourceName].width + "px";
-                    _this.canvasRenderer.style.height = tileSelector.resourceNameAndImage[_this.resourceName].height + "px";
-                    (_a = _this.canvasContext) === null || _a === void 0 ? void 0 : _a.drawImage(tileSelector.resourceNameAndImage[_this.resourceName], 0, 0);
-                    _this.renderCanvas();
-                };
-                tileSelector.resourceNameAndImage[resourceName].src = imageSource;
+                this.loadResource(imageSource, resourceName);
             }
             else {
                 this.renderCanvas();
@@ -1979,6 +1970,20 @@
             }
             this.populateStoredTileAnimations(resourceName);
             this.modal.style.display = "flex";
+        };
+        tileSelector.prototype.loadResource = function (imageSource, resourceName) {
+            var _this = this;
+            tileSelector.resourceNameAndImage[resourceName] = new Image();
+            tileSelector.resourceNameAndImage[resourceName].onload = function () {
+                var _a;
+                _this.canvasRenderer.width = tileSelector.resourceNameAndImage[resourceName].width;
+                _this.canvasRenderer.height = tileSelector.resourceNameAndImage[resourceName].height;
+                _this.canvasRenderer.style.width = tileSelector.resourceNameAndImage[resourceName].width + "px";
+                _this.canvasRenderer.style.height = tileSelector.resourceNameAndImage[resourceName].height + "px";
+                (_a = _this.canvasContext) === null || _a === void 0 ? void 0 : _a.drawImage(tileSelector.resourceNameAndImage[resourceName], 0, 0);
+                _this.renderCanvas();
+            };
+            tileSelector.resourceNameAndImage[resourceName].src = imageSource;
         };
         tileSelector.prototype.populateStoredTileAnimations = function (resourceName) {
             var _this = this;
@@ -2196,7 +2201,12 @@
                         else {
                             var tileToDraw = meta.tile.get(_this.counter);
                             _this.drawMouseOverSelection(meta, mouseX, mouseY);
-                            (_b = _this.ctx) === null || _b === void 0 ? void 0 : _b.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                            if (tileSelector.resourceNameAndImage[tileToDraw.resourceName] != null) {
+                                (_b = _this.ctx) === null || _b === void 0 ? void 0 : _b.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                            }
+                            else {
+                                console.log(tileToDraw.resourceName + " has not been initialized");
+                            }
                         }
                     });
                 }
@@ -2445,6 +2455,7 @@
             });
         }
         fileSystemHandlerResources.prototype.populateFileSystem = function (roomData) {
+            var _this = this;
             var dataToInsertIntoFileSystem = [];
             var idCounter = 0;
             roomData.forEach(function (roomMeta) {
@@ -2459,6 +2470,7 @@
                             //It's a file
                             var nameOnly = item.split(".")[0];
                             newEntry = new fileSystemEntry("file", nameOnly, [], idCounter, [roomSrc, roomSrc]);
+                            _this.tileHandler.loadResource("../../" + roomSrc, roomSrc);
                             //newEntry.image = this.savedImageDataUrls[nameOnly];
                             if (currentFolder == null) {
                                 dataToInsertIntoFileSystem.push(newEntry);
@@ -2750,8 +2762,8 @@
             if (this.cursor.objectSelected != null && this.cursor.objectSelected.objectMouseImageReady == false && cursorData.cursorType != cursorType.grabber) {
                 return;
             }
-            var mouseGridX = Math.floor(this.mouseXPosition / this.canvasRenderPart.gridWidth) * this.canvasRenderPart.gridWidth;
-            var mouseGridY = Math.floor(this.mouseYPosition / this.canvasRenderPart.gridHeight) * this.canvasRenderPart.gridHeight;
+            var mouseGridX = (Math.floor(this.mouseXPosition / this.canvasRenderPart.gridWidth) * this.canvasRenderPart.gridWidth) + ((this.canvasRenderPart.gridXOffset) % this.canvasRenderPart.gridWidth);
+            var mouseGridY = (Math.floor(this.mouseYPosition / this.canvasRenderPart.gridHeight) * this.canvasRenderPart.gridHeight) + ((this.canvasRenderPart.gridYOffset) % this.canvasRenderPart.gridHeight);
             if (cursorData.cursorType == cursorType.pensil && this.canvasRenderPart.layerHandler.selectedLayer != null) {
                 if (this.cursor.objectSelected != null || this.cursor.currentSubTile != null) {
                     var nameOfMetaObject = (_a = this.cursor.objectSelected) === null || _a === void 0 ? void 0 : _a.objectName;
@@ -2759,12 +2771,10 @@
                         nameOfMetaObject = (_b = this.cursor.currentSubTile) === null || _b === void 0 ? void 0 : _b.name;
                     }
                     if (this.noGridMouse) {
-                        console.log("here");
                         this.canvasRenderPart.layerHandler.addToLayer(new objectMetaData(this.mouseXPosition - this.canvasRenderPart.gridXOffset, this.mouseYPosition - this.canvasRenderPart.gridYOffset, nameOfMetaObject, this.cursor.currentSubTile));
                     }
                     else {
                         //check if there already is an item at the position
-                        console.log(this.canvasRenderPart.layerHandler.hasObjectPos(mouseGridX, mouseGridY));
                         if (this.canvasRenderPart.layerHandler.hasObjectPos(mouseGridX, mouseGridY) == false) {
                             this.canvasRenderPart.layerHandler.addToLayer(new objectMetaData(mouseGridX - this.canvasRenderPart.gridXOffset, mouseGridY - this.canvasRenderPart.gridYOffset, nameOfMetaObject, this.cursor.currentSubTile));
                         }
@@ -2787,7 +2797,6 @@
             this.mouseDown = true;
         };
         handleCanvas.prototype.importRoom = function (jsonString) {
-            console.log("import room");
             this.canvasRenderPart.layerHandler.importRoom(jsonString);
         };
         handleCanvas.prototype.exportRoom = function () {
