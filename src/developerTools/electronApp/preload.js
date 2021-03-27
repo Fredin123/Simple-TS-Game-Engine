@@ -3,14 +3,31 @@ const glob = require("glob");
 var vex = require('vex-js');
 vex.registerPlugin(require('vex-dialog'))
 vex.defaultOptions.className = 'vex-theme-os'
-fs = require('fs');
+const fs = require('fs');
+const fsPromise = require('fs').promises;
 path = require('path');
 
 contextBridge.exposeInMainWorld('node', {
 
+  clearPreviouslyGeneratedImages: (roomName) => {
+    /*fs.writeFile("../../resources/_generated_tiles/tst.txt", "TEST", "utf8", function (err) {
+      if (err) return console.log(err);
+    });*/
+    fsPromise.rmdir("../../resources/_generated_tiles/"+roomName, { recursive: true })
+    .then(() => console.log('directory removed!'));
+  },
+
+  saveCompiledTiles: (roomName, fileName, arraybuffer) => {
+    let nameWithNoEnding = roomName.split(".")[0];
+    if(fs.existsSync("../../resources/_generated_tiles/"+nameWithNoEnding) == false){
+      fs.mkdirSync("../../resources/_generated_tiles/"+nameWithNoEnding);
+    }
+    let buffer = arrayBufferToBufferCycle(arraybuffer);
+    fs.createWriteStream("../../resources/_generated_tiles/"+nameWithNoEnding+"/"+fileName).write(buffer);
+  },
+
   saveJsonData: (dataName, jsonString) => {
     let targetDir = path.resolve(dataName+".json");
-    console.log(targetDir);
     fs.writeFile(targetDir, jsonString, "utf8", function (err) {
       if (err) return console.log(err);
     });
@@ -99,4 +116,15 @@ contextBridge.exposeInMainWorld('node', {
   }
 
 
-})
+});
+
+
+
+function arrayBufferToBufferCycle(ab) {
+  var buffer = Buffer.alloc(ab.byteLength);
+  var view = new Uint8Array(ab);
+  for (var i = 0; i < buffer.length; ++i) {
+      buffer[i] = view[i];
+  }
+  return buffer;
+}

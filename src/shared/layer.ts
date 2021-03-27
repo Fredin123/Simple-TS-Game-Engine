@@ -1,4 +1,4 @@
-import { objectMetaData } from "../../objectMetaData";
+import { objectMetaData } from "../developerTools/src/objectMetaData";
 
 
 export class layer{

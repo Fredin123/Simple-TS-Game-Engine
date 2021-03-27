@@ -1,5 +1,5 @@
-import { subTileMeta } from "./subTileMeta";
-import { tileAnimation } from "./tileAnimation";
+import { subTileMeta } from "../../../shared/tile/subTileMeta";
+import { tileAnimation } from "../../../shared/tile/tileAnimation";
 import { tileSelector } from "./tileSelector";
 
 
@@ -34,8 +34,9 @@ export class animatedTypeCreator{
 
 
     setTileSet(tileSet: tileAnimation){
+        console.log("use this tile set: ",tileSet);
         this.animation = tileSet;
-        this.tempSubTile = this.animation.tiles[0];
+        this.tempSubTile = null;
         this.createElementsForTiles(this.animation.tiles);
     }
 
@@ -98,6 +99,7 @@ export class animatedTypeCreator{
         let deleteLayerButton = document.createElement("button");
         deleteLayerButton.innerHTML = "delete";
         deleteLayerButton.addEventListener("mouseup", (e: Event) => {
+            if(this.animation.name != "") return;
             let buttonElement = e.target as HTMLButtonElement;
             let name = buttonElement.parentElement?.getAttribute("itemName");
             if(name != null){

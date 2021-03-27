@@ -5,7 +5,7 @@ export class tileAnimation{
     name: string = "";
     tiles: subTileMeta[];
 
-    movementSpeed: number = 30;
+    animationSpeed: number = 0.5;
     animationFunction: ((itt: number) => number[]) | undefined;
     rotationFunction: ((itt: number) => number) | undefined;
 
@@ -21,7 +21,9 @@ export class tileAnimation{
     }
 
     get(index: number){
-        return this.tiles[index % this.tiles.length];
+        let animFrames = 60*this.animationSpeed;
+
+        return this.tiles[(index%animFrames) % this.tiles.length];
     }
 
     getAllTiles(){

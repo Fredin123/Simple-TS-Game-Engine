@@ -1,6 +1,6 @@
-import { subTileMeta } from "./subTileMeta";
+import { subTileMeta } from "../../../shared/tile/subTileMeta";
 import { animatedTypeCreator } from "./animatedTypeCreator";
-import { tileAnimation } from "./tileAnimation";
+import { tileAnimation } from "../../../shared/tile/tileAnimation";
 
 declare var window: any;
 
@@ -24,7 +24,7 @@ export class tileSelector{
 
 
     private resourceName: string = "";
-    private subTileDone: boolean = false;
+    private subTileDone: boolean = true;
 
     private tileCreator: animatedTypeCreator;
 
@@ -101,26 +101,44 @@ export class tileSelector{
     }
 
 
-    clickUseButton(){
+    private clickUseButton(){
         if(this.tileCreator.tempSubTile != null){
             let tileAnimation = this.tileCreator.getTileStack();
             if(tileAnimation.name == ""){
-                window.node.prompt("", "Create a name for the animation stack", (name: string | null) => {
-                    if(name != null){
-                        let tileAnimation = this.tileCreator.getTileStack();
-                        tileAnimation.name = name;
-                        if(tileSelector.resourceCreatedTileAnimations[this.resourceName] == null){
-                            tileSelector.resourceCreatedTileAnimations[this.resourceName] = [];
+                if(tileAnimation.tiles.length > 1){
+                    window.node.prompt("", "At what speed whould the animation play? [0 - 1]", (input: string | null) => {
+                        if(input != null){
+                            var floatValue = parseFloat(input);
+                            if(isNaN(floatValue) == false){
+                                this.createAnimationStackFinalize(floatValue);
+                            }
                         }
-                        tileSelector.resourceCreatedTileAnimations[this.resourceName].push(tileAnimation);
-                        window.node.saveJsonData(this.saveDatePremadeTilesName, JSON.stringify(tileSelector.resourceCreatedTileAnimations));
-                        this.callbackSubTile(tileAnimation);
-                    }
-                });
+                    });
+                }else{
+                    this.createAnimationStackFinalize(0);
+                }
+                
+                
             }else{
                 this.callbackSubTile(tileAnimation);
             }
         }
+    }
+
+    private createAnimationStackFinalize(animationSpeed: number){
+        window.node.prompt("", "Create a name for the animation stack", (name: string | null) => {
+            if(name != null){
+                let tileAnimation = this.tileCreator.getTileStack();
+                tileAnimation.name = name;
+                tileAnimation.animationSpeed = animationSpeed;
+                if(tileSelector.resourceCreatedTileAnimations[this.resourceName] == null){
+                    tileSelector.resourceCreatedTileAnimations[this.resourceName] = [];
+                }
+                tileSelector.resourceCreatedTileAnimations[this.resourceName].push(tileAnimation);
+                window.node.saveJsonData(this.saveDatePremadeTilesName, JSON.stringify(tileSelector.resourceCreatedTileAnimations));
+                this.callbackSubTile(tileAnimation);
+            }
+        });
     }
 
     mouseUpCanvas(e: MouseEvent){
@@ -185,6 +203,7 @@ export class tileSelector{
     }
 
     open(imageSource: string, resourceName: string, tileDoneCallback: (exportedTile: tileAnimation) => void ){
+        this.tileCreator.setTileSet(new tileAnimation());
         this.callbackSubTile = tileDoneCallback;
         this.resourceName = resourceName;
 

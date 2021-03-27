@@ -1,8 +1,4 @@
 import { barin } from "./brain";
-import { gameRunner } from "./gameRunner";
-import { internalFunction } from "./internalFunctions";
-import { logger } from "./logger";
-import { objectGenerator } from "../objectGenerator";
 import { objectBase } from "./objectHandlers/objectBase";
 import { objectContainer } from "./objectHandlers/objectContainer";
 

@@ -2,7 +2,7 @@ import { handleCanvas } from "./canvasHandler/handleCanvas";
 import * as PIXI from 'pixi.js'
 import { objectBase } from "../../engine/objectHandlers/objectBase";
 import { tools } from "../../engine/tools/tools";
-import { objectGenerator } from "../../objectGenerator";
+import { objectGenerator } from "../../shared/objectGenerator";
 import { fileSystemEntry } from "./fileSystemEntry";
 import { cursorData } from "./cursor/cursorData";
 import { objectSelectedData } from "./cursor/objectSelectedData";

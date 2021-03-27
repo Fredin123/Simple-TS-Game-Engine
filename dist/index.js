@@ -154,77 +154,6 @@
         return roomEvent;
     }());
 
-    var tools = /** @class */ (function () {
-        function tools() {
-        }
-        /*download(filename: string, text:string) {
-            var element = document.createElement('a');
-            console.log(text)
-            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
-            element.setAttribute('download', filename);
-          
-            element.style.display = 'none';
-            document.body.appendChild(element);
-          
-            element.click();
-          
-            document.body.removeChild(element);
-        }*/
-        tools.download = function (filename, text, type) {
-            if (type === void 0) { type = "text/plain"; }
-            // Create an invisible A element
-            var a = document.createElement("a");
-            a.style.display = "none";
-            document.body.appendChild(a);
-            // Set the HREF to a Blob representation of the data to be downloaded
-            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
-            // Use download attribute to set set desired file name
-            a.setAttribute("download", filename);
-            // Trigger the download by simulating click
-            a.click();
-            // Cleanup
-            window.URL.revokeObjectURL(a.href);
-            document.body.removeChild(a);
-        };
-        tools.upload = function (callback) {
-            var _this = this;
-            var element = document.createElement("input");
-            element.type = "file";
-            element.style.display = "none";
-            document.body.appendChild(element);
-            element.onchange = function (e) {
-                _this.uploadOnChange(e, callback);
-            };
-            element.click();
-        };
-        tools.getClassNameFromConstructorName = function (constructorName) {
-            var funcNameOnly = constructorName.replace("function ", "");
-            var paramsStartIndex = funcNameOnly.indexOf("(");
-            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
-            return funcNameOnly;
-        };
-        tools.functionName = function (func) {
-            console.log(func.toString());
-            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
-            return result ? result[1] : ''; // for an anonymous function there won't be a match
-        };
-        tools.uploadOnChange = function (e, callback) {
-            var ev = e;
-            console.log(ev.target.files);
-            var reader = new FileReader();
-            reader.readAsText(ev.target.files[0], "UTF-8");
-            reader.onload = function (evt) {
-                var _a, _b;
-                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
-                callback(LZString.decompressFromEncodedURIComponent(t));
-            };
-            reader.onerror = function (evt) {
-                alert("Could not read file");
-            };
-        };
-        return tools;
-    }());
-
     /*! *****************************************************************************
     Copyright (c) Microsoft Corporation.
 
@@ -437,20 +366,11 @@
     var internalFunction = /** @class */ (function () {
         function internalFunction() {
         }
-        //Full
         internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
             var x1 = initiator.g.x + initiadorCollisionBox.x;
             var y1 = initiator.g.y + initiadorCollisionBox.y;
             var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
             var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
-            /*logger.showMessage(collisionTarget.objectName,"\n",x1 ," < ", x2 + collisionTarget.collisionBox.width ," && ",
-                x1 + initiator.collisionBox.width ," > ", x2 ," && ",
-                y1 ," < ", y2 + collisionTarget.collisionBox.height ," && ",
-                y1 + initiator.collisionBox.height ," > ", y2,"    n",
-                x1 < x2 + collisionTarget.collisionBox.width &&
-                x1 + initiator.collisionBox.width > x2 &&
-                y1 < y2 + collisionTarget.collisionBox.height &&
-                y1 + initiator.collisionBox.height > y2);*/
             return (x1 < x2 + collisionTarget.collisionBox.width &&
                 x1 + initiadorCollisionBox.width > x2 &&
                 y1 < y2 + collisionTarget.collisionBox.height &&
@@ -769,6 +689,8 @@
 
     var nulliObject = /** @class */ (function () {
         function nulliObject(xp, yp) {
+            this.isTile = false;
+            this.tileStepTime = -1;
             this.friction = 0;
             this.airFriction = 0;
             this.stickyBottom = false;
@@ -830,6 +752,8 @@
 
     var objectBase = /** @class */ (function () {
         function objectBase(x, y, childObjectName) {
+            this.isTile = false;
+            this.tileStepTime = -1;
             this.ID = uidGen.new();
             this._g = new PIXI.Container();
             this.friction = 0.5;
@@ -1150,85 +1074,123 @@
         return vectorFixedDelta;
     }());
 
-    var resources = /** @class */ (function () {
-        function resources(app, onCompleteCallback, alternativePath) {
+    var resourcesHand = /** @class */ (function () {
+        function resourcesHand(app, onCompleteCallback, alternativePath) {
             if (alternativePath === void 0) { alternativePath = ""; }
             this.objectGen = new objectGenerator();
-            resources.app = app;
+            resourcesHand.app = app;
             fetch(alternativePath + '/resources.txt', {
                 method: 'get'
             })
                 .then(function (response) { return response.text(); })
-                .then(function (textData) { return resources.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
+                .then(function (textData) { return resourcesHand.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
                 .catch(function (err) {
-                console.log(err);
+                console.log("err: " + err);
             });
         }
-        resources.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
-            for (var _i = 0, loadedResources_1 = loadedResources; _i < loadedResources_1.length; _i++) {
-                var resource = loadedResources_1[_i];
-                //resource = alternativePath += resource;
-                console.log(resource);
-            }
-            resources.resourcesToLoad = loadedResources;
-            resources.resourcesToLoad.forEach(function (resourceDir) {
+        resourcesHand.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
+            resourcesHand.resourcesToLoad = loadedResources;
+            resourcesHand.resourcesToLoad.forEach(function (resourceDir) {
                 var resourceDirsSplit = resourceDir.split("/");
                 var resourceName = resourceDirsSplit[resourceDirsSplit.length - 1];
-                resources.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
+                resourcesHand.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
             });
-            resources.app.loader.load(function (e) {
-                resources.resourcesToLoad.forEach(function (resource) {
+            resourcesHand.app.loader.load(function (e) {
+                resourcesHand.resourcesToLoad.forEach(function (resource) {
                     var split = resource.split("/");
                     var name = split[split.length - 1];
                     if (name.indexOf(".json") != -1) {
-                        resources.storeAnimatedArray(name);
+                        resourcesHand.storeAnimatedArray(name);
+                    }
+                    else if (split[0] == "_generated_tiles") {
+                        resourcesHand.storeStaticTile(name);
+                    }
+                    else if (split[0] == "tiles") {
+                        resourcesHand.storeStaticTile(name);
                     }
                 });
                 onCompleteCallback();
             });
         };
-        resources.storeAnimatedArray = function (resourceName) {
-            var texturesTmp = resources.app.loader.resources[resourceName].textures;
-            if (resources.app.loader.resources[resourceName].textures != null) {
+        resourcesHand.generateAnimatedTiles = function (animationMeta) {
+            if (resourcesHand.animatedSprite[animationMeta.name] == null) {
+                resourcesHand.animatedSprite[animationMeta.name] = [];
+            }
+            for (var _i = 0, _a = animationMeta.tiles; _i < _a.length; _i++) {
+                var tile = _a[_i];
+                console.log("find tile.resourceName: " + tile.resourceName);
+                var parts = tile.resourceName.split("/");
+                console.log("in: ", resourcesHand.app.loader.resources);
+                var newTex = new PIXI.Texture(resourcesHand.app.loader.resources[parts[parts.length - 1]].texture.baseTexture, new PIXI.Rectangle(tile.startX, tile.startY, tile.width, tile.height));
+                resourcesHand.animatedSprite[animationMeta.name].push(newTex);
+            }
+        };
+        resourcesHand.storeStaticTile = function (genName) {
+            var texturesTmp = resourcesHand.app.loader.resources[genName].texture;
+            if (texturesTmp != null) {
+                resourcesHand.staticTile[genName] = texturesTmp;
+            }
+            else {
+                throw new Error("Can't create static tile resource for: " + genName);
+            }
+        };
+        resourcesHand.storeAnimatedArray = function (resourceName) {
+            var texturesTmp = resourcesHand.app.loader.resources[resourceName].textures;
+            if (resourcesHand.app.loader.resources[resourceName].textures != null) {
                 for (var key in texturesTmp) {
                     if (texturesTmp.hasOwnProperty(key)) {
-                        if (resources.animatedSprite[resourceName] == null) {
-                            resources.animatedSprite[resourceName] = [];
+                        if (resourcesHand.animatedSprite[resourceName] == null) {
+                            resourcesHand.animatedSprite[resourceName] = [];
                         }
-                        resources.animatedSprite[resourceName].push(texturesTmp[key]);
+                        resourcesHand.animatedSprite[resourceName].push(texturesTmp[key]);
                     }
                 }
             }
             //const animeFromSheet = new PIXI.AnimatedSprite(animation);
         };
-        resources.getAnimatedSprite = function (name) {
+        resourcesHand.getAnimatedSprite = function (name) {
             if (name.indexOf(".") != -1) {
                 name = name.split(".")[0];
             }
             name += ".json";
-            console.log("Name: ", name);
-            if (resources.animatedSprite[name] != null) {
-                return new PIXI.AnimatedSprite(resources.animatedSprite[name]);
+            if (resourcesHand.animatedSprite[name] != null) {
+                return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
             }
+            console.log("Wanted to find this animated sprite: ", name);
+            console.log("In this resource pool: ", resourcesHand.animatedSprite);
             return null;
         };
-        resources.resourcePNG = function (resourceName) {
-            for (var _i = 0, _a = resources.resourcesToLoad; _i < _a.length; _i++) {
+        resourcesHand.getAnimatedTile = function (name) {
+            if (resourcesHand.animatedSprite[name] != null) {
+                return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
+            }
+            console.log("Wanted to find this animated sprite: ", name);
+            console.log("In this resource pool: ", resourcesHand.animatedSprite);
+            return null;
+        };
+        resourcesHand.getStaticTile = function (genName) {
+            return new PIXI.Sprite(resourcesHand.staticTile[genName]);
+        };
+        resourcesHand.resourcePNG = function (resourceName) {
+            for (var _i = 0, _a = resourcesHand.resourcesToLoad; _i < _a.length; _i++) {
                 var resourceDir = _a[_i];
                 var splitDirs = resourceDir.split("/");
                 var nameAndMeta = splitDirs[splitDirs.length - 1];
                 if (nameAndMeta.toLocaleLowerCase().indexOf(".png") != -1) {
                     nameAndMeta.split(".")[0];
                     if (nameAndMeta == resourceName + ".png") {
-                        return resources.app.loader.resources[nameAndMeta].texture;
+                        return resourcesHand.app.loader.resources[nameAndMeta].texture;
                     }
                 }
             }
             throw new Error("PNG resource does not exist: " + resourceName);
         };
-        resources.resourcesToLoad = [];
-        resources.animatedSprite = {};
-        return resources;
+        resourcesHand.createAnimatedSpriteFromTile = function (tileAnim) {
+        };
+        resourcesHand.resourcesToLoad = [];
+        resourcesHand.animatedSprite = {};
+        resourcesHand.staticTile = {};
+        return resourcesHand;
     }());
 
     var mio = /** @class */ (function (_super) {
@@ -1246,7 +1208,7 @@
                 newGraphics.drawRect(0, 0, 128, 128);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
-                var animation = resources.getAnimatedSprite("playerWalk");
+                var animation = resourcesHand.getAnimatedSprite("playerWalk");
                 if (animation != null) {
                     animation.animationSpeed = 0.1;
                     animation.play();
@@ -1279,7 +1241,122 @@
         return mio;
     }(objectBase));
 
-    //{NEW IMPORTS END HERE}
+    var tools = /** @class */ (function () {
+        function tools() {
+        }
+        /*download(filename: string, text:string) {
+            var element = document.createElement('a');
+            console.log(text)
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
+            element.setAttribute('download', filename);
+          
+            element.style.display = 'none';
+            document.body.appendChild(element);
+          
+            element.click();
+          
+            document.body.removeChild(element);
+        }*/
+        tools.download = function (filename, text, type) {
+            if (type === void 0) { type = "text/plain"; }
+            // Create an invisible A element
+            var a = document.createElement("a");
+            a.style.display = "none";
+            document.body.appendChild(a);
+            // Set the HREF to a Blob representation of the data to be downloaded
+            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
+            // Use download attribute to set set desired file name
+            a.setAttribute("download", filename);
+            // Trigger the download by simulating click
+            a.click();
+            // Cleanup
+            window.URL.revokeObjectURL(a.href);
+            document.body.removeChild(a);
+        };
+        tools.upload = function (callback) {
+            var _this = this;
+            var element = document.createElement("input");
+            element.type = "file";
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.onchange = function (e) {
+                _this.uploadOnChange(e, callback);
+            };
+            element.click();
+        };
+        tools.getClassNameFromConstructorName = function (constructorName) {
+            var funcNameOnly = constructorName.replace("function ", "");
+            var paramsStartIndex = funcNameOnly.indexOf("(");
+            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
+            return funcNameOnly;
+        };
+        tools.functionName = function (func) {
+            console.log(func.toString());
+            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
+            return result ? result[1] : ''; // for an anonymous function there won't be a match
+        };
+        tools.uploadOnChange = function (e, callback) {
+            var ev = e;
+            console.log(ev.target.files);
+            var reader = new FileReader();
+            reader.readAsText(ev.target.files[0], "UTF-8");
+            reader.onload = function (evt) {
+                var _a, _b;
+                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
+                callback(LZString.decompressFromEncodedURIComponent(t));
+            };
+            reader.onerror = function (evt) {
+                alert("Could not read file");
+            };
+        };
+        return tools;
+    }());
+
+    var tileMetaObj = /** @class */ (function (_super) {
+        __extends(tileMetaObj, _super);
+        function tileMetaObj(xp, yp) {
+            var _this = _super.call(this, xp, yp, tileMetaObj.objectName) || this;
+            _this.isTile = true;
+            _this.animation = null;
+            _this.currentTileIndex = 0;
+            return _this;
+        }
+        tileMetaObj.prototype.logic = function (l) {
+            return;
+        };
+        tileMetaObj.prototype.setTiles = function (tAnim) {
+            _super.prototype.style.call(this, function (g) {
+                if (tAnim.tiles.length == 1) {
+                    var animation = resourcesHand.getStaticTile(tAnim.tiles[0].resourceName);
+                    if (animation != null) {
+                        g.addChild(animation);
+                    }
+                    else {
+                        console.log("animation is null: ", tAnim);
+                    }
+                }
+                else if (tAnim.tiles.length > 1) {
+                    console.log("tAnim: ", tAnim);
+                    resourcesHand.generateAnimatedTiles(tAnim);
+                    var animation = resourcesHand.getAnimatedTile(tAnim.name);
+                    if (animation != null) {
+                        console.log("tAnim.animationSpeed: ", tAnim.animationSpeed);
+                        animation.animationSpeed = (60 / (tAnim.animationSpeed * 60)) / 60;
+                        animation.play();
+                        g.addChild(animation);
+                    }
+                }
+                return g;
+            });
+        };
+        tileMetaObj.prototype.animate = function () {
+            this.currentTileIndex += 1;
+        };
+        tileMetaObj.objectName = "tileMetaObj";
+        return tileMetaObj;
+    }(objectBase));
+
+    //{NEW IMPORTS START HERE}
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
@@ -1294,13 +1371,23 @@
         objectGenerator.prototype.getAvailibleObjects = function () {
             return this.availibleObjects;
         };
-        objectGenerator.prototype.generateObject = function (objectName, x, y) {
+        objectGenerator.prototype.generateObject = function (objectName, x, y, tile) {
             for (var i = 0; i < this.availibleObjects.length; i++) {
-                var avObj = this.availibleObjects[i];
-                var temp = avObj(x, y);
-                var className = tools.getClassNameFromConstructorName(temp.constructor.toString());
-                if (className == objectName) {
-                    return temp;
+                if (tile == null) {
+                    //Create normal object
+                    var avObj = this.availibleObjects[i];
+                    var temp = avObj(x, y);
+                    var className = tools.getClassNameFromConstructorName(temp.constructor.toString());
+                    if (className == objectName) {
+                        return temp;
+                    }
+                }
+                else {
+                    //Create tile object
+                    var newTile = new tileMetaObj(x, y);
+                    newTile.setTiles(tile);
+                    resourcesHand.createAnimatedSpriteFromTile(tile);
+                    return newTile;
                 }
             }
             console.log("Can't generate object for: " + objectName);
@@ -1374,9 +1461,12 @@
         return objectContainer;
     }());
 
+    var room1 = "NobwRAtgpgLghgeQEYCsoGMYGcCSA7AGTgE8oAnMALlDBgEsAbKK8POaKsACzgYDMABHAF8y7KAKwAHKFAAmYADRg4eOhDj0A9ngDKM+VQAMAOgCsy+kyxUaVqADlxnI0rBkoWLQFcy6R86U7p4+fp4A9PZY4QCyWlhYxAIAtAIAYgxamnR4AOYACgyafFpkEFgmUnluWPBkMAAaVADMAEzKtXD1AJrGygDudHIwXFQAjK0AHMpcUHS5XDDjAGxGAL6K4PZOHEFjbh5evv47zEGHof7RUbHxiSnpmdl5hcWl5ZXVHXWNfWCdPRWRgGQxGQJmcwWS0oYwAnK0NltGAFdmBWgcQscUWdgkcwtdkdE4gkkqkMll6C8ijASmUKlVcjUfk1KMD-j9epRmpMACwg4ajGGrCHzRbjKZrAC6GzAdCwAGEtBAkDlsjoEHwACqEqh8XhYKDKOX5LowDWK5Wq7R4XX6w1gAAeVB50zAxCorTMy2UbFRPH4QhEYmgkgMCkRtGRVDw3gYDCNCqVKrY1o12ustoYBoTJvq5qTVroOkz2cdLSMfLdHoA7O0wL6cUhMugANZgCP2aOx+OyxOWlNFvBpnWUPVZ+3G035-tqm2ju3KJ2UHltZTuyitWs+wJgJtaVvtzaRphduMJi3J2fDjPz8c5qd8C+F4u30tLr1s9ebusNzh7g8dlGlAxmevZPgO6paiOY6lpOeaPgWEFzjB9pLiudbrmyv5BBARbtpKMxDHIUDIQuYBFKQZCnJwRCUQI+zKAAXvgxFLusR7QPAyBoJguCECQ5C2EiJ6UKwO5uKo6izvosgKKy5iWCOdjItRQQYniJw7ugzTLEgsKTOgPLJFAyyTEYyQ8mM6BwMk+lQLCyRIC6fBmM0RhyGMcA8nInyMt8poslMroAjAnKtDybKDAKLS8iKULjPCUoynK4FXlBN4wGQ3gTlguZmghM7WiWqEepMrpfhF26otpun6YZxmmeZlnWbZkz2Y5zmue5nneb5h7CWcYmogxKhqBo1oyYY8kWMenhCbNqlgK4ygXFii2rfikSErcJIPOSzwFNStIfAyTIBeC7KmpykWgoKcJ1rMorQvdSXnohaXpnNr45Xl06XkVlCZdli6leVHqVfWO77IBIlDTi6LKJJ42DpNcmmDNUTzdsO7LbilzYpwG1XFt1g7fcZJPJSh1vHSfX+fULLNGYdYhdd-JgjC8JxWKnMItKb2FYO15fSh97walANAyVy5mWu4NYTu6JSoRcjEaRd7kQJVE7loABu5AUW4zF4Kx4xSkAA";
+
     var gameRunner = /** @class */ (function () {
         function gameRunner(gameContainer, gameProperties, app) {
             var _this = this;
+            this.tileContainer = [];
             this.generateObjects = new objectGenerator();
             this.targetFps = 30;
             this.fpsLimiter = 0;
@@ -1402,24 +1492,52 @@
                         _this.app.stage.position.x = _this.app.renderer.width / 2;
                         _this.app.stage.position.y = _this.app.renderer.height / 2;
                     }
+                    for (var _i = 0, _a = _this.tileContainer; _i < _a.length; _i++) {
+                        var t = _a[_i];
+                        if (roomEvent.getTicks() % t.tileStepTime == 0) {
+                            t.animate();
+                        }
+                    }
                 }
                 if (_this.fpsLimiter > 0) {
                     _this.fpsLimiter--;
                 }
             });
-            //this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(room1)));
-            //this.loadRoom(JSON.parse(LZString.decompressFromUTF16(room1)));
+            this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(room1)));
         }
-        gameRunner.prototype.loadRoom = function (roomData) {
+        gameRunner.prototype.loadRoom = function (layers) {
             this.objContainer.removeObjects();
-            for (var i = 0; i < roomData.length; i++) {
-                var objDTO = roomData[i];
-                var genObj = this.generateObjects.generateObject(objDTO.name, objDTO.x, objDTO.y);
-                if (genObj != null) {
-                    this.objContainer.addObject(genObj, 0);
-                    this.app.stage.addChild(genObj.g);
+            for (var _i = 0, layers_1 = layers; _i < layers_1.length; _i++) {
+                var layer_1 = layers_1[_i];
+                var pixiContainerLayer = new PIXI$1.Container();
+                for (var _a = 0, _b = layer_1.metaObjectsInLayer; _a < _b.length; _a++) {
+                    var objMeta = _b[_a];
+                    if (objMeta.isPartOfCombination == false) {
+                        var genObj = this.generateObjects.generateObject(objMeta.name, objMeta.x, objMeta.y, objMeta.tile);
+                        if (genObj != null) {
+                            if (genObj.isTile == false) {
+                                this.objContainer.addObject(genObj, layer_1.zIndex);
+                                pixiContainerLayer.addChild(genObj.g);
+                            }
+                            else {
+                                this.tileContainer.push(genObj);
+                                pixiContainerLayer.addChild(genObj.g);
+                            }
+                        }
+                    }
                 }
+                this.app.stage.addChild(pixiContainerLayer);
             }
+            /*for(var i=0; i<roomData.length; i++){
+                var objDTO: objectMetaData = roomData[i];
+                if(objDTO.isPartOfCombination == false){
+                    let genObj:objectBase = this.generateObjects.generateObject(objDTO.name, objDTO.x, objDTO.y, objDTO.tile);
+                    if(genObj != null){
+                        this.objContainer.addObject(genObj, 0);
+                        this.app.stage.addChild(genObj.g);
+                    }
+                }
+            }*/
         };
         return gameRunner;
     }());
@@ -1487,7 +1605,7 @@
         var app = new PIXI.Application();
         var gameProperties = new gameSettings();
         gameProperties.stretchToWindow = true;
-        new resources(app, function () {
+        new resourcesHand(app, function () {
             new gameRunner("game", gameProperties, app);
         });
         logger.initialize();

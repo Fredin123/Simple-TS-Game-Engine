@@ -1,77 +1,6 @@
 (function (PIXI$1) {
     'use strict';
 
-    var tools = /** @class */ (function () {
-        function tools() {
-        }
-        /*download(filename: string, text:string) {
-            var element = document.createElement('a');
-            console.log(text)
-            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
-            element.setAttribute('download', filename);
-          
-            element.style.display = 'none';
-            document.body.appendChild(element);
-          
-            element.click();
-          
-            document.body.removeChild(element);
-        }*/
-        tools.download = function (filename, text, type) {
-            if (type === void 0) { type = "text/plain"; }
-            // Create an invisible A element
-            var a = document.createElement("a");
-            a.style.display = "none";
-            document.body.appendChild(a);
-            // Set the HREF to a Blob representation of the data to be downloaded
-            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
-            // Use download attribute to set set desired file name
-            a.setAttribute("download", filename);
-            // Trigger the download by simulating click
-            a.click();
-            // Cleanup
-            window.URL.revokeObjectURL(a.href);
-            document.body.removeChild(a);
-        };
-        tools.upload = function (callback) {
-            var _this = this;
-            var element = document.createElement("input");
-            element.type = "file";
-            element.style.display = "none";
-            document.body.appendChild(element);
-            element.onchange = function (e) {
-                _this.uploadOnChange(e, callback);
-            };
-            element.click();
-        };
-        tools.getClassNameFromConstructorName = function (constructorName) {
-            var funcNameOnly = constructorName.replace("function ", "");
-            var paramsStartIndex = funcNameOnly.indexOf("(");
-            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
-            return funcNameOnly;
-        };
-        tools.functionName = function (func) {
-            console.log(func.toString());
-            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
-            return result ? result[1] : ''; // for an anonymous function there won't be a match
-        };
-        tools.uploadOnChange = function (e, callback) {
-            var ev = e;
-            console.log(ev.target.files);
-            var reader = new FileReader();
-            reader.readAsText(ev.target.files[0], "UTF-8");
-            reader.onload = function (evt) {
-                var _a, _b;
-                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
-                callback(LZString.decompressFromEncodedURIComponent(t));
-            };
-            reader.onerror = function (evt) {
-                alert("Could not read file");
-            };
-        };
-        return tools;
-    }());
-
     /*! *****************************************************************************
     Copyright (c) Microsoft Corporation.
 
@@ -293,20 +222,11 @@
     var internalFunction = /** @class */ (function () {
         function internalFunction() {
         }
-        //Full
         internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
             var x1 = initiator.g.x + initiadorCollisionBox.x;
             var y1 = initiator.g.y + initiadorCollisionBox.y;
             var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
             var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
-            /*logger.showMessage(collisionTarget.objectName,"\n",x1 ," < ", x2 + collisionTarget.collisionBox.width ," && ",
-                x1 + initiator.collisionBox.width ," > ", x2 ," && ",
-                y1 ," < ", y2 + collisionTarget.collisionBox.height ," && ",
-                y1 + initiator.collisionBox.height ," > ", y2,"    n",
-                x1 < x2 + collisionTarget.collisionBox.width &&
-                x1 + initiator.collisionBox.width > x2 &&
-                y1 < y2 + collisionTarget.collisionBox.height &&
-                y1 + initiator.collisionBox.height > y2);*/
             return (x1 < x2 + collisionTarget.collisionBox.width &&
                 x1 + initiadorCollisionBox.width > x2 &&
                 y1 < y2 + collisionTarget.collisionBox.height &&
@@ -755,6 +675,8 @@
 
     var nulliObject = /** @class */ (function () {
         function nulliObject(xp, yp) {
+            this.isTile = false;
+            this.tileStepTime = -1;
             this.friction = 0;
             this.airFriction = 0;
             this.stickyBottom = false;
@@ -816,6 +738,8 @@
 
     var objectBase = /** @class */ (function () {
         function objectBase(x, y, childObjectName) {
+            this.isTile = false;
+            this.tileStepTime = -1;
             this.ID = uidGen.new();
             this._g = new PIXI.Container();
             this.friction = 0.5;
@@ -1151,7 +1075,7 @@
                 newGraphics.drawRect(0, 0, 128, 128);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
-                var animation = resources.getAnimatedSprite("playerWalk");
+                var animation = resourcesHand.getAnimatedSprite("playerWalk");
                 if (animation != null) {
                     animation.animationSpeed = 0.1;
                     animation.play();
@@ -1184,7 +1108,122 @@
         return mio;
     }(objectBase));
 
-    //{NEW IMPORTS END HERE}
+    var tools = /** @class */ (function () {
+        function tools() {
+        }
+        /*download(filename: string, text:string) {
+            var element = document.createElement('a');
+            console.log(text)
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
+            element.setAttribute('download', filename);
+          
+            element.style.display = 'none';
+            document.body.appendChild(element);
+          
+            element.click();
+          
+            document.body.removeChild(element);
+        }*/
+        tools.download = function (filename, text, type) {
+            if (type === void 0) { type = "text/plain"; }
+            // Create an invisible A element
+            var a = document.createElement("a");
+            a.style.display = "none";
+            document.body.appendChild(a);
+            // Set the HREF to a Blob representation of the data to be downloaded
+            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
+            // Use download attribute to set set desired file name
+            a.setAttribute("download", filename);
+            // Trigger the download by simulating click
+            a.click();
+            // Cleanup
+            window.URL.revokeObjectURL(a.href);
+            document.body.removeChild(a);
+        };
+        tools.upload = function (callback) {
+            var _this = this;
+            var element = document.createElement("input");
+            element.type = "file";
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.onchange = function (e) {
+                _this.uploadOnChange(e, callback);
+            };
+            element.click();
+        };
+        tools.getClassNameFromConstructorName = function (constructorName) {
+            var funcNameOnly = constructorName.replace("function ", "");
+            var paramsStartIndex = funcNameOnly.indexOf("(");
+            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
+            return funcNameOnly;
+        };
+        tools.functionName = function (func) {
+            console.log(func.toString());
+            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
+            return result ? result[1] : ''; // for an anonymous function there won't be a match
+        };
+        tools.uploadOnChange = function (e, callback) {
+            var ev = e;
+            console.log(ev.target.files);
+            var reader = new FileReader();
+            reader.readAsText(ev.target.files[0], "UTF-8");
+            reader.onload = function (evt) {
+                var _a, _b;
+                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
+                callback(LZString.decompressFromEncodedURIComponent(t));
+            };
+            reader.onerror = function (evt) {
+                alert("Could not read file");
+            };
+        };
+        return tools;
+    }());
+
+    var tileMetaObj = /** @class */ (function (_super) {
+        __extends(tileMetaObj, _super);
+        function tileMetaObj(xp, yp) {
+            var _this = _super.call(this, xp, yp, tileMetaObj.objectName) || this;
+            _this.isTile = true;
+            _this.animation = null;
+            _this.currentTileIndex = 0;
+            return _this;
+        }
+        tileMetaObj.prototype.logic = function (l) {
+            return;
+        };
+        tileMetaObj.prototype.setTiles = function (tAnim) {
+            _super.prototype.style.call(this, function (g) {
+                if (tAnim.tiles.length == 1) {
+                    var animation = resourcesHand.getStaticTile(tAnim.tiles[0].resourceName);
+                    if (animation != null) {
+                        g.addChild(animation);
+                    }
+                    else {
+                        console.log("animation is null: ", tAnim);
+                    }
+                }
+                else if (tAnim.tiles.length > 1) {
+                    console.log("tAnim: ", tAnim);
+                    resourcesHand.generateAnimatedTiles(tAnim);
+                    var animation = resourcesHand.getAnimatedTile(tAnim.name);
+                    if (animation != null) {
+                        console.log("tAnim.animationSpeed: ", tAnim.animationSpeed);
+                        animation.animationSpeed = (60 / (tAnim.animationSpeed * 60)) / 60;
+                        animation.play();
+                        g.addChild(animation);
+                    }
+                }
+                return g;
+            });
+        };
+        tileMetaObj.prototype.animate = function () {
+            this.currentTileIndex += 1;
+        };
+        tileMetaObj.objectName = "tileMetaObj";
+        return tileMetaObj;
+    }(objectBase));
+
+    //{NEW IMPORTS START HERE}
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
@@ -1199,13 +1238,23 @@
         objectGenerator.prototype.getAvailibleObjects = function () {
             return this.availibleObjects;
         };
-        objectGenerator.prototype.generateObject = function (objectName, x, y) {
+        objectGenerator.prototype.generateObject = function (objectName, x, y, tile) {
             for (var i = 0; i < this.availibleObjects.length; i++) {
-                var avObj = this.availibleObjects[i];
-                var temp = avObj(x, y);
-                var className = tools.getClassNameFromConstructorName(temp.constructor.toString());
-                if (className == objectName) {
-                    return temp;
+                if (tile == null) {
+                    //Create normal object
+                    var avObj = this.availibleObjects[i];
+                    var temp = avObj(x, y);
+                    var className = tools.getClassNameFromConstructorName(temp.constructor.toString());
+                    if (className == objectName) {
+                        return temp;
+                    }
+                }
+                else {
+                    //Create tile object
+                    var newTile = new tileMetaObj(x, y);
+                    newTile.setTiles(tile);
+                    resourcesHand.createAnimatedSpriteFromTile(tile);
+                    return newTile;
                 }
             }
             console.log("Can't generate object for: " + objectName);
@@ -1214,85 +1263,123 @@
         return objectGenerator;
     }());
 
-    var resources = /** @class */ (function () {
-        function resources(app, onCompleteCallback, alternativePath) {
+    var resourcesHand = /** @class */ (function () {
+        function resourcesHand(app, onCompleteCallback, alternativePath) {
             if (alternativePath === void 0) { alternativePath = ""; }
             this.objectGen = new objectGenerator();
-            resources.app = app;
+            resourcesHand.app = app;
             fetch(alternativePath + '/resources.txt', {
                 method: 'get'
             })
                 .then(function (response) { return response.text(); })
-                .then(function (textData) { return resources.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
+                .then(function (textData) { return resourcesHand.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
                 .catch(function (err) {
-                console.log(err);
+                console.log("err: " + err);
             });
         }
-        resources.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
-            for (var _i = 0, loadedResources_1 = loadedResources; _i < loadedResources_1.length; _i++) {
-                var resource = loadedResources_1[_i];
-                //resource = alternativePath += resource;
-                console.log(resource);
-            }
-            resources.resourcesToLoad = loadedResources;
-            resources.resourcesToLoad.forEach(function (resourceDir) {
+        resourcesHand.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
+            resourcesHand.resourcesToLoad = loadedResources;
+            resourcesHand.resourcesToLoad.forEach(function (resourceDir) {
                 var resourceDirsSplit = resourceDir.split("/");
                 var resourceName = resourceDirsSplit[resourceDirsSplit.length - 1];
-                resources.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
+                resourcesHand.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
             });
-            resources.app.loader.load(function (e) {
-                resources.resourcesToLoad.forEach(function (resource) {
+            resourcesHand.app.loader.load(function (e) {
+                resourcesHand.resourcesToLoad.forEach(function (resource) {
                     var split = resource.split("/");
                     var name = split[split.length - 1];
                     if (name.indexOf(".json") != -1) {
-                        resources.storeAnimatedArray(name);
+                        resourcesHand.storeAnimatedArray(name);
+                    }
+                    else if (split[0] == "_generated_tiles") {
+                        resourcesHand.storeStaticTile(name);
+                    }
+                    else if (split[0] == "tiles") {
+                        resourcesHand.storeStaticTile(name);
                     }
                 });
                 onCompleteCallback();
             });
         };
-        resources.storeAnimatedArray = function (resourceName) {
-            var texturesTmp = resources.app.loader.resources[resourceName].textures;
-            if (resources.app.loader.resources[resourceName].textures != null) {
+        resourcesHand.generateAnimatedTiles = function (animationMeta) {
+            if (resourcesHand.animatedSprite[animationMeta.name] == null) {
+                resourcesHand.animatedSprite[animationMeta.name] = [];
+            }
+            for (var _i = 0, _a = animationMeta.tiles; _i < _a.length; _i++) {
+                var tile = _a[_i];
+                console.log("find tile.resourceName: " + tile.resourceName);
+                var parts = tile.resourceName.split("/");
+                console.log("in: ", resourcesHand.app.loader.resources);
+                var newTex = new PIXI.Texture(resourcesHand.app.loader.resources[parts[parts.length - 1]].texture.baseTexture, new PIXI.Rectangle(tile.startX, tile.startY, tile.width, tile.height));
+                resourcesHand.animatedSprite[animationMeta.name].push(newTex);
+            }
+        };
+        resourcesHand.storeStaticTile = function (genName) {
+            var texturesTmp = resourcesHand.app.loader.resources[genName].texture;
+            if (texturesTmp != null) {
+                resourcesHand.staticTile[genName] = texturesTmp;
+            }
+            else {
+                throw new Error("Can't create static tile resource for: " + genName);
+            }
+        };
+        resourcesHand.storeAnimatedArray = function (resourceName) {
+            var texturesTmp = resourcesHand.app.loader.resources[resourceName].textures;
+            if (resourcesHand.app.loader.resources[resourceName].textures != null) {
                 for (var key in texturesTmp) {
                     if (texturesTmp.hasOwnProperty(key)) {
-                        if (resources.animatedSprite[resourceName] == null) {
-                            resources.animatedSprite[resourceName] = [];
+                        if (resourcesHand.animatedSprite[resourceName] == null) {
+                            resourcesHand.animatedSprite[resourceName] = [];
                         }
-                        resources.animatedSprite[resourceName].push(texturesTmp[key]);
+                        resourcesHand.animatedSprite[resourceName].push(texturesTmp[key]);
                     }
                 }
             }
             //const animeFromSheet = new PIXI.AnimatedSprite(animation);
         };
-        resources.getAnimatedSprite = function (name) {
+        resourcesHand.getAnimatedSprite = function (name) {
             if (name.indexOf(".") != -1) {
                 name = name.split(".")[0];
             }
             name += ".json";
-            console.log("Name: ", name);
-            if (resources.animatedSprite[name] != null) {
-                return new PIXI.AnimatedSprite(resources.animatedSprite[name]);
+            if (resourcesHand.animatedSprite[name] != null) {
+                return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
             }
+            console.log("Wanted to find this animated sprite: ", name);
+            console.log("In this resource pool: ", resourcesHand.animatedSprite);
             return null;
         };
-        resources.resourcePNG = function (resourceName) {
-            for (var _i = 0, _a = resources.resourcesToLoad; _i < _a.length; _i++) {
+        resourcesHand.getAnimatedTile = function (name) {
+            if (resourcesHand.animatedSprite[name] != null) {
+                return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
+            }
+            console.log("Wanted to find this animated sprite: ", name);
+            console.log("In this resource pool: ", resourcesHand.animatedSprite);
+            return null;
+        };
+        resourcesHand.getStaticTile = function (genName) {
+            return new PIXI.Sprite(resourcesHand.staticTile[genName]);
+        };
+        resourcesHand.resourcePNG = function (resourceName) {
+            for (var _i = 0, _a = resourcesHand.resourcesToLoad; _i < _a.length; _i++) {
                 var resourceDir = _a[_i];
                 var splitDirs = resourceDir.split("/");
                 var nameAndMeta = splitDirs[splitDirs.length - 1];
                 if (nameAndMeta.toLocaleLowerCase().indexOf(".png") != -1) {
                     nameAndMeta.split(".")[0];
                     if (nameAndMeta == resourceName + ".png") {
-                        return resources.app.loader.resources[nameAndMeta].texture;
+                        return resourcesHand.app.loader.resources[nameAndMeta].texture;
                     }
                 }
             }
             throw new Error("PNG resource does not exist: " + resourceName);
         };
-        resources.resourcesToLoad = [];
-        resources.animatedSprite = {};
-        return resources;
+        resourcesHand.createAnimatedSpriteFromTile = function (tileAnim) {
+        };
+        resourcesHand.resourcesToLoad = [];
+        resourcesHand.animatedSprite = {};
+        resourcesHand.staticTile = {};
+        return resourcesHand;
     }());
 
     var cursorType;
@@ -1378,7 +1465,7 @@
         function tileAnimation(tiles) {
             if (tiles === void 0) { tiles = []; }
             this.name = "";
-            this.movementSpeed = 30;
+            this.animationSpeed = 0.5;
             this.tiles = tiles;
         }
         tileAnimation.initFromJsonGeneratedObj = function (obj) {
@@ -1387,7 +1474,8 @@
             return realObject;
         };
         tileAnimation.prototype.get = function (index) {
-            return this.tiles[index % this.tiles.length];
+            var animFrames = 60 * this.animationSpeed;
+            return this.tiles[(index % animFrames) % this.tiles.length];
         };
         tileAnimation.prototype.getAllTiles = function () {
             return this.tiles;
@@ -1398,6 +1486,8 @@
     var objectMetaData = /** @class */ (function () {
         function objectMetaData(x, y, name, tile) {
             this.tile = null;
+            this.isCombinationOfTiles = false;
+            this.isPartOfCombination = false;
             this.x = x;
             this.y = y;
             this.name = name;
@@ -1408,16 +1498,560 @@
         return objectMetaData;
     }());
 
+    var subTileMeta = /** @class */ (function () {
+        function subTileMeta(resourceName, startX, startY, width, height) {
+            this.tileName = "";
+            this.resourceName = resourceName;
+            this.startX = startX;
+            this.startY = startY;
+            this.width = width;
+            this.height = height;
+        }
+        subTileMeta.prototype.clone = function () {
+            return new subTileMeta(this.resourceName, this.startX, this.startY, this.width, this.height);
+        };
+        return subTileMeta;
+    }());
+
+    var animatedTypeCreator = /** @class */ (function () {
+        function animatedTypeCreator(elementName) {
+            var _a, _b;
+            this.tempSubTile = null;
+            this.animation = new tileAnimation();
+            this.tilePreview = document.createElement("canvas");
+            this.container = document.getElementById(elementName);
+            this.tilesContainer = document.createElement("div");
+            this.tilesContainer.style.margin = "8px";
+            (_a = this.container) === null || _a === void 0 ? void 0 : _a.appendChild(this.tilesContainer);
+            this.addTileToAnimButton = document.createElement("button");
+            this.addTileToAnimButton.innerHTML = "add tile to animated tile";
+            this.addTileToAnimButton.style.marginBottom = "32px";
+            this.addTileToAnimButton.addEventListener("mouseup", this.addTileToAnimation.bind(this));
+            (_b = this.container) === null || _b === void 0 ? void 0 : _b.appendChild(this.addTileToAnimButton);
+            this.tilePreview.className = "tilePreview";
+            document.body.appendChild(this.tilePreview);
+        }
+        animatedTypeCreator.prototype.setTileSet = function (tileSet) {
+            console.log("use this tile set: ", tileSet);
+            this.animation = tileSet;
+            this.tempSubTile = null;
+            this.createElementsForTiles(this.animation.tiles);
+        };
+        animatedTypeCreator.prototype.addTileToAnimation = function (e) {
+            var _a;
+            if (this.tempSubTile != null) {
+                var newTile = (_a = this.tempSubTile) === null || _a === void 0 ? void 0 : _a.clone();
+                newTile.tileName = this.animation.tiles.length.toString();
+                this.animation.tiles.push(newTile);
+            }
+            this.createElementsForTiles(this.animation.tiles);
+        };
+        animatedTypeCreator.prototype.createAnimatedLayerItem = function (newTile) {
+            var _this = this;
+            var item = document.createElement("div");
+            if (newTile != null) {
+                var nameElement = document.createElement("div");
+                nameElement.style.display = "inline-block";
+                nameElement.style.paddingRight = "32px";
+                nameElement.innerHTML = newTile === null || newTile === void 0 ? void 0 : newTile.tileName;
+                nameElement.addEventListener("mouseenter", function (e) {
+                    if (newTile != null) {
+                        _this.showPreviewOfTile(e, newTile);
+                    }
+                });
+                nameElement.addEventListener("mouseleave", function (e) {
+                    _this.tilePreview.style.display = "none";
+                });
+                item.appendChild(nameElement);
+                item.setAttribute("itemName", newTile === null || newTile === void 0 ? void 0 : newTile.tileName);
+            }
+            var moveUpButton = document.createElement("button");
+            moveUpButton.innerHTML = "up";
+            moveUpButton.addEventListener("mouseup", function (e) {
+                var _a;
+                var buttonElement = e.target;
+                var name = (_a = buttonElement.parentElement) === null || _a === void 0 ? void 0 : _a.getAttribute("itemName");
+                if (name != null) {
+                    _this.moveTile(name, -1);
+                }
+            });
+            item.appendChild(moveUpButton);
+            var moveDownButton = document.createElement("button");
+            moveDownButton.innerHTML = "down";
+            moveDownButton.addEventListener("mouseup", function (e) {
+                var _a;
+                var buttonElement = e.target;
+                var name = (_a = buttonElement.parentElement) === null || _a === void 0 ? void 0 : _a.getAttribute("itemName");
+                if (name != null) {
+                    _this.moveTile(name, 1);
+                }
+            });
+            item.appendChild(moveDownButton);
+            var deleteLayerButton = document.createElement("button");
+            deleteLayerButton.innerHTML = "delete";
+            deleteLayerButton.addEventListener("mouseup", function (e) {
+                var _a;
+                if (_this.animation.name != "")
+                    return;
+                var buttonElement = e.target;
+                var name = (_a = buttonElement.parentElement) === null || _a === void 0 ? void 0 : _a.getAttribute("itemName");
+                if (name != null) {
+                    _this.removeTile(name);
+                }
+            });
+            item.appendChild(deleteLayerButton);
+            return item;
+        };
+        animatedTypeCreator.prototype.getTileStack = function () {
+            return this.animation;
+        };
+        animatedTypeCreator.prototype.moveTile = function (tileName, moveDeltaSign) {
+            var originalPosition = -1;
+            for (var i = 0; i < this.animation.tiles.length; i++) {
+                var tile = this.animation.tiles[i];
+                if (tile.tileName == tileName) {
+                    originalPosition = i;
+                }
+            }
+            var itemToPlace = this.animation.tiles[originalPosition];
+            var newPosition = originalPosition + moveDeltaSign;
+            this.animation.tiles.splice(originalPosition, 1);
+            this.animation.tiles.splice(newPosition, 0, itemToPlace);
+            this.createElementsForTiles(this.animation.tiles);
+        };
+        animatedTypeCreator.prototype.removeTile = function (tileName) {
+            var originalPosition = -1;
+            for (var i = 0; i < this.animation.tiles.length; i++) {
+                var tile = this.animation.tiles[i];
+                if (tile.tileName == tileName) {
+                    originalPosition = i;
+                }
+            }
+            this.animation.tiles.splice(originalPosition, 1);
+            this.createElementsForTiles(this.animation.tiles);
+        };
+        animatedTypeCreator.prototype.createElementsForTiles = function (tilesArr) {
+            var _this = this;
+            var _a, _b;
+            while ((_a = this.tilesContainer) === null || _a === void 0 ? void 0 : _a.firstChild) {
+                this.tilesContainer.removeChild((_b = this.tilesContainer) === null || _b === void 0 ? void 0 : _b.firstChild);
+            }
+            tilesArr.forEach(function (tile) {
+                var _a;
+                (_a = _this.tilesContainer) === null || _a === void 0 ? void 0 : _a.appendChild(_this.createAnimatedLayerItem(tile));
+            });
+        };
+        animatedTypeCreator.prototype.showPreviewOfTile = function (e, targetTile) {
+            this.tilePreview.style.display = "inline";
+            var target = e.target;
+            var rect = target.getBoundingClientRect();
+            this.tilePreview.style.top = rect.top + "px";
+            this.tilePreview.style.left = window.innerWidth / 2 + "px";
+            this.tilePreview.style.width = "256px";
+            this.tilePreview.style.height = "256px";
+            this.tilePreview.width = 256;
+            this.tilePreview.height = 256;
+            var drawWidth = targetTile.width;
+            var drawHeight = targetTile.height;
+            if (drawWidth > 256) {
+                drawWidth = 256;
+                drawHeight = drawWidth * (targetTile.height / targetTile.width);
+            }
+            if (drawHeight > 256) {
+                drawHeight = 256;
+                drawWidth = drawHeight * (targetTile.width / targetTile.height);
+            }
+            var previewCtx = this.tilePreview.getContext("2d");
+            previewCtx === null || previewCtx === void 0 ? void 0 : previewCtx.clearRect(0, 0, this.tilePreview.width, this.tilePreview.height);
+            previewCtx === null || previewCtx === void 0 ? void 0 : previewCtx.drawImage(tileSelector.resourceNameAndImage[targetTile.resourceName], targetTile.startX, targetTile.startY, targetTile.width, targetTile.height, 0, 0, drawWidth, drawHeight);
+        };
+        return animatedTypeCreator;
+    }());
+
+    var tileSelector = /** @class */ (function () {
+        function tileSelector() {
+            var _this = this;
+            this.saveDatePremadeTilesName = "customAnimatedTilesMetaData_DONT_DELETE";
+            this.modal = document.createElement("div");
+            this.closeButton = document.createElement("button");
+            this.canvasRenderer = document.createElement("canvas");
+            this.controls = document.createElement("div");
+            this.mouseX = -1;
+            this.mouseY = -1;
+            this.resourceName = "";
+            this.subTileDone = true;
+            this.callbackSubTile = function (exportedTile) { };
+            window.node.getJsonData(this.saveDatePremadeTilesName, function (jsonString) {
+                if (jsonString != null) {
+                    var objectDataOnly_1 = JSON.parse(jsonString);
+                    var keys = Object.keys(objectDataOnly_1);
+                    keys.forEach(function (key) {
+                        tileSelector.resourceCreatedTileAnimations[key] = [];
+                        var objDataArray = objectDataOnly_1[key];
+                        objDataArray.forEach(function (objMetaData) {
+                            tileSelector.resourceCreatedTileAnimations[key].push(tileAnimation.initFromJsonGeneratedObj(objMetaData));
+                        });
+                    });
+                }
+            });
+            this.modal.className = "modalStandard";
+            this.controls.className = "modalTilesControl";
+            this.appendControls();
+            var createAnimTiles = document.createElement("div");
+            createAnimTiles.id = "animTileCreator";
+            this.controls.appendChild(createAnimTiles);
+            var useTileButton = document.createElement("button");
+            useTileButton.innerHTML = "use this tile";
+            useTileButton.addEventListener("mouseup", this.clickUseButton.bind(this));
+            this.controls.appendChild(useTileButton);
+            this.prevCreatedAnimTiles = document.createElement("div");
+            this.controls.appendChild(this.prevCreatedAnimTiles);
+            this.modal.appendChild(this.controls);
+            this.canvasContainer = document.createElement("div");
+            this.canvasContainer.className = "flexItem flex1";
+            this.canvasContainer.style.border = "solid 1px blue";
+            this.canvasContainer.style.overflow = "auto";
+            this.canvasRenderer.className = "tileModalCanvas";
+            this.canvasContainer.appendChild(this.canvasRenderer);
+            this.modal.appendChild(this.canvasContainer);
+            this.canvasContext = this.canvasRenderer.getContext("2d");
+            this.closeButton.className = "modalCloseButton";
+            this.closeButton.innerHTML = "Close";
+            this.modal.appendChild(this.closeButton);
+            this.modal.style.display = "none";
+            this.closeButton.addEventListener("mouseup", this.close.bind(this));
+            this.canvasRenderer.addEventListener("mousemove", this.mouseMoveCanvas.bind(this));
+            this.canvasRenderer.addEventListener("mousedown", this.clickCanvas.bind(this));
+            this.canvasRenderer.addEventListener("mouseup", this.mouseUpCanvas.bind(this));
+            document.body.appendChild(this.modal);
+            setInterval(function () {
+                _this.renderCanvas();
+            }, 500);
+            this.tileCreator = new animatedTypeCreator("animTileCreator");
+        }
+        tileSelector.prototype.clickUseButton = function () {
+            var _this = this;
+            if (this.tileCreator.tempSubTile != null) {
+                var tileAnimation_1 = this.tileCreator.getTileStack();
+                if (tileAnimation_1.name == "") {
+                    if (tileAnimation_1.tiles.length > 1) {
+                        window.node.prompt("", "At what speed whould the animation play? [0 - 1]", function (input) {
+                            if (input != null) {
+                                var floatValue = parseFloat(input);
+                                if (isNaN(floatValue) == false) {
+                                    _this.createAnimationStackFinalize(floatValue);
+                                }
+                            }
+                        });
+                    }
+                    else {
+                        this.createAnimationStackFinalize(0);
+                    }
+                }
+                else {
+                    this.callbackSubTile(tileAnimation_1);
+                }
+            }
+        };
+        tileSelector.prototype.createAnimationStackFinalize = function (animationSpeed) {
+            var _this = this;
+            window.node.prompt("", "Create a name for the animation stack", function (name) {
+                if (name != null) {
+                    var tileAnimation_2 = _this.tileCreator.getTileStack();
+                    tileAnimation_2.name = name;
+                    tileAnimation_2.animationSpeed = animationSpeed;
+                    if (tileSelector.resourceCreatedTileAnimations[_this.resourceName] == null) {
+                        tileSelector.resourceCreatedTileAnimations[_this.resourceName] = [];
+                    }
+                    tileSelector.resourceCreatedTileAnimations[_this.resourceName].push(tileAnimation_2);
+                    window.node.saveJsonData(_this.saveDatePremadeTilesName, JSON.stringify(tileSelector.resourceCreatedTileAnimations));
+                    _this.callbackSubTile(tileAnimation_2);
+                }
+            });
+        };
+        tileSelector.prototype.mouseUpCanvas = function (e) {
+            this.subTileDone = true;
+        };
+        tileSelector.prototype.clickCanvas = function (e) {
+            this.subTileDone = false;
+            var x = e.clientX;
+            var y = e.clientY;
+            var rect = this.canvasRenderer.getBoundingClientRect();
+            x -= rect.left;
+            y -= rect.top;
+            var gridWidth = parseInt(document.getElementById("gridWidthIn").value);
+            var gridHeight = parseInt(document.getElementById("gridHeightIn").value);
+            var gridXOffset = parseInt(document.getElementById("gridXOffset").value);
+            var gridYOffset = parseInt(document.getElementById("gridYOffset").value);
+            this.tileCreator.tempSubTile = new subTileMeta(this.resourceName, (Math.floor(x / gridWidth) * gridWidth) + gridXOffset, (Math.floor(y / gridHeight) * gridHeight) + gridYOffset, 0, 0);
+        };
+        tileSelector.prototype.mouseMoveCanvas = function (e) {
+            var x = e.clientX;
+            var y = e.clientY;
+            var rect = this.canvasRenderer.getBoundingClientRect();
+            x -= rect.left;
+            y -= rect.top;
+            this.mouseX = x;
+            this.mouseY = y;
+            this.renderCanvas();
+        };
+        tileSelector.prototype.initCanvas = function () {
+        };
+        tileSelector.prototype.appendControls = function () {
+            var controllerHTML = '<label for="gridWidthIn">Grid width:</label><input id="gridWidthIn" type="number" value="32"><br>';
+            controllerHTML += '<label for="gridHeightIn">Grid height:</label><input id="gridHeightIn" type="number" value="32"><br>';
+            controllerHTML += '<label for="gridXOffset">Grid x offset:</label><input id="gridXOffset" type="number" value="0"><br>';
+            controllerHTML += '<label for="gridYOffset">Grid y offset:</label><input id="gridYOffset" type="number" value="0"><br>';
+            this.controls.innerHTML = controllerHTML;
+        };
+        tileSelector.prototype.close = function () {
+            window.node.saveJsonData(this.saveDatePremadeTilesName, JSON.stringify(tileSelector.resourceCreatedTileAnimations));
+            this.modal.style.display = "none";
+        };
+        tileSelector.prototype.open = function (imageSource, resourceName, tileDoneCallback) {
+            this.tileCreator.setTileSet(new tileAnimation());
+            this.callbackSubTile = tileDoneCallback;
+            this.resourceName = resourceName;
+            if (tileSelector.resourceNameAndImage[resourceName] == null) {
+                this.loadResource(imageSource, resourceName);
+            }
+            else {
+                this.renderCanvas();
+            }
+            while (this.prevCreatedAnimTiles.firstChild) {
+                this.prevCreatedAnimTiles.removeChild(this.prevCreatedAnimTiles.firstChild);
+            }
+            this.populateStoredTileAnimations(resourceName);
+            this.modal.style.display = "flex";
+        };
+        tileSelector.prototype.loadResource = function (imageSource, resourceName) {
+            var _this = this;
+            tileSelector.resourceNameAndImage[resourceName] = new Image();
+            tileSelector.resourceNameAndImage[resourceName].onload = function () {
+                var _a;
+                _this.canvasRenderer.width = tileSelector.resourceNameAndImage[resourceName].width;
+                _this.canvasRenderer.height = tileSelector.resourceNameAndImage[resourceName].height;
+                _this.canvasRenderer.style.width = tileSelector.resourceNameAndImage[resourceName].width + "px";
+                _this.canvasRenderer.style.height = tileSelector.resourceNameAndImage[resourceName].height + "px";
+                (_a = _this.canvasContext) === null || _a === void 0 ? void 0 : _a.drawImage(tileSelector.resourceNameAndImage[resourceName], 0, 0);
+                _this.renderCanvas();
+            };
+            tileSelector.resourceNameAndImage[resourceName].src = imageSource;
+        };
+        tileSelector.prototype.populateStoredTileAnimations = function (resourceName) {
+            var _this = this;
+            while (this.prevCreatedAnimTiles.firstChild) {
+                this.prevCreatedAnimTiles.removeChild(this.prevCreatedAnimTiles.firstChild);
+            }
+            if (tileSelector.resourceCreatedTileAnimations[resourceName] != null) {
+                var alreadyCreatedTileSets = tileSelector.resourceCreatedTileAnimations[resourceName];
+                alreadyCreatedTileSets.forEach(function (tileSet) {
+                    var containerItem = document.createElement("div");
+                    var newTileSetItem = document.createElement("div");
+                    newTileSetItem.innerHTML = tileSet.name;
+                    newTileSetItem.addEventListener("mouseup", function () {
+                        _this.tileCreator.setTileSet(tileSet);
+                    });
+                    containerItem.appendChild(newTileSetItem);
+                    var deleteButton = document.createElement("button");
+                    deleteButton.innerHTML = "delete";
+                    deleteButton.addEventListener("mouseup", function () {
+                        var pos = tileSelector.resourceCreatedTileAnimations[resourceName].indexOf(tileSet);
+                        console.log("tileSelector.resourceCreatedTileAnimations[resourceName]: ", tileSelector.resourceCreatedTileAnimations[resourceName]);
+                        tileSelector.resourceCreatedTileAnimations[resourceName].splice(pos, 1);
+                        console.log("tileSelector.resourceCreatedTileAnimations[resourceName]: ", tileSelector.resourceCreatedTileAnimations[resourceName]);
+                        _this.populateStoredTileAnimations(resourceName);
+                        if (_this.tileCreator.animation.name == tileSet.name) {
+                            _this.tileCreator.animation = new tileAnimation();
+                            _this.tileCreator.tempSubTile = null;
+                        }
+                    });
+                    containerItem.appendChild(deleteButton);
+                    _this.prevCreatedAnimTiles.appendChild(containerItem);
+                });
+            }
+        };
+        tileSelector.prototype.renderGrid = function () {
+            var _a, _b, _c, _d, _e, _f, _g, _h;
+            var gridWidth = parseInt(document.getElementById("gridWidthIn").value);
+            var gridHeight = parseInt(document.getElementById("gridHeightIn").value);
+            var gridXOffset = parseInt(document.getElementById("gridXOffset").value);
+            var gridYOffset = parseInt(document.getElementById("gridYOffset").value);
+            if (gridWidth <= 0 || isNaN(gridWidth)) {
+                gridWidth = 1;
+            }
+            if (gridHeight <= 0 || isNaN(gridHeight)) {
+                gridHeight = 1;
+            }
+            if (gridXOffset <= 0 || isNaN(gridXOffset)) {
+                gridXOffset = 0;
+            }
+            if (gridYOffset <= 0 || isNaN(gridYOffset)) {
+                gridYOffset = 0;
+            }
+            var horizontalLines = Math.round(this.canvasRenderer.height / gridHeight) + 2;
+            var verticallines = Math.round(this.canvasRenderer.width / gridWidth) + 2;
+            this.canvasContext.strokeStyle = 'black';
+            this.canvasContext.lineWidth = 0.5;
+            for (var i = 0; i < horizontalLines; i++) {
+                (_a = this.canvasContext) === null || _a === void 0 ? void 0 : _a.beginPath();
+                (_b = this.canvasContext) === null || _b === void 0 ? void 0 : _b.moveTo(0.5 + (gridXOffset % gridWidth) - gridWidth, (i) * gridHeight + 0.5 + (gridYOffset % gridHeight) - gridHeight);
+                (_c = this.canvasContext) === null || _c === void 0 ? void 0 : _c.lineTo(this.canvasRenderer.width + 0.5 + (gridXOffset % gridWidth) - gridWidth, (i) * gridHeight + 0.5 + (gridYOffset % gridHeight) - gridHeight);
+                (_d = this.canvasContext) === null || _d === void 0 ? void 0 : _d.stroke();
+            }
+            for (var i = 0; i < verticallines; i++) {
+                (_e = this.canvasContext) === null || _e === void 0 ? void 0 : _e.beginPath();
+                (_f = this.canvasContext) === null || _f === void 0 ? void 0 : _f.moveTo((i) * gridWidth + 0.5 + (gridXOffset % gridWidth) - gridWidth, this.canvasRenderer.height + (i) * gridWidth + 0.5 + (gridYOffset % gridHeight) - gridHeight);
+                (_g = this.canvasContext) === null || _g === void 0 ? void 0 : _g.lineTo((i) * gridWidth + 0.5 + (gridXOffset % gridWidth) - gridWidth, 0.5 + (gridYOffset % gridHeight) - gridHeight);
+                (_h = this.canvasContext) === null || _h === void 0 ? void 0 : _h.stroke();
+            }
+            this.canvasContext.lineWidth = 1;
+            var mouseGridX = (Math.floor(this.mouseX / gridWidth) * gridWidth) + gridXOffset;
+            var mouseGridY = (Math.floor(this.mouseY / gridHeight) * gridHeight) + gridYOffset;
+            this.canvasContext.strokeStyle = 'red';
+            if (this.tileCreator.tempSubTile != null) {
+                this.canvasContext.beginPath();
+                this.canvasContext.rect(this.tileCreator.tempSubTile.startX, this.tileCreator.tempSubTile.startY, this.tileCreator.tempSubTile.width, this.tileCreator.tempSubTile.height);
+                this.canvasContext.stroke();
+                if (this.subTileDone == false) {
+                    this.tileCreator.tempSubTile.width = mouseGridX - this.tileCreator.tempSubTile.startX;
+                    this.tileCreator.tempSubTile.height = mouseGridY - this.tileCreator.tempSubTile.startY;
+                }
+            }
+            else if (this.mouseX != -1 || this.mouseY != -1) {
+                this.canvasContext.beginPath();
+                this.canvasContext.rect(mouseGridX, mouseGridY, gridWidth, gridHeight);
+                this.canvasContext.stroke();
+            }
+        };
+        tileSelector.prototype.renderCanvas = function () {
+            var _a, _b;
+            (_a = this.canvasContext) === null || _a === void 0 ? void 0 : _a.clearRect(0, 0, this.canvasRenderer.width, this.canvasRenderer.height);
+            if (this.resourceName != "") {
+                (_b = this.canvasContext) === null || _b === void 0 ? void 0 : _b.drawImage(tileSelector.resourceNameAndImage[this.resourceName], 0, 0);
+            }
+            //Render lines
+            this.renderGrid();
+        };
+        tileSelector.resourceNameAndImage = {};
+        tileSelector.resourceCreatedTileAnimations = {};
+        return tileSelector;
+    }());
+
+    var layerCompressor = /** @class */ (function () {
+        function layerCompressor() {
+        }
+        layerCompressor.compressRoom = function (roomName, layerData) {
+            window.node.clearPreviouslyGeneratedImages(roomName);
+            var compressed = [];
+            //Loop through each layer and compress
+            layerData.forEach(function (l) {
+                var compressedLayer = layerCompressor.compressLayer(l, roomName);
+                compressed.push(compressedLayer);
+            });
+            return compressed;
+        };
+        layerCompressor.compressLayer = function (l, roomName) {
+            //get each static tile from the layer
+            var compressedLayer = new layer(l.layerName, l.zIndex);
+            var staticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length == 1; });
+            if (staticTiles.length > 0) {
+                var combinedStaticTiles = layerCompressor.combineStaticTilesIntoOne(staticTiles, roomName);
+                compressedLayer.metaObjectsInLayer.push(combinedStaticTiles);
+                //Mark static tiles that were combined
+                for (var _i = 0, staticTiles_1 = staticTiles; _i < staticTiles_1.length; _i++) {
+                    var t = staticTiles_1[_i];
+                    t.isPartOfCombination = true;
+                }
+                staticTiles.forEach(function (tile) {
+                    compressedLayer.metaObjectsInLayer.push(tile);
+                });
+            }
+            var nonStaticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length > 1; });
+            for (var _a = 0, nonStaticTiles_1 = nonStaticTiles; _a < nonStaticTiles_1.length; _a++) {
+                var t = nonStaticTiles_1[_a];
+                compressedLayer.metaObjectsInLayer.push(t);
+            }
+            //add rest of the objects to the layer
+            l.metaObjectsInLayer.forEach(function (obj) {
+                if (obj.tile == null) {
+                    compressedLayer.metaObjectsInLayer.push(obj);
+                }
+            });
+            return compressedLayer;
+        };
+        layerCompressor.combineStaticTilesIntoOne = function (staticTiles, roomName) {
+            var canvas = document.createElement("canvas");
+            var ctx = canvas.getContext("2d");
+            var width = 0;
+            var height = 0;
+            var xStart = null;
+            var yStart = null;
+            //Resize the canvas to fit all tiles
+            staticTiles.forEach(function (obj) {
+                if (xStart == null || obj.x < xStart) {
+                    xStart = obj.x;
+                }
+                if (yStart == null || obj.y < yStart) {
+                    yStart = obj.y;
+                }
+            });
+            staticTiles.forEach(function (obj) {
+                if ((obj.x + obj.tile.tiles[0].width) - xStart > width) {
+                    width = (obj.x + obj.tile.tiles[0].width) - xStart;
+                }
+                if ((obj.y + obj.tile.tiles[0].height) - yStart > height) {
+                    height = (obj.y + obj.tile.tiles[0].height) - yStart;
+                }
+            });
+            canvas.width = width;
+            canvas.height = height;
+            canvas.style.width = width + "px";
+            canvas.style.height = height + "px";
+            //Render tiles
+            staticTiles.forEach(function (tile) {
+                var tileDraw = tile.tile.tiles[0];
+                var image = tileSelector.resourceNameAndImage[tileDraw.resourceName];
+                console.log(image.src);
+                if (image == null) {
+                    console.log("tile: ", tile);
+                    console.log("Image is null ", image);
+                }
+                ctx === null || ctx === void 0 ? void 0 : ctx.drawImage(image, tileDraw.startX, tileDraw.startY, tileDraw.width, tileDraw.height, tile.x - xStart, tile.y - yStart, tileDraw.width, tileDraw.height);
+            });
+            var generatedName = uidGen.new() + ".png";
+            canvas.toBlob(function (blob) {
+                if (blob != null) {
+                    console.log(blob);
+                    blob.arrayBuffer().then(function (buffer) {
+                        return window.node.saveCompiledTiles(roomName, generatedName, buffer);
+                    });
+                }
+                else {
+                    console.log("Blob is null, staticTiles: ", staticTiles);
+                }
+            });
+            var newTile = new subTileMeta(generatedName, xStart, yStart, width, height);
+            var combinedTiles = new tileAnimation([newTile]);
+            var compressetMeta = new objectMetaData(xStart, yStart, generatedName, combinedTiles);
+            compressetMeta.isCombinationOfTiles = true;
+            return compressetMeta;
+        };
+        return layerCompressor;
+    }());
+
     var layerContainer = /** @class */ (function () {
         function layerContainer(canvasContext) {
             this.storedLayers = [];
+            this.currentRoom = "";
             this.selectedLayer = null;
             this.gridXOffset = 0;
             this.gridYOffset = 0;
             this.ctx = canvasContext;
             this.containerElement = document.getElementById("layerContainer");
         }
-        layerContainer.prototype.importRoom = function (jsonString) {
+        layerContainer.prototype.importRoom = function (clickedFile, jsonString) {
+            this.currentRoom = clickedFile;
             var arayOfData = [];
             if (jsonString != "") {
                 arayOfData = JSON.parse(jsonString);
@@ -1430,7 +2064,9 @@
                 var dataLayer = arayOfData[i];
                 var newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
                 dataLayer.metaObjectsInLayer.forEach(function (obj) {
-                    newLayer.metaObjectsInLayer.push(new objectMetaData(obj.x, obj.y, obj.name, obj.tile));
+                    if (obj.isCombinationOfTiles == false) {
+                        newLayer.metaObjectsInLayer.push(new objectMetaData(obj.x, obj.y, obj.name, obj.tile));
+                    }
                 });
                 this_1.storedLayers.push(newLayer);
             };
@@ -1443,7 +2079,7 @@
             this.selectFirstLayer();
         };
         layerContainer.prototype.exportRoom = function () {
-            return LZString.compressToEncodedURIComponent(JSON.stringify(this.storedLayers));
+            return LZString.compressToEncodedURIComponent(JSON.stringify(layerCompressor.compressRoom(this.currentRoom, this.storedLayers)));
         };
         layerContainer.prototype.createLayerOption = function (layerName) {
             var layerOption = document.createElement("div");
@@ -1590,11 +2226,21 @@
             var button = e.target;
             var layerName = (_a = button.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
             if (layerName != null) {
-                var targetToMoveUp = this.storedLayers.filter(function (x) { return x.layerName == layerName; })[0];
-                var index_1 = targetToMoveUp.zIndex;
-                var targetToMoveDown = this.storedLayers.filter(function (x) { return x.zIndex == index_1 - 1; })[0];
-                targetToMoveUp.zIndex = targetToMoveDown.zIndex;
-                targetToMoveDown.zIndex = index_1;
+                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
+                    var l = _b[_i];
+                    if (l.layerName == layerName) {
+                        for (var _c = 0, _d = this.storedLayers; _c < _d.length; _c++) {
+                            var sl = _d[_c];
+                            if (sl.zIndex == l.zIndex - 1) {
+                                l.zIndex = l.zIndex ^ sl.zIndex;
+                                sl.zIndex = l.zIndex ^ sl.zIndex;
+                                l.zIndex = l.zIndex ^ sl.zIndex;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
                 this.initializeLayerModule(__spreadArrays(this.storedLayers));
             }
             if (layerName != null) {
@@ -1608,12 +2254,22 @@
             var button = e.target;
             var layerName = (_a = button.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
             if (layerName != null) {
-                var targetToMoveDown = this.storedLayers.filter(function (x) { return x.layerName == layerName; })[0];
-                var index_2 = targetToMoveDown.zIndex;
-                var targetToMoveUp = this.storedLayers.filter(function (x) { return x.zIndex == index_2 + 1; })[0];
-                targetToMoveUp.zIndex = targetToMoveDown.zIndex;
-                targetToMoveDown.zIndex = index_2;
-                this.initializeLayerModule(__spreadArrays(this.storedLayers));
+                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
+                    var l = _b[_i];
+                    if (l.layerName == layerName) {
+                        for (var _c = 0, _d = this.storedLayers; _c < _d.length; _c++) {
+                            var sl = _d[_c];
+                            if (sl.zIndex == l.zIndex + 1) {
+                                l.zIndex = l.zIndex ^ sl.zIndex;
+                                sl.zIndex = l.zIndex ^ sl.zIndex;
+                                l.zIndex = l.zIndex ^ sl.zIndex;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                this.initializeLayerModule(this.storedLayers);
             }
             if (layerName != null) {
                 if (this.selectedLayer != null) {
@@ -1634,19 +2290,19 @@
             }
         };
         layerContainer.prototype.selectFirstLayer = function () {
-            console.log("selectFirstLayer");
             this.selectLayer(this.storedLayers[0]);
         };
         layerContainer.prototype.createNewLayer = function (newLayerName) {
             var nextIndex = 0;
             this.storedLayers.forEach(function (layer) {
-                if (layer.zIndex > nextIndex) {
+                if (layer.zIndex >= nextIndex) {
                     nextIndex = layer.zIndex + 1;
                 }
             });
             var newLayer = new layer(newLayerName, nextIndex);
+            newLayer.zIndex = nextIndex;
             this.storedLayers.push(newLayer);
-            this.initializeLayerModule(JSON.parse(JSON.stringify(this.storedLayers)));
+            this.initializeLayerModule(this.storedLayers);
             this.selectLayer(newLayer);
         };
         layerContainer.prototype.deleteLayer = function (layerName) {
@@ -1664,425 +2320,6 @@
             }
         };
         return layerContainer;
-    }());
-
-    var subTileMeta = /** @class */ (function () {
-        function subTileMeta(resourceName, startX, startY, width, height) {
-            this.tileName = "";
-            this.resourceName = resourceName;
-            this.startX = startX;
-            this.startY = startY;
-            this.width = width;
-            this.height = height;
-        }
-        subTileMeta.prototype.clone = function () {
-            return new subTileMeta(this.resourceName, this.startX, this.startY, this.width, this.height);
-        };
-        return subTileMeta;
-    }());
-
-    var animatedTypeCreator = /** @class */ (function () {
-        function animatedTypeCreator(elementName) {
-            var _a, _b;
-            this.tempSubTile = null;
-            this.animation = new tileAnimation();
-            this.tilePreview = document.createElement("canvas");
-            this.container = document.getElementById(elementName);
-            this.tilesContainer = document.createElement("div");
-            this.tilesContainer.style.margin = "8px";
-            (_a = this.container) === null || _a === void 0 ? void 0 : _a.appendChild(this.tilesContainer);
-            this.addTileToAnimButton = document.createElement("button");
-            this.addTileToAnimButton.innerHTML = "add tile to animated tile";
-            this.addTileToAnimButton.style.marginBottom = "32px";
-            this.addTileToAnimButton.addEventListener("mouseup", this.addTileToAnimation.bind(this));
-            (_b = this.container) === null || _b === void 0 ? void 0 : _b.appendChild(this.addTileToAnimButton);
-            this.tilePreview.className = "tilePreview";
-            document.body.appendChild(this.tilePreview);
-        }
-        animatedTypeCreator.prototype.setTileSet = function (tileSet) {
-            this.animation = tileSet;
-            this.tempSubTile = this.animation.tiles[0];
-            this.createElementsForTiles(this.animation.tiles);
-        };
-        animatedTypeCreator.prototype.addTileToAnimation = function (e) {
-            var _a;
-            if (this.tempSubTile != null) {
-                var newTile = (_a = this.tempSubTile) === null || _a === void 0 ? void 0 : _a.clone();
-                newTile.tileName = this.animation.tiles.length.toString();
-                this.animation.tiles.push(newTile);
-            }
-            this.createElementsForTiles(this.animation.tiles);
-        };
-        animatedTypeCreator.prototype.createAnimatedLayerItem = function (newTile) {
-            var _this = this;
-            var item = document.createElement("div");
-            if (newTile != null) {
-                var nameElement = document.createElement("div");
-                nameElement.style.display = "inline-block";
-                nameElement.style.paddingRight = "32px";
-                nameElement.innerHTML = newTile === null || newTile === void 0 ? void 0 : newTile.tileName;
-                nameElement.addEventListener("mouseenter", function (e) {
-                    if (newTile != null) {
-                        _this.showPreviewOfTile(e, newTile);
-                    }
-                });
-                nameElement.addEventListener("mouseleave", function (e) {
-                    _this.tilePreview.style.display = "none";
-                });
-                item.appendChild(nameElement);
-                item.setAttribute("itemName", newTile === null || newTile === void 0 ? void 0 : newTile.tileName);
-            }
-            var moveUpButton = document.createElement("button");
-            moveUpButton.innerHTML = "up";
-            moveUpButton.addEventListener("mouseup", function (e) {
-                var _a;
-                var buttonElement = e.target;
-                var name = (_a = buttonElement.parentElement) === null || _a === void 0 ? void 0 : _a.getAttribute("itemName");
-                if (name != null) {
-                    _this.moveTile(name, -1);
-                }
-            });
-            item.appendChild(moveUpButton);
-            var moveDownButton = document.createElement("button");
-            moveDownButton.innerHTML = "down";
-            moveDownButton.addEventListener("mouseup", function (e) {
-                var _a;
-                var buttonElement = e.target;
-                var name = (_a = buttonElement.parentElement) === null || _a === void 0 ? void 0 : _a.getAttribute("itemName");
-                if (name != null) {
-                    _this.moveTile(name, 1);
-                }
-            });
-            item.appendChild(moveDownButton);
-            var deleteLayerButton = document.createElement("button");
-            deleteLayerButton.innerHTML = "delete";
-            deleteLayerButton.addEventListener("mouseup", function (e) {
-                var _a;
-                var buttonElement = e.target;
-                var name = (_a = buttonElement.parentElement) === null || _a === void 0 ? void 0 : _a.getAttribute("itemName");
-                if (name != null) {
-                    _this.removeTile(name);
-                }
-            });
-            item.appendChild(deleteLayerButton);
-            return item;
-        };
-        animatedTypeCreator.prototype.getTileStack = function () {
-            return this.animation;
-        };
-        animatedTypeCreator.prototype.moveTile = function (tileName, moveDeltaSign) {
-            var originalPosition = -1;
-            for (var i = 0; i < this.animation.tiles.length; i++) {
-                var tile = this.animation.tiles[i];
-                if (tile.tileName == tileName) {
-                    originalPosition = i;
-                }
-            }
-            var itemToPlace = this.animation.tiles[originalPosition];
-            var newPosition = originalPosition + moveDeltaSign;
-            this.animation.tiles.splice(originalPosition, 1);
-            this.animation.tiles.splice(newPosition, 0, itemToPlace);
-            this.createElementsForTiles(this.animation.tiles);
-        };
-        animatedTypeCreator.prototype.removeTile = function (tileName) {
-            var originalPosition = -1;
-            for (var i = 0; i < this.animation.tiles.length; i++) {
-                var tile = this.animation.tiles[i];
-                if (tile.tileName == tileName) {
-                    originalPosition = i;
-                }
-            }
-            this.animation.tiles.splice(originalPosition, 1);
-            this.createElementsForTiles(this.animation.tiles);
-        };
-        animatedTypeCreator.prototype.createElementsForTiles = function (tilesArr) {
-            var _this = this;
-            var _a, _b;
-            while ((_a = this.tilesContainer) === null || _a === void 0 ? void 0 : _a.firstChild) {
-                this.tilesContainer.removeChild((_b = this.tilesContainer) === null || _b === void 0 ? void 0 : _b.firstChild);
-            }
-            tilesArr.forEach(function (tile) {
-                var _a;
-                (_a = _this.tilesContainer) === null || _a === void 0 ? void 0 : _a.appendChild(_this.createAnimatedLayerItem(tile));
-            });
-        };
-        animatedTypeCreator.prototype.showPreviewOfTile = function (e, targetTile) {
-            this.tilePreview.style.display = "inline";
-            var target = e.target;
-            var rect = target.getBoundingClientRect();
-            this.tilePreview.style.top = rect.top + "px";
-            this.tilePreview.style.left = window.innerWidth / 2 + "px";
-            this.tilePreview.style.width = "256px";
-            this.tilePreview.style.height = "256px";
-            this.tilePreview.width = 256;
-            this.tilePreview.height = 256;
-            var drawWidth = targetTile.width;
-            var drawHeight = targetTile.height;
-            if (drawWidth > 256) {
-                drawWidth = 256;
-                drawHeight = drawWidth * (targetTile.height / targetTile.width);
-            }
-            if (drawHeight > 256) {
-                drawHeight = 256;
-                drawWidth = drawHeight * (targetTile.width / targetTile.height);
-            }
-            var previewCtx = this.tilePreview.getContext("2d");
-            previewCtx === null || previewCtx === void 0 ? void 0 : previewCtx.clearRect(0, 0, this.tilePreview.width, this.tilePreview.height);
-            previewCtx === null || previewCtx === void 0 ? void 0 : previewCtx.drawImage(tileSelector.resourceNameAndImage[targetTile.resourceName], targetTile.startX, targetTile.startY, targetTile.width, targetTile.height, 0, 0, drawWidth, drawHeight);
-        };
-        return animatedTypeCreator;
-    }());
-
-    var tileSelector = /** @class */ (function () {
-        function tileSelector() {
-            var _this = this;
-            this.saveDatePremadeTilesName = "customAnimatedTilesMetaData_DONT_DELETE";
-            this.modal = document.createElement("div");
-            this.closeButton = document.createElement("button");
-            this.canvasRenderer = document.createElement("canvas");
-            this.controls = document.createElement("div");
-            this.mouseX = -1;
-            this.mouseY = -1;
-            this.resourceName = "";
-            this.subTileDone = false;
-            this.callbackSubTile = function (exportedTile) { };
-            window.node.getJsonData(this.saveDatePremadeTilesName, function (jsonString) {
-                if (jsonString != null) {
-                    var objectDataOnly_1 = JSON.parse(jsonString);
-                    var keys = Object.keys(objectDataOnly_1);
-                    keys.forEach(function (key) {
-                        tileSelector.resourceCreatedTileAnimations[key] = [];
-                        var objDataArray = objectDataOnly_1[key];
-                        objDataArray.forEach(function (objMetaData) {
-                            tileSelector.resourceCreatedTileAnimations[key].push(tileAnimation.initFromJsonGeneratedObj(objMetaData));
-                        });
-                    });
-                }
-            });
-            this.modal.className = "modalStandard";
-            this.controls.className = "modalTilesControl";
-            this.appendControls();
-            var createAnimTiles = document.createElement("div");
-            createAnimTiles.id = "animTileCreator";
-            this.controls.appendChild(createAnimTiles);
-            var useTileButton = document.createElement("button");
-            useTileButton.innerHTML = "use this tile";
-            useTileButton.addEventListener("mouseup", this.clickUseButton.bind(this));
-            this.controls.appendChild(useTileButton);
-            this.prevCreatedAnimTiles = document.createElement("div");
-            this.controls.appendChild(this.prevCreatedAnimTiles);
-            this.modal.appendChild(this.controls);
-            this.canvasContainer = document.createElement("div");
-            this.canvasContainer.className = "flexItem flex1";
-            this.canvasContainer.style.border = "solid 1px blue";
-            this.canvasContainer.style.overflow = "auto";
-            this.canvasRenderer.className = "tileModalCanvas";
-            this.canvasContainer.appendChild(this.canvasRenderer);
-            this.modal.appendChild(this.canvasContainer);
-            this.canvasContext = this.canvasRenderer.getContext("2d");
-            this.closeButton.className = "modalCloseButton";
-            this.closeButton.innerHTML = "Close";
-            this.modal.appendChild(this.closeButton);
-            this.modal.style.display = "none";
-            this.closeButton.addEventListener("mouseup", this.close.bind(this));
-            this.canvasRenderer.addEventListener("mousemove", this.mouseMoveCanvas.bind(this));
-            this.canvasRenderer.addEventListener("mousedown", this.clickCanvas.bind(this));
-            this.canvasRenderer.addEventListener("mouseup", this.mouseUpCanvas.bind(this));
-            document.body.appendChild(this.modal);
-            setInterval(function () {
-                _this.renderCanvas();
-            }, 500);
-            this.tileCreator = new animatedTypeCreator("animTileCreator");
-        }
-        tileSelector.prototype.clickUseButton = function () {
-            var _this = this;
-            if (this.tileCreator.tempSubTile != null) {
-                var tileAnimation_1 = this.tileCreator.getTileStack();
-                if (tileAnimation_1.name == "") {
-                    window.node.prompt("", "Create a name for the animation stack", function (name) {
-                        if (name != null) {
-                            var tileAnimation_2 = _this.tileCreator.getTileStack();
-                            tileAnimation_2.name = name;
-                            if (tileSelector.resourceCreatedTileAnimations[_this.resourceName] == null) {
-                                tileSelector.resourceCreatedTileAnimations[_this.resourceName] = [];
-                            }
-                            tileSelector.resourceCreatedTileAnimations[_this.resourceName].push(tileAnimation_2);
-                            window.node.saveJsonData(_this.saveDatePremadeTilesName, JSON.stringify(tileSelector.resourceCreatedTileAnimations));
-                            _this.callbackSubTile(tileAnimation_2);
-                        }
-                    });
-                }
-                else {
-                    this.callbackSubTile(tileAnimation_1);
-                }
-            }
-        };
-        tileSelector.prototype.mouseUpCanvas = function (e) {
-            this.subTileDone = true;
-        };
-        tileSelector.prototype.clickCanvas = function (e) {
-            this.subTileDone = false;
-            var x = e.clientX;
-            var y = e.clientY;
-            var rect = this.canvasRenderer.getBoundingClientRect();
-            x -= rect.left;
-            y -= rect.top;
-            var gridWidth = parseInt(document.getElementById("gridWidthIn").value);
-            var gridHeight = parseInt(document.getElementById("gridHeightIn").value);
-            var gridXOffset = parseInt(document.getElementById("gridXOffset").value);
-            var gridYOffset = parseInt(document.getElementById("gridYOffset").value);
-            this.tileCreator.tempSubTile = new subTileMeta(this.resourceName, (Math.floor(x / gridWidth) * gridWidth) + gridXOffset, (Math.floor(y / gridHeight) * gridHeight) + gridYOffset, 0, 0);
-        };
-        tileSelector.prototype.mouseMoveCanvas = function (e) {
-            var x = e.clientX;
-            var y = e.clientY;
-            var rect = this.canvasRenderer.getBoundingClientRect();
-            x -= rect.left;
-            y -= rect.top;
-            this.mouseX = x;
-            this.mouseY = y;
-            this.renderCanvas();
-        };
-        tileSelector.prototype.initCanvas = function () {
-        };
-        tileSelector.prototype.appendControls = function () {
-            var controllerHTML = '<label for="gridWidthIn">Grid width:</label><input id="gridWidthIn" type="number" value="32"><br>';
-            controllerHTML += '<label for="gridHeightIn">Grid height:</label><input id="gridHeightIn" type="number" value="32"><br>';
-            controllerHTML += '<label for="gridXOffset">Grid x offset:</label><input id="gridXOffset" type="number" value="0"><br>';
-            controllerHTML += '<label for="gridYOffset">Grid y offset:</label><input id="gridYOffset" type="number" value="0"><br>';
-            this.controls.innerHTML = controllerHTML;
-        };
-        tileSelector.prototype.close = function () {
-            window.node.saveJsonData(this.saveDatePremadeTilesName, JSON.stringify(tileSelector.resourceCreatedTileAnimations));
-            this.modal.style.display = "none";
-        };
-        tileSelector.prototype.open = function (imageSource, resourceName, tileDoneCallback) {
-            this.callbackSubTile = tileDoneCallback;
-            this.resourceName = resourceName;
-            if (tileSelector.resourceNameAndImage[resourceName] == null) {
-                this.loadResource(imageSource, resourceName);
-            }
-            else {
-                this.renderCanvas();
-            }
-            while (this.prevCreatedAnimTiles.firstChild) {
-                this.prevCreatedAnimTiles.removeChild(this.prevCreatedAnimTiles.firstChild);
-            }
-            this.populateStoredTileAnimations(resourceName);
-            this.modal.style.display = "flex";
-        };
-        tileSelector.prototype.loadResource = function (imageSource, resourceName) {
-            var _this = this;
-            tileSelector.resourceNameAndImage[resourceName] = new Image();
-            tileSelector.resourceNameAndImage[resourceName].onload = function () {
-                var _a;
-                _this.canvasRenderer.width = tileSelector.resourceNameAndImage[resourceName].width;
-                _this.canvasRenderer.height = tileSelector.resourceNameAndImage[resourceName].height;
-                _this.canvasRenderer.style.width = tileSelector.resourceNameAndImage[resourceName].width + "px";
-                _this.canvasRenderer.style.height = tileSelector.resourceNameAndImage[resourceName].height + "px";
-                (_a = _this.canvasContext) === null || _a === void 0 ? void 0 : _a.drawImage(tileSelector.resourceNameAndImage[resourceName], 0, 0);
-                _this.renderCanvas();
-            };
-            tileSelector.resourceNameAndImage[resourceName].src = imageSource;
-        };
-        tileSelector.prototype.populateStoredTileAnimations = function (resourceName) {
-            var _this = this;
-            while (this.prevCreatedAnimTiles.firstChild) {
-                this.prevCreatedAnimTiles.removeChild(this.prevCreatedAnimTiles.firstChild);
-            }
-            if (tileSelector.resourceCreatedTileAnimations[resourceName] != null) {
-                var alreadyCreatedTileSets = tileSelector.resourceCreatedTileAnimations[resourceName];
-                alreadyCreatedTileSets.forEach(function (tileSet) {
-                    var containerItem = document.createElement("div");
-                    var newTileSetItem = document.createElement("div");
-                    newTileSetItem.innerHTML = tileSet.name;
-                    newTileSetItem.addEventListener("mouseup", function () {
-                        _this.tileCreator.setTileSet(tileSet);
-                    });
-                    containerItem.appendChild(newTileSetItem);
-                    var deleteButton = document.createElement("button");
-                    deleteButton.innerHTML = "delete";
-                    deleteButton.addEventListener("mouseup", function () {
-                        var pos = tileSelector.resourceCreatedTileAnimations[resourceName].indexOf(tileSet);
-                        console.log("tileSelector.resourceCreatedTileAnimations[resourceName]: ", tileSelector.resourceCreatedTileAnimations[resourceName]);
-                        tileSelector.resourceCreatedTileAnimations[resourceName].splice(pos, 1);
-                        console.log("tileSelector.resourceCreatedTileAnimations[resourceName]: ", tileSelector.resourceCreatedTileAnimations[resourceName]);
-                        _this.populateStoredTileAnimations(resourceName);
-                        if (_this.tileCreator.animation.name == tileSet.name) {
-                            _this.tileCreator.animation = new tileAnimation();
-                            _this.tileCreator.tempSubTile = null;
-                        }
-                    });
-                    containerItem.appendChild(deleteButton);
-                    _this.prevCreatedAnimTiles.appendChild(containerItem);
-                });
-            }
-        };
-        tileSelector.prototype.renderGrid = function () {
-            var _a, _b, _c, _d, _e, _f, _g, _h;
-            var gridWidth = parseInt(document.getElementById("gridWidthIn").value);
-            var gridHeight = parseInt(document.getElementById("gridHeightIn").value);
-            var gridXOffset = parseInt(document.getElementById("gridXOffset").value);
-            var gridYOffset = parseInt(document.getElementById("gridYOffset").value);
-            if (gridWidth <= 0 || isNaN(gridWidth)) {
-                gridWidth = 1;
-            }
-            if (gridHeight <= 0 || isNaN(gridHeight)) {
-                gridHeight = 1;
-            }
-            if (gridXOffset <= 0 || isNaN(gridXOffset)) {
-                gridXOffset = 0;
-            }
-            if (gridYOffset <= 0 || isNaN(gridYOffset)) {
-                gridYOffset = 0;
-            }
-            var horizontalLines = Math.round(this.canvasRenderer.height / gridHeight) + 2;
-            var verticallines = Math.round(this.canvasRenderer.width / gridWidth) + 2;
-            this.canvasContext.strokeStyle = 'black';
-            this.canvasContext.lineWidth = 0.5;
-            for (var i = 0; i < horizontalLines; i++) {
-                (_a = this.canvasContext) === null || _a === void 0 ? void 0 : _a.beginPath();
-                (_b = this.canvasContext) === null || _b === void 0 ? void 0 : _b.moveTo(0.5 + (gridXOffset % gridWidth) - gridWidth, (i) * gridHeight + 0.5 + (gridYOffset % gridHeight) - gridHeight);
-                (_c = this.canvasContext) === null || _c === void 0 ? void 0 : _c.lineTo(this.canvasRenderer.width + 0.5 + (gridXOffset % gridWidth) - gridWidth, (i) * gridHeight + 0.5 + (gridYOffset % gridHeight) - gridHeight);
-                (_d = this.canvasContext) === null || _d === void 0 ? void 0 : _d.stroke();
-            }
-            for (var i = 0; i < verticallines; i++) {
-                (_e = this.canvasContext) === null || _e === void 0 ? void 0 : _e.beginPath();
-                (_f = this.canvasContext) === null || _f === void 0 ? void 0 : _f.moveTo((i) * gridWidth + 0.5 + (gridXOffset % gridWidth) - gridWidth, this.canvasRenderer.height + (i) * gridWidth + 0.5 + (gridYOffset % gridHeight) - gridHeight);
-                (_g = this.canvasContext) === null || _g === void 0 ? void 0 : _g.lineTo((i) * gridWidth + 0.5 + (gridXOffset % gridWidth) - gridWidth, 0.5 + (gridYOffset % gridHeight) - gridHeight);
-                (_h = this.canvasContext) === null || _h === void 0 ? void 0 : _h.stroke();
-            }
-            this.canvasContext.lineWidth = 1;
-            var mouseGridX = (Math.floor(this.mouseX / gridWidth) * gridWidth) + gridXOffset;
-            var mouseGridY = (Math.floor(this.mouseY / gridHeight) * gridHeight) + gridYOffset;
-            this.canvasContext.strokeStyle = 'red';
-            if (this.tileCreator.tempSubTile != null) {
-                this.canvasContext.beginPath();
-                this.canvasContext.rect(this.tileCreator.tempSubTile.startX, this.tileCreator.tempSubTile.startY, this.tileCreator.tempSubTile.width, this.tileCreator.tempSubTile.height);
-                this.canvasContext.stroke();
-                if (this.subTileDone == false) {
-                    this.tileCreator.tempSubTile.width = mouseGridX - this.tileCreator.tempSubTile.startX;
-                    this.tileCreator.tempSubTile.height = mouseGridY - this.tileCreator.tempSubTile.startY;
-                }
-            }
-            else if (this.mouseX != -1 || this.mouseY != -1) {
-                this.canvasContext.beginPath();
-                this.canvasContext.rect(mouseGridX, mouseGridY, gridWidth, gridHeight);
-                this.canvasContext.stroke();
-            }
-        };
-        tileSelector.prototype.renderCanvas = function () {
-            var _a, _b;
-            (_a = this.canvasContext) === null || _a === void 0 ? void 0 : _a.clearRect(0, 0, this.canvasRenderer.width, this.canvasRenderer.height);
-            if (this.resourceName != "") {
-                (_b = this.canvasContext) === null || _b === void 0 ? void 0 : _b.drawImage(tileSelector.resourceNameAndImage[this.resourceName], 0, 0);
-            }
-            //Render lines
-            this.renderGrid();
-        };
-        tileSelector.resourceNameAndImage = {};
-        tileSelector.resourceCreatedTileAnimations = {};
-        return tileSelector;
     }());
 
     var canvasRenderer = /** @class */ (function () {
@@ -2115,12 +2352,6 @@
             (_b = document.getElementById("gridYInput")) === null || _b === void 0 ? void 0 : _b.addEventListener("change", this.onGridSizeChange.bind(this));
             this.container = document.getElementById("canvasAndFilesCon");
             window.onresize = this.windowResize.bind(this);
-            setInterval(function () {
-                _this.counter++;
-                if (_this.counter > 1000) {
-                    _this.counter = 0;
-                }
-            }, 1000);
             setTimeout(function () {
                 _this.windowResize();
             }, 800);
@@ -2174,6 +2405,7 @@
         };
         canvasRenderer.prototype.render = function (mouseX, mouseY, cursor) {
             var _a;
+            this.counter++;
             this.haveSelectedFromHover = false;
             (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.clearRect(0, 0, this.canvas.width / this.canvasScaleX, this.canvas.height / this.canvasScaleY);
             this.drawGrid();
@@ -2189,12 +2421,10 @@
                         if (meta.tile == null) {
                             if (canvasRenderer.classAndImage[meta.name].complete) {
                                 try {
-                                    //this.ctx?.setTransform(1, 0, 0, 1, this.canvasXOffset, this.canvasYOffset);
                                     _this.drawMouseOverSelection(meta, mouseX, mouseY);
                                     (_a = _this.ctx) === null || _a === void 0 ? void 0 : _a.drawImage(canvasRenderer.classAndImage[meta.name], meta.x + _this.gridXOffset, meta.y + _this.gridYOffset);
                                 }
                                 catch (exception) {
-                                    //console.log("Fel: ", obj.image, obj);
                                 }
                             }
                         }
@@ -2528,7 +2758,6 @@
         fileSystemHandlerResources.prototype.onClickFile = function (fileClicked, id, image, customData) {
             var _this = this;
             this.tileHandler.open("../../" + customData[1], customData[0], function (subtile) {
-                console.log("subtile: ", subtile);
                 _this.cursor.objectSelected = null;
                 _this.cursor.currentSubTile = subtile;
                 _this.tileHandler.close();
@@ -2667,7 +2896,7 @@
                 customData[1] = "[]";
             }
             this.currentRoom = customData;
-            this.canvasHandler.importRoom(LZString.decompressFromEncodedURIComponent(customData[1]));
+            this.canvasHandler.importRoom(fileClicked, LZString.decompressFromEncodedURIComponent(customData[1]));
         };
         fileSystemHandlerRooms.prototype.onCreateNewFile = function (name, id, proceed) {
             var _this = this;
@@ -2796,8 +3025,8 @@
             }
             this.mouseDown = true;
         };
-        handleCanvas.prototype.importRoom = function (jsonString) {
-            this.canvasRenderPart.layerHandler.importRoom(jsonString);
+        handleCanvas.prototype.importRoom = function (roomName, jsonString) {
+            this.canvasRenderPart.layerHandler.importRoom(roomName, jsonString);
         };
         handleCanvas.prototype.exportRoom = function () {
             return this.canvasRenderPart.layerHandler.exportRoom();
@@ -2824,7 +3053,7 @@
     (function () {
         //load resources first
         var app = new PIXI.Application();
-        new resources(app, function () {
+        new resourcesHand(app, function () {
             initializeProgram();
         }, "../../../dist/");
     })();

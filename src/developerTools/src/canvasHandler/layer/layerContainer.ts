@@ -1,7 +1,8 @@
 import { handleCanvas } from "../handleCanvas";
-import { layer } from "./layer";
+import { layer } from "../../../../shared/layer";
 import { objectMetaData } from "../../objectMetaData";
 import { canvasRenderer } from "../canvasRenderer";
+import { layerCompressor } from "./layerCompressor";
 
 declare var LZString: any;
 
@@ -9,6 +10,7 @@ declare var LZString: any;
 export class layerContainer{
     containerElement: HTMLElement;
     storedLayers: layer[] = [];
+    currentRoom: string = "";
     selectedLayer: layer | null = null;
     ctx: CanvasRenderingContext2D|null;
 
@@ -21,7 +23,8 @@ export class layerContainer{
     }
 
 
-    importRoom(jsonString: string){
+    importRoom(clickedFile: string, jsonString: string){
+        this.currentRoom = clickedFile;
         let arayOfData: layer[] = [];
         if(jsonString != ""){
             arayOfData = JSON.parse(jsonString);
@@ -36,7 +39,9 @@ export class layerContainer{
             let newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
 
             dataLayer.metaObjectsInLayer.forEach(obj => {
-                newLayer.metaObjectsInLayer.push(new objectMetaData(obj.x, obj.y, obj.name, obj.tile));
+                if(obj.isCombinationOfTiles == false){
+                    newLayer.metaObjectsInLayer.push(new objectMetaData(obj.x, obj.y, obj.name, obj.tile));
+                }
             });
             this.storedLayers.push(newLayer);
         }
@@ -50,7 +55,7 @@ export class layerContainer{
     }
 
     exportRoom(){
-        return LZString.compressToEncodedURIComponent(JSON.stringify(this.storedLayers));
+        return LZString.compressToEncodedURIComponent(JSON.stringify(layerCompressor.compressRoom(this.currentRoom, this.storedLayers)));
     }
 
 
@@ -201,12 +206,22 @@ export class layerContainer{
         let button = e.target as HTMLElement;
         let layerName = button.parentElement?.getElementsByTagName("span")[0].innerHTML;
         if(layerName != null){
-            let targetToMoveUp = this.storedLayers.filter(x => x.layerName == layerName)[0];
-            let index = targetToMoveUp.zIndex;
-            let targetToMoveDown = this.storedLayers.filter(x => x.zIndex == index-1)[0];
+            for(let l of this.storedLayers){
+                if(l.layerName == layerName){
 
-            targetToMoveUp.zIndex = targetToMoveDown.zIndex;
-            targetToMoveDown.zIndex = index;
+                    for(let sl of this.storedLayers){
+                        if(sl.zIndex == l.zIndex-1){
+                            l.zIndex=l.zIndex^sl.zIndex;
+                            sl.zIndex=l.zIndex^sl.zIndex;
+                            l.zIndex=l.zIndex^sl.zIndex;
+                            break;
+                        }
+                    }
+
+                    break;
+                }
+            }
+
             this.initializeLayerModule([...this.storedLayers]);
         }
         if(layerName != null){
@@ -221,13 +236,24 @@ export class layerContainer{
         let button = e.target as HTMLElement;
         let layerName = button.parentElement?.getElementsByTagName("span")[0].innerHTML;
         if(layerName != null){
-            let targetToMoveDown = this.storedLayers.filter(x => x.layerName == layerName)[0];
-            let index = targetToMoveDown.zIndex;
-            let targetToMoveUp = this.storedLayers.filter(x => x.zIndex == index+1)[0];
+            for(let l of this.storedLayers){
+                if(l.layerName == layerName){
 
-            targetToMoveUp.zIndex = targetToMoveDown.zIndex;
-            targetToMoveDown.zIndex = index;
-            this.initializeLayerModule([...this.storedLayers]);
+                    for(let sl of this.storedLayers){
+                        if(sl.zIndex == l.zIndex+1){
+                            l.zIndex=l.zIndex^sl.zIndex;
+                            sl.zIndex=l.zIndex^sl.zIndex;
+                            l.zIndex=l.zIndex^sl.zIndex;
+                            break;
+                        }
+                    }
+
+                    break;
+                }
+            }
+
+            
+            this.initializeLayerModule(this.storedLayers);
         }
         if(layerName != null){
             if(this.selectedLayer != null){
@@ -257,7 +283,6 @@ export class layerContainer{
 
 
     selectFirstLayer(){
-        console.log("selectFirstLayer");
         this.selectLayer(this.storedLayers[0]);
     }
 
@@ -265,14 +290,15 @@ export class layerContainer{
     createNewLayer(newLayerName: string){
         let nextIndex = 0;
         this.storedLayers.forEach(layer => {
-            if(layer.zIndex > nextIndex){
+            if(layer.zIndex >= nextIndex){
                 nextIndex = layer.zIndex+1;
             }
         });
         let newLayer = new layer(newLayerName, nextIndex);
+        newLayer.zIndex = nextIndex;
         this.storedLayers.push(newLayer);
-        
-        this.initializeLayerModule(JSON.parse(JSON.stringify(this.storedLayers)));
+
+        this.initializeLayerModule(this.storedLayers);
 
         this.selectLayer(newLayer);
     }

@@ -1,4 +1,4 @@
-import { layer } from "./layer/layer";
+import { layer } from "../../../shared/layer";
 import { layerContainer } from "./layer/layerContainer";
 import { objectMetaData } from "../objectMetaData";
 import { tileSelector } from "../tiles/tileSelector";
@@ -64,12 +64,6 @@ export class canvasRenderer{
 
         window.onresize = this.windowResize.bind(this);
 
-        setInterval(() => {
-            this.counter ++;
-            if(this.counter > 1000){
-                this.counter = 0;
-            }
-        }, 1000);
 
         setTimeout(() => {
             this.windowResize();
@@ -136,6 +130,7 @@ export class canvasRenderer{
 
 
     render(mouseX: number, mouseY: number, cursor: cursorData){
+        this.counter++;
         this.haveSelectedFromHover = false;
         this.ctx?.clearRect(0, 0, this.canvas.width/this.canvasScaleX, this.canvas.height/this.canvasScaleY);
         this.drawGrid();
@@ -153,13 +148,12 @@ export class canvasRenderer{
                     if(meta.tile == null){
                         if(canvasRenderer.classAndImage[meta.name].complete){
                             try{
-                                //this.ctx?.setTransform(1, 0, 0, 1, this.canvasXOffset, this.canvasYOffset);
                                 this.drawMouseOverSelection(meta, mouseX, mouseY);
                                 this.ctx?.drawImage(canvasRenderer.classAndImage[meta.name], 
                                     meta.x + this.gridXOffset, 
                                     meta.y + this.gridYOffset);
                             }catch(exception){
-                                //console.log("Fel: ", obj.image, obj);
+                                
                             }
                             
                         }
@@ -277,7 +271,6 @@ export class canvasRenderer{
                     yMousePut = mouseGridY;
                 }
 
-                
                 let image = tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
                 this.ctx?.drawImage(image, cursor.currentSubTile.get(0).startX, 
                     cursor.currentSubTile.get(0).startY, 

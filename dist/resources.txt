@@ -1,3 +1,5 @@
+_generated_tiles/test/b3aeef7a-cee3-4e68-9b8f-a574ffd4cb67.png
+_generated_tiles/test/c36b98c4-e680-41ca-98e9-b48f530d1a4d.png
 playerWalk/playerWalk.json
 playerWalk/playerWalk.png
 tiles/Mossy - FloatingPlatforms.png

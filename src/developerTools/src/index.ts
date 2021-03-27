@@ -1,4 +1,4 @@
-import { resources } from "../../engine/preload sources/resources";
+import { resourcesHand } from "../../engine/preload sources/resources";
 import { cursorData } from "./cursor/cursorData";
 import { fileSystemHandlerObjects } from "./fileSystemHandlerObjects";
 import { fileSystemHandlerResources } from "./fileSystemHandlerResources";
@@ -11,7 +11,7 @@ import { mouseControls } from "./mouseControls";
 (function(){
     //load resources first
     var app = new PIXI.Application();
-    new resources(app, () => {
+    new resourcesHand(app, () => {
         initializeProgram();
     }, "../../../dist/");
     

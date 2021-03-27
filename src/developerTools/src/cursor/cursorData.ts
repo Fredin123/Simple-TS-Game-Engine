@@ -1,7 +1,7 @@
 import { cursorType } from "./cursorType";
 import { objectSelectedData } from "./objectSelectedData";
-import { subTileMeta } from "../tiles/subTileMeta";
-import { tileAnimation } from "../tiles/tileAnimation";
+import { subTileMeta } from "../../../shared/tile/subTileMeta";
+import { tileAnimation } from "../../../shared/tile/tileAnimation";
 
 
 

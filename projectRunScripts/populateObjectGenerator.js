@@ -37,14 +37,14 @@ getDirectories(path.join(__dirname, '../')+'src/objects', function (err, res) {
 
 
 function insertNewObjects(objectNames){
-    fs.readFile(path.join(__dirname, '../')+'src/objectGenerator.ts', 'utf8', function (err,data) {
+    fs.readFile(path.join(__dirname, '../')+'src/shared/objectGenerator.ts', 'utf8', function (err,data) {
         if (err) {
           return console.log(err);
         }
         let newFileData = insertObjects(data);
         newFileData = insertImports(newFileData);
         
-        fs.writeFileSync(path.join(__dirname, '../')+'src/objectGenerator.ts', newFileData, "utf8", function(err){
+        fs.writeFileSync(path.join(__dirname, '../')+'src/shared/objectGenerator.ts', newFileData, "utf8", function(err){
           if (err) return console.log(err);
         });
     });
@@ -82,7 +82,7 @@ function insertImports(data){
     let name = exploded[exploded.length-1].split(".")[0];
     if(objectDirs.substring(objectDirs.indexOf("/objects")).indexOf(".ts") != -1){
       let fixedDir = objectDirs.substring(objectDirs.indexOf("/objects")).replace(".ts", "");
-      insertString += "import { "+name+" } from \"."+fixedDir+"\";\n";
+      insertString += "import { "+name+" } from \".."+fixedDir+"\";\n";
     }
     
   });

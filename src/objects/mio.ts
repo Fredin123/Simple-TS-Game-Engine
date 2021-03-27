@@ -7,7 +7,7 @@ import { iVector } from "../engine/vector/iVector";
 import { vectorFixedDelta } from "../engine/vector/vectorFixedDelta";
 import { calculations } from "../engine/calculations";
 import { roomEvent } from "../engine/roomEvent";
-import { resources } from "../engine/preload sources/resources";
+import { resourcesHand } from "../engine/preload sources/resources";
 
 
 
@@ -36,7 +36,7 @@ export class mio extends objectBase{
             g.addChild(newGraphics);
 
             
-            let animation = resources.getAnimatedSprite("playerWalk");
+            let animation = resourcesHand.getAnimatedSprite("playerWalk");
             if(animation != null){
                 animation!.animationSpeed = 0.1;
                 animation!.play();

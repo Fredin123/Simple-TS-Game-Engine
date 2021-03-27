@@ -12,6 +12,8 @@ import { calculations } from "../calculations";
 
 
 export class objectBase implements iObject{
+    isTile = false;
+    tileStepTime: number = -1;
     static null: iObject = new nulliObject(0, 0);
     readonly ID: string =  uidGen.new();
     private _g: PIXI.Container = new PIXI.Container();

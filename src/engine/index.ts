@@ -1,7 +1,7 @@
 import { gameSettings } from "./gameSettings";
 import { gameRunner } from "./gameRunner";
 import { logger } from "./logger";
-import { resources } from "./preload sources/resources";
+import { resourcesHand } from "./preload sources/resources";
 
 
 (function(){
@@ -10,7 +10,7 @@ import { resources } from "./preload sources/resources";
     gameProperties.stretchToWindow = true;
     let runner: gameRunner;
 
-    let resourceLoader: resources = new resources(app, () => {
+    let resourceLoader: resourcesHand = new resourcesHand(app, () => {
         runner = new gameRunner("game", gameProperties, app);
     });
     

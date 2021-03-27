@@ -1,11 +1,11 @@
 import { handleCanvas } from "./canvasHandler/handleCanvas";
 import * as PIXI from 'pixi.js'
-import { objectGenerator } from "../../objectGenerator";
+import { objectGenerator } from "../../shared/objectGenerator";
 import { fileSystemEntry } from "./fileSystemEntry";
 import { tileSelector } from "./tiles/tileSelector";
 import { cursorData } from "./cursor/cursorData";
-import { subTileMeta } from "./tiles/subTileMeta";
-import { tileAnimation } from "./tiles/tileAnimation";
+import { subTileMeta } from "../../shared/tile/subTileMeta";
+import { tileAnimation } from "../../shared/tile/tileAnimation";
 
 declare var prettyFiles: any;
 declare var window: any;
@@ -134,7 +134,6 @@ export class fileSystemHandlerResources{
 
     private onClickFile(fileClicked:string, id: number, image:string, customData: any){
         this.tileHandler.open("../../"+customData[1], customData[0], (subtile: tileAnimation) =>{
-            console.log("subtile: ",subtile);
             this.cursor.objectSelected = null;
             this.cursor.currentSubTile = subtile;
             this.tileHandler.close();

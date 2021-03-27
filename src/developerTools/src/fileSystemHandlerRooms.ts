@@ -2,7 +2,7 @@ import { handleCanvas } from "./canvasHandler/handleCanvas";
 import * as PIXI from 'pixi.js'
 import { objectBase } from "../../engine/objectHandlers/objectBase";
 import { tools } from "../../engine/tools/tools";
-import { objectGenerator } from "../../objectGenerator";
+import { objectGenerator } from "../../shared/objectGenerator";
 import { roomHandler } from "./roomHandler";
 import { fileSystemEntry } from "./fileSystemEntry";
 
@@ -119,7 +119,7 @@ export class fileSystemHandlerRooms{
             customData[1] = "[]";
         }
         this.currentRoom = customData;
-        this.canvasHandler.importRoom(LZString.decompressFromEncodedURIComponent(customData[1]));
+        this.canvasHandler.importRoom(fileClicked, LZString.decompressFromEncodedURIComponent(customData[1]));
     }
 
     private onCreateNewFile(name: string, id: number, proceed: any){

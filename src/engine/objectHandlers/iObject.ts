@@ -11,6 +11,8 @@ import { nulliObject } from "./nulliObject";
 
 export interface iObject{
     readonly ID: string;
+    isTile: boolean;
+    tileStepTime: number;
     g: PIXI.Container;
     collisionBox: boxCollider;
     resourcesNeeded: string[];

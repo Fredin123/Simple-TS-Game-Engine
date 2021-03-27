@@ -1,6 +1,6 @@
 import { cursorData } from "../cursor/cursorData";
 import { cursorType } from "../cursor/cursorType";
-import { layer } from "./layer/layer";
+import { layer } from "../../../shared/layer";
 import { layerContainer } from "./layer/layerContainer";
 import { objectMetaData } from "../objectMetaData";
 import { tileSelector } from "../tiles/tileSelector";
@@ -161,8 +161,8 @@ export class handleCanvas{
     
 
 
-    importRoom(jsonString: string){
-        this.canvasRenderPart.layerHandler.importRoom(jsonString);
+    importRoom(roomName: string, jsonString: string){
+        this.canvasRenderPart.layerHandler.importRoom(roomName, jsonString);
     }
 
     exportRoom(){

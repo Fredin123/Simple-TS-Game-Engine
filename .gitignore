@@ -3,3 +3,11 @@ dist/index.js
 dist/dev/index.js
 dist/dev/index.js
 dist/dev/index.js
+dist/resources/
+dist/resources.txt
+dist/currentResources.txt
+src/resources/_generated_tiles/
+src/resources/
+src/objects/
+src/scenes/
+src/developerTools/electronApp/customAnimatedTilesMetaData_DONT_DELETE.json

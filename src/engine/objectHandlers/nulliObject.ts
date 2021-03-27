@@ -6,6 +6,8 @@ import { resourceMeta } from "../preload sources/resourceMeta";
 import { boxCollider } from "./boxCollider";
 
 export class nulliObject implements iObject{
+    isTile = false;
+    tileStepTime: number = -1;
     static objectName = "nulliObject";
     friction: number = 0;
     airFriction: number = 0;

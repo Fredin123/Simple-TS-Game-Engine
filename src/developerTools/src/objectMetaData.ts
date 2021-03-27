@@ -1,5 +1,5 @@
-import { subTileMeta } from "./tiles/subTileMeta";
-import { tileAnimation } from "./tiles/tileAnimation";
+import { subTileMeta } from "../../shared/tile/subTileMeta";
+import { tileAnimation } from "../../shared/tile/tileAnimation";
 
 
 export class objectMetaData{
@@ -8,6 +8,10 @@ export class objectMetaData{
     name: string;
 
     tile: tileAnimation | null = null;
+
+    isCombinationOfTiles: boolean = false;
+
+    isPartOfCombination: boolean = false;
 
     constructor(x: number, y: number, name: string, tile: tileAnimation | null){
         this.x = x;
