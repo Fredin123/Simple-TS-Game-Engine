@@ -79,8 +79,12 @@ export class canvasRenderer{
     }
 
     windowResize(){
-        this.canvas.width = this.canvas.clientWidth;
-        this.canvas.height = this.canvas.clientHeight;
+        
+        this.canvas.style.width = window.innerWidth+"px";
+        this.canvas.style.height = window.innerHeight+"px";
+
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
         
     }
 
@@ -271,14 +275,23 @@ export class canvasRenderer{
                     yMousePut = mouseGridY;
                 }
 
-                let image = tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
-                this.ctx?.drawImage(image, cursor.currentSubTile.get(0).startX, 
-                    cursor.currentSubTile.get(0).startY, 
-                    cursor.currentSubTile.get(0).width, 
-                    cursor.currentSubTile.get(0).height,
-                    xMousePut, yMousePut, 
-                    cursor.currentSubTile.get(0).width, 
-                    cursor.currentSubTile.get(0).height);
+                if(cursor.currentSubTile.get(0) == undefined){
+                    console.log("can't get first image from tile: ", cursor.currentSubTile);
+                }
+                if(tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName] != null){
+                    let image = tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
+                    this.ctx?.drawImage(image, cursor.currentSubTile.get(0).startX, 
+                        cursor.currentSubTile.get(0).startY, 
+                        cursor.currentSubTile.get(0).width, 
+                        cursor.currentSubTile.get(0).height,
+                        xMousePut, yMousePut, 
+                        cursor.currentSubTile.get(0).width, 
+                        cursor.currentSubTile.get(0).height);
+                }else{
+                    console.log("Can't find resource ",cursor.currentSubTile.get(0).resourceName);
+                    console.log("In resource pool: ",tileSelector.resourceNameAndImage);
+                }
+                
             }
         }
     }

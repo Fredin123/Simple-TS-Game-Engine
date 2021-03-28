@@ -39,7 +39,11 @@ export class tileMetaObj extends objectBase{
                 let animation = resourcesHand.getAnimatedTile(tAnim.name);
                 if(animation != null){
                     console.log("tAnim.animationSpeed: ",tAnim.animationSpeed);
-                    animation!.animationSpeed = (60/(tAnim.animationSpeed*60))/60;
+                    animation!.animationSpeed = 0;
+                    if(tAnim.animationSpeed > 0){
+                        animation!.animationSpeed = (60/(tAnim.animationSpeed*60))/60;
+                    }
+                    
                     animation!.play();
                     g.addChild(animation);
                 }

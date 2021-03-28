@@ -9,6 +9,7 @@ import { iObject } from "./iObject";
 import { iVector } from "../vector/iVector";
 import { nulliObject } from "./nulliObject";
 import { calculations } from "../calculations";
+import { resourcesHand } from "../preload sources/resources";
 
 
 export class objectBase implements iObject{
@@ -17,6 +18,7 @@ export class objectBase implements iObject{
     static null: iObject = new nulliObject(0, 0);
     readonly ID: string =  uidGen.new();
     private _g: PIXI.Container = new PIXI.Container();
+    private gSprites : {[key: string]: PIXI.Sprite} = {};
     friction: number = 0.5;
     airFriction: number = 0.8;
 
@@ -98,6 +100,32 @@ export class objectBase implements iObject{
 
         this._g.x = oldX;
         this._g.y = oldY;
+    }
+
+
+    addSprite(animationName: string, xPos:number, yPos: number, id: string){
+        this.removeSprite(id);
+        
+        let newAnimation = resourcesHand.getAnimatedSprite(animationName);
+        if(newAnimation != null){
+            newAnimation.x = xPos;
+            newAnimation.y = yPos;
+            this.gSprites[id] = newAnimation;
+        }
+        
+    }
+
+    removeSprite(id: string){
+        if(this.gSprites[id] != null){
+            this._g.removeChild(this.gSprites[id]);
+        }
+    }
+
+    removeAllSprites(){
+        let keys = Object.keys(this.gSprites);
+        for(let k of keys){
+            this.removeSprite(k);
+        }
     }
 
     logic(l: roomEvent){

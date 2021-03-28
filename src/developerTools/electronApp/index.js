@@ -1066,8 +1066,8 @@
             var _this = _super.call(this, xp, yp, mio.objectName) || this;
             _this.airFriction = 0.93;
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
-            _this.weight = 0.03;
-            _this.maxRunSpeed = 2;
+            _this.weight = 0.09;
+            _this.maxRunSpeed = 13;
             _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI$1.Graphics();
@@ -1075,12 +1075,17 @@
                 newGraphics.drawRect(0, 0, 128, 128);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
-                var animation = resourcesHand.getAnimatedSprite("playerWalk");
+                var animation = resourcesHand.getAnimatedSprite("catRun");
                 if (animation != null) {
-                    animation.animationSpeed = 0.1;
+                    animation.width = 256;
+                    animation.height = 256;
+                    animation.animationSpeed = 0.3;
                     animation.play();
+                    animation.x = -64;
+                    animation.y = -64;
                     g.addChild(animation);
                 }
+                //g.removeChild(animation);
                 g.filters = [];
                 g.calculateBounds();
                 return g;
@@ -1091,13 +1096,13 @@
         mio.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
             if (l.checkKeyHeld("a")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 0.8);
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 1);
             }
             if (l.checkKeyHeld("d")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 0.8);
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 1);
             }
             if (l.checkKeyPressed("w")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 12);
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 32);
             }
             this.force.limitHorizontalMagnitude(this.maxRunSpeed);
             l.useCamera = true;
@@ -1208,7 +1213,10 @@
                     var animation = resourcesHand.getAnimatedTile(tAnim.name);
                     if (animation != null) {
                         console.log("tAnim.animationSpeed: ", tAnim.animationSpeed);
-                        animation.animationSpeed = (60 / (tAnim.animationSpeed * 60)) / 60;
+                        animation.animationSpeed = 0;
+                        if (tAnim.animationSpeed > 0) {
+                            animation.animationSpeed = (60 / (tAnim.animationSpeed * 60)) / 60;
+                        }
                         animation.play();
                         g.addChild(animation);
                     }
@@ -1268,6 +1276,7 @@
             if (alternativePath === void 0) { alternativePath = ""; }
             this.objectGen = new objectGenerator();
             resourcesHand.app = app;
+            PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
             fetch(alternativePath + '/resources.txt', {
                 method: 'get'
             })
@@ -1471,11 +1480,18 @@
         tileAnimation.initFromJsonGeneratedObj = function (obj) {
             var realObject = new tileAnimation(obj.tiles);
             realObject.name = obj.name;
+            realObject.animationSpeed = obj.animationSpeed;
             return realObject;
         };
         tileAnimation.prototype.get = function (index) {
             var animFrames = 60 * this.animationSpeed;
-            return this.tiles[(index % animFrames) % this.tiles.length];
+            if (index > 0) {
+                index = Math.floor(index / animFrames) % this.tiles.length;
+                if (isNaN(index)) {
+                    index = 0;
+                }
+            }
+            return this.tiles[index];
         };
         tileAnimation.prototype.getAllTiles = function () {
             return this.tiles;
@@ -2065,7 +2081,8 @@
                 var newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
                 dataLayer.metaObjectsInLayer.forEach(function (obj) {
                     if (obj.isCombinationOfTiles == false) {
-                        newLayer.metaObjectsInLayer.push(new objectMetaData(obj.x, obj.y, obj.name, obj.tile));
+                        var newObj = new objectMetaData(obj.x, obj.y, obj.name, obj.tile);
+                        newLayer.metaObjectsInLayer.push(newObj);
                     }
                 });
                 this_1.storedLayers.push(newLayer);
@@ -2363,8 +2380,10 @@
             this.layerHandler.gridYOffset = this.gridYOffset;
         };
         canvasRenderer.prototype.windowResize = function () {
-            this.canvas.width = this.canvas.clientWidth;
-            this.canvas.height = this.canvas.clientHeight;
+            this.canvas.style.width = window.innerWidth + "px";
+            this.canvas.style.height = window.innerHeight + "px";
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
         };
         canvasRenderer.prototype.onGridSizeChange = function () {
             var _a, _b;
@@ -2509,8 +2528,17 @@
                         xMousePut = mouseGridX;
                         yMousePut = mouseGridY;
                     }
-                    var image = tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
-                    (_g = this.ctx) === null || _g === void 0 ? void 0 : _g.drawImage(image, cursor.currentSubTile.get(0).startX, cursor.currentSubTile.get(0).startY, cursor.currentSubTile.get(0).width, cursor.currentSubTile.get(0).height, xMousePut, yMousePut, cursor.currentSubTile.get(0).width, cursor.currentSubTile.get(0).height);
+                    if (cursor.currentSubTile.get(0) == undefined) {
+                        console.log("can't get first image from tile: ", cursor.currentSubTile);
+                    }
+                    if (tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName] != null) {
+                        var image = tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
+                        (_g = this.ctx) === null || _g === void 0 ? void 0 : _g.drawImage(image, cursor.currentSubTile.get(0).startX, cursor.currentSubTile.get(0).startY, cursor.currentSubTile.get(0).width, cursor.currentSubTile.get(0).height, xMousePut, yMousePut, cursor.currentSubTile.get(0).width, cursor.currentSubTile.get(0).height);
+                    }
+                    else {
+                        console.log("Can't find resource ", cursor.currentSubTile.get(0).resourceName);
+                        console.log("In resource pool: ", tileSelector.resourceNameAndImage);
+                    }
                 }
             }
         };

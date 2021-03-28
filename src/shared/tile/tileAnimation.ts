@@ -17,13 +17,19 @@ export class tileAnimation{
     static initFromJsonGeneratedObj(obj: tileAnimation){
         let realObject = new tileAnimation(obj.tiles);
         realObject.name = obj.name;
+        realObject.animationSpeed = obj.animationSpeed;
         return realObject;
     }
 
     get(index: number){
         let animFrames = 60*this.animationSpeed;
-
-        return this.tiles[(index%animFrames) % this.tiles.length];
+        if(index > 0){
+            index = Math.floor(index/animFrames) % this.tiles.length;
+            if(isNaN(index)){
+                index = 0;
+            }
+        }
+        return this.tiles[index];
     }
 
     getAllTiles(){

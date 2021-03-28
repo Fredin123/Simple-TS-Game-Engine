@@ -40,7 +40,8 @@ export class layerContainer{
 
             dataLayer.metaObjectsInLayer.forEach(obj => {
                 if(obj.isCombinationOfTiles == false){
-                    newLayer.metaObjectsInLayer.push(new objectMetaData(obj.x, obj.y, obj.name, obj.tile));
+                    let newObj = new objectMetaData(obj.x, obj.y, obj.name, obj.tile);
+                    newLayer.metaObjectsInLayer.push(newObj);
                 }
             });
             this.storedLayers.push(newLayer);
@@ -84,6 +85,7 @@ export class layerContainer{
         layerOption.appendChild(hideCheck);
 
         this.containerElement.appendChild(layerOption);
+        
 
         return layerOption;
     }

@@ -16,9 +16,11 @@ export class mio extends objectBase{
     static objectName = "mio";
     airFriction: number = 0.93;
     gravity: iVector = new vectorFixedDelta(calculations.degreesToRadians(270), 0);//vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
-    weight:number =  0.03;
+    weight:number =  0.09;
 
-    maxRunSpeed = 2;
+    maxRunSpeed = 13;
+
+
 
     
 
@@ -36,15 +38,19 @@ export class mio extends objectBase{
             g.addChild(newGraphics);
 
             
-            let animation = resourcesHand.getAnimatedSprite("playerWalk");
+            let animation = resourcesHand.getAnimatedSprite("catRun");
             if(animation != null){
-                animation!.animationSpeed = 0.1;
+                animation!.width = 256;
+                animation!.height = 256;
+                animation!.animationSpeed = 0.3;
                 animation!.play();
+                animation.x = -64;
+                animation.y = -64;
                 g.addChild(animation);
             }
             
 
-            
+            //g.removeChild(animation);
             g.filters = [];
             g.calculateBounds();
 
@@ -54,19 +60,23 @@ export class mio extends objectBase{
         super.addCollisionTarget(block.objectName, movingBlockHori.objectName, movingBlockVert.objectName);
     }
 
+
+    
+
+
     logic(l: roomEvent){
         super.logic(l);
 
         
         if(l.checkKeyHeld("a")){
-            super.addForceAngleMagnitude(calculations.degreesToRadians(180), 0.8);
+            super.addForceAngleMagnitude(calculations.degreesToRadians(180), 1);
         }
         if(l.checkKeyHeld("d")){
-            super.addForceAngleMagnitude(calculations.degreesToRadians(0), 0.8);
+            super.addForceAngleMagnitude(calculations.degreesToRadians(0), 1);
         }
 
         if(l.checkKeyPressed("w")){
-            super.addForceAngleMagnitude(calculations.degreesToRadians(90), 12);
+            super.addForceAngleMagnitude(calculations.degreesToRadians(90), 32);
         }
 
         this.force.limitHorizontalMagnitude(this.maxRunSpeed);

@@ -13,6 +13,8 @@ export class resourcesHand{
     constructor(app: PIXI.Application, onCompleteCallback: ()=>void, alternativePath: string = ""){
         resourcesHand.app = app;
 
+        PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+
         fetch(alternativePath+'/resources.txt', {
             method: 'get'
         })

@@ -8,7 +8,7 @@ export class gameSettings{
 
     applySettings(a: PIXI.Application){
         this.app = a;
-        this.app.renderer.backgroundColor = 0xFFF;
+        this.app.renderer.backgroundColor = 0xFFFFFF;
         if(this.stretchToWindow){
             this.windowStretchListener();
             window.addEventListener("resize", this.windowStretchListener.bind(this));

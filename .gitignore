@@ -11,3 +11,5 @@ src/resources/
 src/objects/
 src/scenes/
 src/developerTools/electronApp/customAnimatedTilesMetaData_DONT_DELETE.json
+resources
+dist/resources.txt
