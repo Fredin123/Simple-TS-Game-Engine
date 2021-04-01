@@ -15,25 +15,21 @@ export class movementOperations{
     static moveByForce(target: iObject, force: vector, collisionNames: string[], objContainer: objectContainer, deltaTime: number){
         force.Dx = force.Dx * deltaTime;
         force.Dy = force.Dy * deltaTime;
-        if(Math.abs(force.Dx) <= 0.000000001){
+        if(Math.abs(force.Dx) <= 0.0000001){
             force.Dx = 0;
         }
 
-        if(Math.abs(force.Dy) <= 0.000000001){
+        if(Math.abs(force.Dy) <= 0.0000001){
             force.Dy = 0;
         }
         let xdiff = force.Dx;
         let ydiff = force.Dy;
 
         
-        this.moveForceHorizontal(Math.round(xdiff), 1, target, collisionNames, objContainer);
-        //this.moveForceHorizontal(xdiff - ~~xdiff, 0.01, target, collisionNames, objContainer);
-        //this.moveOutFromCollider(xdiff % 1, 0.01, target, collisionNames, objContainer);
+        this.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
         
         
-        this.moveForceVertical(Math.round(ydiff), 1, target, collisionNames, objContainer);
-        //this.moveForceVertical(ydiff - ~~ydiff, 0.01, target, collisionNames, objContainer);
-        //this.moveForceVertical(ydiff - ~~ydiff, 0.001, target, collisionNames, objContainer);
+        this.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
         
 
         force.Dx *= target.airFriction;
@@ -52,17 +48,17 @@ export class movementOperations{
         
     }
 
-    private static moveForceHorizontal(magnitude: number, iteretorSize: number, target: iObject, collisionNames: string[], objContainer: objectContainer){
+    private static moveForceHorizontal(magnitude: number, target: iObject, collisionNames: string[], objContainer: objectContainer){
         if(magnitude == 0) return;
         let sign: number = magnitude>0?1:-1;
         let objectsThatWereCollidingThisObjectWhileMoving = new Array<iObject>();
 
         
-        for(let i=0; i<Math.abs(magnitude); i+=iteretorSize){
+        for(let i=0; i<Math.abs(magnitude); i+=1){
             objectsThatWereCollidingThisObjectWhileMoving.length = 0;
             
 
-            target.g.x += iteretorSize*sign;
+            target.g.x += sign;
 
             if(objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null){
                 //Push object
@@ -71,13 +67,13 @@ export class movementOperations{
                         //Move right
                         if(testCollisionWith.g.x > target.g.x  && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
                             objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                            testCollisionWith.g.x += iteretorSize*sign;
+                            testCollisionWith.g.x += sign;
                         }
                     }else{
                         //Move left
                         if(testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x+target.collisionBox.width && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
                             objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                            testCollisionWith.g.x += iteretorSize*sign;
+                            testCollisionWith.g.x += sign;
                         }
                     }
                     
@@ -103,8 +99,8 @@ export class movementOperations{
                             if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
                                 if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
                                     objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.x += iteretorSize*sign;
-                                    if(i >= Math.abs(magnitude)-iteretorSize){
+                                    testCollisionWith.g.x += sign;
+                                    if(i >= Math.abs(magnitude)-1){
                                         testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                     }
                                 }
@@ -114,8 +110,8 @@ export class movementOperations{
                             if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
                                 if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
                                     objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.x += iteretorSize*sign;
-                                    if(i >= Math.abs(magnitude)-iteretorSize){
+                                    testCollisionWith.g.x += sign;
+                                    if(i >= Math.abs(magnitude)-1){
                                         testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                     }
                                 }
@@ -133,10 +129,10 @@ export class movementOperations{
             if(collisionTarget != objectBase.null){
                 
                 sign *= -1;
-                target.g.x += 1*iteretorSize*sign;
+                target.g.x += 1*sign;
 
                 objectsThatWereCollidingThisObjectWhileMoving.forEach(updaterObject => {
-                    updaterObject.g.y += iteretorSize*sign;
+                    updaterObject.g.y += 1*sign;
                 });
 
                 target.force.Dx = 0;
@@ -196,29 +192,46 @@ export class movementOperations{
 
     }
 
-    private static moveForceVertical(magnitude: number, iteretorSize: number, target: iObject, collisionNames: string[], objContainer: objectContainer){
+    private static moveForceVertical(magnitude: number, target: iObject, collisionNames: string[], objContainer: objectContainer){
         if(magnitude == 0) return;
         let sign: number = magnitude>0?1:-1;
         let objectsThatWereCollidingThisObjectWhileMoving = new Array<iObject>();
 
-        for(let i=0; i<Math.abs(magnitude); i+=iteretorSize){
+        for(let i=0; i<Math.abs(magnitude); i+=1){
             
 
-            target.g.y += iteretorSize*sign;
+            target.g.y += sign;
 
             if(objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null){
                 objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], (testCollisionWith: iObject)=>{
                     if(sign > 0){
                         //Move down
                         if(testCollisionWith.g.y > target.g.y  && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
-                            objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                            testCollisionWith.g.y += iteretorSize*sign;
+                            testCollisionWith.g.y += sign;
+                            let move = true;
+                            /*if(this.boxIntersectionSpecific(testCollisionWith, testCollisionWith.collisionBox, 
+                                objectBase.objectsThatCollideWithKeyObjectName[testCollisionWith.objectName], objContainer)){
+                                    move = false;
+                                    testCollisionWith.g.y -= sign;
+                            }*/
+                            if(move){
+                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                            }
                         }
                     }else{
                         //Move up
                         if(testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y+target.collisionBox.height && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
-                            objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                            testCollisionWith.g.y += iteretorSize*sign;
+                            testCollisionWith.g.y += sign;
+                            let move = true;
+
+                            /*if(this.boxIntersectionSpecific(testCollisionWith, testCollisionWith.collisionBox, 
+                                objectBase.objectsThatCollideWithKeyObjectName[testCollisionWith.objectName], objContainer)){
+                                    move = false;
+                                    testCollisionWith.g.y -= sign;
+                            }*/
+                            if(move){
+                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                            }
                         }
                     }
                     
@@ -244,8 +257,8 @@ export class movementOperations{
                             if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
                                 if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
                                     objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.y += iteretorSize*sign;
-                                    if(i >= Math.abs(magnitude)-iteretorSize){
+                                    testCollisionWith.g.y += sign;
+                                    if(i >= Math.abs(magnitude)-1){
                                         testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                     }
                                 }
@@ -255,8 +268,8 @@ export class movementOperations{
                             if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
                                 if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
                                     objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.y += iteretorSize*sign;
-                                    if(i >= Math.abs(magnitude)-iteretorSize){
+                                    testCollisionWith.g.y += sign;
+                                    if(i >= Math.abs(magnitude)-1){
                                         testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                     }
                                 }
@@ -271,13 +284,14 @@ export class movementOperations{
             }
 
 
+            //This has to be more optimized
             let collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
             if(collisionTarget != objectBase.null){
                 sign *= -1;
-                target.g.y += iteretorSize*sign;
+                target.g.y += sign;
 
                 objectsThatWereCollidingThisObjectWhileMoving.forEach(updaterObject => {
-                    updaterObject.g.y += iteretorSize*sign;
+                    updaterObject.g.y += sign;
                 });
 
                 target.force.Dy = 0;

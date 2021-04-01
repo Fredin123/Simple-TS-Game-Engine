@@ -1,7 +1,11 @@
+_generated_tiles/test/4ddc8777-445d-4906-be45-f7ed6e5d6172.png
 _generated_tiles/test/9704e05f-16c3-4a0a-8785-c27817f50605.png
+_generated_tiles/test/b0912c8d-6b00-4adb-9f01-0e5c103210e4.png
 _generated_tiles/test/b3aeef7a-cee3-4e68-9b8f-a574ffd4cb67.png
 _generated_tiles/test/c36b98c4-e680-41ca-98e9-b48f530d1a4d.png
 _generated_tiles/test/d810481b-6698-4821-8750-3938cd84dc3f.png
+cat/beastRun/beastRun.json
+cat/beastRun/beastRun.png
 cat/jumpDown/catJumpDown.json
 cat/jumpDown/catJumpDown.png
 cat/jumpMid/catJumpMid.json

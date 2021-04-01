@@ -2,6 +2,8 @@
 import { block } from "../objects/blocks/block";
 import { movingBlockHori } from "../objects/blocks/movingBlockHori";
 import { movingBlockVert } from "../objects/blocks/movingBlockVert";
+import { grass } from "../objects/decoration/grass";
+import { dummySandbag } from "../objects/dummySandbag";
 import { marker } from "../objects/marker";
 import { mio } from "../objects/mio";
 //{NEW IMPORTS END HERE}
@@ -23,6 +25,8 @@ export class objectGenerator{
 		(xp: number, yp: number)=>{return new block(xp, yp);},
 		(xp: number, yp: number)=>{return new movingBlockHori(xp, yp);},
 		(xp: number, yp: number)=>{return new movingBlockVert(xp, yp);},
+		(xp: number, yp: number)=>{return new grass(xp, yp);},
+		(xp: number, yp: number)=>{return new dummySandbag(xp, yp);},
 		(xp: number, yp: number)=>{return new marker(xp, yp);},
 		(xp: number, yp: number)=>{return new mio(xp, yp);},
 //{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)

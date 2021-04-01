@@ -16,12 +16,14 @@ export class marker extends objectBase{
         super.setCollision(0, 0, 0, 0);
 
         super.style((g: PIXI.Container) => {
-            let newGraphics = new PIXI.Graphics();
-
-            newGraphics.beginFill(0xFF3e50); 
-            newGraphics.drawRect(0, 0, 16, 16);
-            newGraphics.endFill();
-            g.addChild(newGraphics);
+            let line = new PIXI.Graphics()
+            line.lineStyle(25, 0xBB0000, 1, 1);
+            line.x = 32;
+            line.y = 0;
+            line.moveTo(0, 0);
+            line.lineTo(0, 100);
+            line.endFill();
+            g.addChild(line);
             return g;
         });
         

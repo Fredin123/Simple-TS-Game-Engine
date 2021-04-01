@@ -18,6 +18,7 @@ export interface iObject{
     resourcesNeeded: string[];
     objectName: string;
     collisionTargets: Array<string>;
+    moveCollisionTargets: Array<string>;
     force: iVector;
     friction: number;
     stickyBottom: boolean;
@@ -30,6 +31,8 @@ export interface iObject{
 
     _hasBeenMoved_Tick : number;
 
+    
+    addMoveCollisionTarget(...collNames:string[]): void;
 
     addCollisionTarget(...collNames:string[]): void;
 

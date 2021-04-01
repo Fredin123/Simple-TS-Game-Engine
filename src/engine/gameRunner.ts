@@ -45,11 +45,12 @@ export class gameRunner {
                 this.objContainer.purgeObjects();
                 this.fpsLimiter = this.frameDelay;
 
-                if(this.logicModule.useCamera){
-                    this.app.stage.pivot.x = this.logicModule.cameraX;
-                    this.app.stage.pivot.y = this.logicModule.cameraY;
+                if(this.logicModule.camera.getIsInUse()){
+                    this.app.stage.pivot.x = Math.round(this.logicModule.camera.getX() + this.logicModule.camera.cameraOffsetX);
+                    this.app.stage.pivot.y = Math.round(this.logicModule.camera.getY() + this.logicModule.camera.cameraOffsetY);
                     this.app.stage.position.x = this.app.renderer.width/2;
                     this.app.stage.position.y = this.app.renderer.height/2;
+
                 }
 
 
@@ -58,6 +59,9 @@ export class gameRunner {
                         (t as tileMetaObj).animate();
                     }
                 }
+
+
+                this.logicModule.camera.moveCamera();
                 
             }
             if(this.fpsLimiter > 0){

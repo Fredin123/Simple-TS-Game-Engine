@@ -8,7 +8,7 @@ const config = {
       dir: 'dist',
       format: 'iife',
       globals:{
-        "pixi.js": "PIXI"
+        "pixi.js": "PIXI",
       }
     },
     plugins: [babel({ babelHelpers: 'bundled' }), typescript()]

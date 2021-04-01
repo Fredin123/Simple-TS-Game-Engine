@@ -23,6 +23,15 @@ export class vectorFixedDelta implements iVector{
         return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
     }
 
+    set magnitude(newMag: number){
+        let newXAdd = Math.cos(this.delta) * newMag;
+        let newYAdd = calculations.flippedSin(this.delta) * newMag;
+
+        this.Dx = newXAdd;
+        this.Dy = newYAdd;
+        
+    }
+
     increaseMagnitude(addValue: number){
         //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
         //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;

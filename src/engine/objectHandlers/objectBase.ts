@@ -10,6 +10,8 @@ import { iVector } from "../vector/iVector";
 import { nulliObject } from "./nulliObject";
 import { calculations } from "../calculations";
 import { resourcesHand } from "../preload sources/resources";
+import { animConfig } from "./animConfig";
+import { AnimatedSprite } from "pixi.js";
 
 
 export class objectBase implements iObject{
@@ -18,7 +20,7 @@ export class objectBase implements iObject{
     static null: iObject = new nulliObject(0, 0);
     readonly ID: string =  uidGen.new();
     private _g: PIXI.Container = new PIXI.Container();
-    private gSprites : {[key: string]: PIXI.Sprite} = {};
+    private gSprites : {[key: string]: PIXI.AnimatedSprite} = {};
     friction: number = 0.5;
     airFriction: number = 0.8;
 
@@ -34,6 +36,7 @@ export class objectBase implements iObject{
     _hasBeenMoved_Tick: number = 0;
 
     static objectsThatCollideWithKeyObjectName: {[key: string]: Array<string>} = {};
+    static objectsThatMoveWithKeyObjectName: {[key: string]: Array<string>} = {};
 
 
     get g(){
@@ -47,12 +50,14 @@ export class objectBase implements iObject{
     get objectName(){
         return this._objectName;
     }
+
+    moveCollisionTargets: Array<string> = [];
     private _collisionTargets: Array<string> = [];
     get collisionTargets(){
         return this._collisionTargets;
     }
     private _force: vector = new vector(0, 0);
-    get force(){
+    public get force(){
         return this._force;
     }
 
@@ -62,6 +67,27 @@ export class objectBase implements iObject{
         this._g.x = x;
         this._g.y = y;
     }
+
+
+    addMoveCollisionTarget(...collNames:string[]){
+        for(let i=0; i<collNames.length; i++){
+            if(this.moveCollisionTargets.indexOf(collNames[i]) == -1){
+                if(objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] == null){
+                    objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] = new Array<string>();
+                }
+                if(objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1){
+                    objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].push(this.objectName);
+                }
+
+                if(this.moveCollisionTargets.indexOf(collNames[i]) == -1){
+                    this.moveCollisionTargets.push(collNames[i]);
+                }
+                
+            }
+        }
+    }
+
+
 
     addCollisionTarget(...collNames:string[]){
         for(let i=0; i<collNames.length; i++){
@@ -92,6 +118,8 @@ export class objectBase implements iObject{
     }
 
     style(newGraphics: (g: PIXI.Container) => PIXI.Container){
+        this.removeAllSprites();
+        this.gSprites = {};
         let tempG = newGraphics(new PIXI.Container());
         let oldX = this.g.x;
         let oldY = this.g.y;
@@ -103,21 +131,35 @@ export class objectBase implements iObject{
     }
 
 
-    addSprite(animationName: string, xPos:number, yPos: number, id: string){
-        this.removeSprite(id);
+    addSprite(settings: animConfig){
         
-        let newAnimation = resourcesHand.getAnimatedSprite(animationName);
+        let newAnimation = resourcesHand.getAnimatedSprite(settings.animationName);
         if(newAnimation != null){
-            newAnimation.x = xPos;
-            newAnimation.y = yPos;
-            this.gSprites[id] = newAnimation;
+            newAnimation.x = settings.x;
+            newAnimation.y = settings.y;
+            newAnimation.animationSpeed = settings.speed;
+            //newAnimation.width = settings.width;
+            //newAnimation.height = settings.height;
+            newAnimation.anchor.set(settings.anchorX, settings.anchorY);
+            newAnimation.scale.set(settings.scaleX, settings.scaleY);
+            newAnimation.rotation = 0;
+            newAnimation.play();
+            this.gSprites[settings.id] = newAnimation;
+            this._g.addChild(newAnimation);
         }
-        
+        return newAnimation;
+    }
+
+    hasSprite(nameOrId: string){
+        return this.gSprites[nameOrId] != null;
     }
 
     removeSprite(id: string){
         if(this.gSprites[id] != null){
             this._g.removeChild(this.gSprites[id]);
+            delete this.gSprites[id];//Nothing wrong with using delete, okay?
+        }else{
+            console.log("Wanted to remove ",id," but could not find it");
         }
     }
 
@@ -127,6 +169,52 @@ export class objectBase implements iObject{
             this.removeSprite(k);
         }
     }
+
+    pauseSprite(id: string){
+        if(this.gSprites[id] != null && this.gSprites[id] instanceof AnimatedSprite){
+            (this.gSprites[id] as AnimatedSprite).stop();
+        }
+    }
+
+    playSprite(id: string){
+        if(this.gSprites[id] != null && this.gSprites[id] instanceof AnimatedSprite){
+            (this.gSprites[id] as AnimatedSprite).play();
+        }
+    }
+
+    scaleXSprites(scaleX: number){
+        let keys = Object.keys(this.gSprites);
+        for(let k of keys){
+            this.gSprites[k].scale.set(scaleX, this.gSprites[k].scale.y);
+        }
+    }
+
+    scaleYSprites(scaleY: number){
+        let keys = Object.keys(this.gSprites);
+        for(let k of keys){
+            this.gSprites[k].scale.set(this.gSprites[k].scale.x, scaleY);
+        }
+    }
+
+    flipAllSpritesVertical(){
+        let keys = Object.keys(this.gSprites);
+        for(let k of keys){
+            this.gSprites[k].height = -this.gSprites[k].height; 
+            if(this.gSprites[k].height < 0){
+                this.gSprites[k].y += this.gSprites[k].height;
+            }else{
+                this.gSprites[k].y -= this.gSprites[k].height;
+            }
+        }
+    }
+
+    setAnimationSpeed(id: string,  speed: number){
+        if(this.gSprites[id] != null && this.gSprites[id] instanceof AnimatedSprite){
+            (this.gSprites[id] as AnimatedSprite).animationSpeed = speed;
+        }
+    }
+
+    
 
     logic(l: roomEvent){
         movementOperations.moveByForce(this, this._force, this.collisionTargets, l.objContainer, l.deltaTime);

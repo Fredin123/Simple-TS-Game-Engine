@@ -1,4 +1,5 @@
-import { barin } from "./brain";
+import { brain } from "./brain";
+import { gameCamera } from "./gameCamera";
 import { objectBase } from "./objectHandlers/objectBase";
 import { objectContainer } from "./objectHandlers/objectContainer";
 
@@ -9,7 +10,6 @@ export class roomEvent {
     private mouseYPosition:number = 0;
     container: HTMLElement;
     private keysDown: Record<string, boolean> = {};
-    b: barin;
     objContainer: objectContainer;
 
     private gameKeysPressed: Record<string, boolean> = {};
@@ -19,15 +19,12 @@ export class roomEvent {
     private static ticks: number = 0;
     deltaTime: number = 1;
 
-    useCamera = false;
-    cameraX = 0;
-    cameraY = 0;
+    public camera: gameCamera = new gameCamera();
 
     constructor(con: HTMLElement, objContainer: objectContainer){
         this.objContainer = objContainer;
         this.container = con;
         this.keysDown = {};
-        this.b = new barin();
 
         this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
         document.addEventListener("keydown", this.keyDownListener.bind(this), false);

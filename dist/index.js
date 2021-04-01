@@ -24,16 +24,56 @@
         return gameSettings;
     }());
 
-    var barin = /** @class */ (function () {
-        function barin() {
+    var brain = /** @class */ (function () {
+        function brain() {
         }
-        barin.prototype.angleBetweenPoints = function (dy, dx) {
+        brain.angleBetweenPoints = function (dx, dy) {
             return Math.atan2(dy, dx) + Math.PI;
         };
-        barin.prototype.distanceBetweenPoints = function (x1, y1, x2, y2) {
+        brain.distanceBetweenPoints = function (x1, y1, x2, y2) {
             return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
         };
-        return barin;
+        return brain;
+    }());
+
+    var gameCamera = /** @class */ (function () {
+        function gameCamera() {
+            this.isInUse = true;
+            this.cameraX = 0;
+            this.cameraY = 0;
+            this.camMovementSpeedX = 0.08;
+            this.camMovementSpeedY = 0.08;
+            this.targetX = 0;
+            this.targetY = 0;
+            this.cameraOffsetX = 0;
+            this.cameraOffsetY = 0;
+        }
+        gameCamera.prototype.getIsInUse = function () {
+            return this.isInUse;
+        };
+        gameCamera.prototype.getX = function () {
+            return this.cameraX;
+        };
+        gameCamera.prototype.getY = function () {
+            return this.cameraY;
+        };
+        gameCamera.prototype.moveCamera = function () {
+            var angle = brain.angleBetweenPoints((this.cameraX - this.targetX), (this.cameraY - this.targetY));
+            var distance = brain.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
+            this.cameraX += Math.cos(angle) * distance * this.camMovementSpeedX;
+            this.cameraY += Math.sin(angle) * distance * this.camMovementSpeedY;
+        };
+        gameCamera.prototype.setMoveSpeedX = function (moveSpeed) {
+            this.camMovementSpeedX = moveSpeed;
+        };
+        gameCamera.prototype.setMoveSpeedY = function (moveSpeed) {
+            this.camMovementSpeedY = moveSpeed;
+        };
+        gameCamera.prototype.setTarget = function (tx, ty) {
+            this.targetX = tx;
+            this.targetY = ty;
+        };
+        return gameCamera;
     }());
 
     var roomEvent = /** @class */ (function () {
@@ -45,13 +85,10 @@
             this.gameKeysReleased = {};
             this.gameKeysHeld = {};
             this.deltaTime = 1;
-            this.useCamera = false;
-            this.cameraX = 0;
-            this.cameraY = 0;
+            this.camera = new gameCamera();
             this.objContainer = objContainer;
             this.container = con;
             this.keysDown = {};
-            this.b = new barin();
             this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
             document.addEventListener("keydown", this.keyDownListener.bind(this), false);
             document.addEventListener("keyup", this.keyUpListener.bind(this), false);
@@ -385,20 +422,16 @@
         movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
             force.Dx = force.Dx * deltaTime;
             force.Dy = force.Dy * deltaTime;
-            if (Math.abs(force.Dx) <= 0.000000001) {
+            if (Math.abs(force.Dx) <= 0.0000001) {
                 force.Dx = 0;
             }
-            if (Math.abs(force.Dy) <= 0.000000001) {
+            if (Math.abs(force.Dy) <= 0.0000001) {
                 force.Dy = 0;
             }
             var xdiff = force.Dx;
             var ydiff = force.Dy;
-            this.moveForceHorizontal(Math.round(xdiff), 1, target, collisionNames, objContainer);
-            //this.moveForceHorizontal(xdiff - ~~xdiff, 0.01, target, collisionNames, objContainer);
-            //this.moveOutFromCollider(xdiff % 1, 0.01, target, collisionNames, objContainer);
-            this.moveForceVertical(Math.round(ydiff), 1, target, collisionNames, objContainer);
-            //this.moveForceVertical(ydiff - ~~ydiff, 0.01, target, collisionNames, objContainer);
-            //this.moveForceVertical(ydiff - ~~ydiff, 0.001, target, collisionNames, objContainer);
+            this.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
+            this.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
             force.Dx *= target.airFriction;
             force.Dy *= target.airFriction;
             if (target.gravity != vector.null) {
@@ -407,14 +440,14 @@
                 target.gravity.increaseMagnitude(target.weight);
             }
         };
-        movementOperations.moveForceHorizontal = function (magnitude, iteretorSize, target, collisionNames, objContainer) {
+        movementOperations.moveForceHorizontal = function (magnitude, target, collisionNames, objContainer) {
             if (magnitude == 0)
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
             var _loop_1 = function (i) {
                 objectsThatWereCollidingThisObjectWhileMoving.length = 0;
-                target.g.x += iteretorSize * sign;
+                target.g.x += sign;
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
                     //Push object
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
@@ -422,14 +455,14 @@
                             //Move right
                             if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
                                 objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.x += iteretorSize * sign;
+                                testCollisionWith.g.x += sign;
                             }
                         }
                         else {
                             //Move left
                             if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
                                 objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.x += iteretorSize * sign;
+                                testCollisionWith.g.x += sign;
                             }
                         }
                         return false;
@@ -452,8 +485,8 @@
                                 if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.x += iteretorSize * sign;
-                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                        testCollisionWith.g.x += sign;
+                                        if (i >= Math.abs(magnitude) - 1) {
                                             testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                         }
                                     }
@@ -464,8 +497,8 @@
                                 if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.x += iteretorSize * sign;
-                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                        testCollisionWith.g.x += sign;
+                                        if (i >= Math.abs(magnitude) - 1) {
                                             testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                         }
                                     }
@@ -478,9 +511,9 @@
                 var collisionTarget = this_1.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
-                    target.g.x += 1 * iteretorSize * sign;
+                    target.g.x += 1 * sign;
                     objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.y += iteretorSize * sign;
+                        updaterObject.g.y += 1 * sign;
                     });
                     target.force.Dx = 0;
                     var distance = 0;
@@ -499,7 +532,7 @@
                 }
             };
             var this_1 = this;
-            for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
+            for (var i = 0; i < Math.abs(magnitude); i += 1) {
                 var state_1 = _loop_1(i);
                 if (state_1 === "break")
                     break;
@@ -531,27 +564,43 @@
                 });
             }
         };
-        movementOperations.moveForceVertical = function (magnitude, iteretorSize, target, collisionNames, objContainer) {
+        movementOperations.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
             if (magnitude == 0)
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
             var _loop_2 = function (i) {
-                target.g.y += iteretorSize * sign;
+                target.g.y += sign;
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
                         if (sign > 0) {
                             //Move down
                             if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.y += iteretorSize * sign;
+                                testCollisionWith.g.y += sign;
+                                var move = true;
+                                /*if(this.boxIntersectionSpecific(testCollisionWith, testCollisionWith.collisionBox,
+                                    objectBase.objectsThatCollideWithKeyObjectName[testCollisionWith.objectName], objContainer)){
+                                        move = false;
+                                        testCollisionWith.g.y -= sign;
+                                }*/
+                                if (move) {
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                }
                             }
                         }
                         else {
                             //Move up
                             if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.y += iteretorSize * sign;
+                                testCollisionWith.g.y += sign;
+                                var move = true;
+                                /*if(this.boxIntersectionSpecific(testCollisionWith, testCollisionWith.collisionBox,
+                                    objectBase.objectsThatCollideWithKeyObjectName[testCollisionWith.objectName], objContainer)){
+                                        move = false;
+                                        testCollisionWith.g.y -= sign;
+                                }*/
+                                if (move) {
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                }
                             }
                         }
                         return false;
@@ -574,8 +623,8 @@
                                 if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.y += iteretorSize * sign;
-                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                        testCollisionWith.g.y += sign;
+                                        if (i >= Math.abs(magnitude) - 1) {
                                             testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                         }
                                     }
@@ -586,8 +635,8 @@
                                 if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.y += iteretorSize * sign;
-                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                        testCollisionWith.g.y += sign;
+                                        if (i >= Math.abs(magnitude) - 1) {
                                             testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                         }
                                     }
@@ -597,12 +646,13 @@
                         });
                     }
                 }
+                //This has to be more optimized
                 var collisionTarget = this_2.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
-                    target.g.y += iteretorSize * sign;
+                    target.g.y += sign;
                     objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.y += iteretorSize * sign;
+                        updaterObject.g.y += sign;
                     });
                     target.force.Dy = 0;
                     var distance = 0;
@@ -623,7 +673,7 @@
                 }
             };
             var this_2 = this;
-            for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
+            for (var i = 0; i < Math.abs(magnitude); i += 1) {
                 var state_2 = _loop_2(i);
                 if (state_2 === "break")
                     break;
@@ -705,6 +755,7 @@
             this.resourcesNeeded = [];
             this._objectName = "nulliObject";
             this.collisionTargets = [];
+            this.moveCollisionTargets = [];
             this.force = new vector(0, 0);
             this._hasBeenMoved_Tick = 0;
             this.objectName = "";
@@ -712,6 +763,13 @@
             this.x = 0;
             this.y = 0;
         }
+        nulliObject.prototype.addMoveCollisionTarget = function () {
+            var collNames = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                collNames[_i] = arguments[_i];
+            }
+            throw new Error("Method not implemented.");
+        };
         nulliObject.prototype.setNewForceAngleMagnitude = function (a, b) {
             throw new Error("Method not implemented.");
         };
@@ -748,330 +806,6 @@
         };
         nulliObject.objectName = "nulliObject";
         return nulliObject;
-    }());
-
-    var objectBase = /** @class */ (function () {
-        function objectBase(x, y, childObjectName) {
-            this.isTile = false;
-            this.tileStepTime = -1;
-            this.ID = uidGen.new();
-            this._g = new PIXI.Container();
-            this.friction = 0.5;
-            this.airFriction = 0.8;
-            this.resourcesNeeded = [];
-            this.stickyBottom = false;
-            this.stickyTop = false;
-            this.stickyLeftSide = false;
-            this.stickyRightSide = false;
-            this.gravity = vector.null;
-            this.weight = 0.4;
-            this._hasBeenMoved_Tick = 0;
-            this._collisionBox = new boxCollider(0, 0, 0, 0);
-            this._objectName = "iObject";
-            this._collisionTargets = [];
-            this._force = new vector(0, 0);
-            this._objectName = childObjectName;
-            this._g.x = x;
-            this._g.y = y;
-        }
-        Object.defineProperty(objectBase.prototype, "g", {
-            get: function () {
-                return this._g;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        Object.defineProperty(objectBase.prototype, "collisionBox", {
-            get: function () {
-                return this._collisionBox;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        Object.defineProperty(objectBase.prototype, "objectName", {
-            get: function () {
-                return this._objectName;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        Object.defineProperty(objectBase.prototype, "collisionTargets", {
-            get: function () {
-                return this._collisionTargets;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        Object.defineProperty(objectBase.prototype, "force", {
-            get: function () {
-                return this._force;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        objectBase.prototype.addCollisionTarget = function () {
-            var collNames = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                collNames[_i] = arguments[_i];
-            }
-            for (var i = 0; i < collNames.length; i++) {
-                if (this.collisionTargets.indexOf(collNames[i]) == -1) {
-                    if (objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] == null) {
-                        objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] = new Array();
-                    }
-                    if (objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1) {
-                        objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].push(this.objectName);
-                    }
-                    if (this.collisionTargets.indexOf(collNames[i]) == -1) {
-                        this.collisionTargets.push(collNames[i]);
-                    }
-                }
-            }
-        };
-        objectBase.prototype.removeCollisionTarget = function () {
-            var collNames = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                collNames[_i] = arguments[_i];
-            }
-            throw new Error("Function removeCollisionTarget has not been implemented correctly");
-        };
-        objectBase.prototype.removeAllCollisionTargets = function () {
-            this.collisionTargets.length = 0;
-        };
-        objectBase.prototype.style = function (newGraphics) {
-            var tempG = newGraphics(new PIXI.Container());
-            var oldX = this.g.x;
-            var oldY = this.g.y;
-            this._g = tempG;
-            this._g.x = oldX;
-            this._g.y = oldY;
-        };
-        objectBase.prototype.logic = function (l) {
-            movementOperations.moveByForce(this, this._force, this.collisionTargets, l.objContainer, l.deltaTime);
-        };
-        objectBase.prototype.setCollision = function (xs, ys, width, height) {
-            this.collisionBox.x = xs;
-            this.collisionBox.y = ys;
-            this.collisionBox.width = width;
-            this.collisionBox.height = height;
-        };
-        Object.defineProperty(objectBase.prototype, "x", {
-            get: function () {
-                return this.g.x;
-            },
-            set: function (n) {
-                this.g.x = n;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        Object.defineProperty(objectBase.prototype, "y", {
-            get: function () {
-                return this.g.y;
-            },
-            set: function (n) {
-                this.g.y = n;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        objectBase.prototype.updatePosition = function (x, y) {
-            this.g.x = x;
-            this.g.y = y;
-        };
-        objectBase.prototype.setNewForce = function (xd, yd) {
-            this._force.Dx = xd;
-            this._force.Dy = yd;
-        };
-        objectBase.prototype.addForce = function (xd, yd) {
-            this._force.Dx += xd;
-            this._force.Dx += yd;
-        };
-        objectBase.prototype.setNewForceAngleMagnitude = function (angle, magnitude) {
-            this._force.Dx = Math.cos(angle) * magnitude;
-            this._force.Dy = calculations.flippedSin(angle) * magnitude;
-            //this._force.angle = angle;
-            //this._force.magnitude = magnitude;
-        };
-        objectBase.prototype.addForceAngleMagnitude = function (angle, magnitude) {
-            this._force.Dx += Math.cos(angle) * magnitude;
-            this._force.Dy += calculations.flippedSin(angle) * magnitude;
-        };
-        objectBase.null = new nulliObject(0, 0);
-        objectBase.objectsThatCollideWithKeyObjectName = {};
-        return objectBase;
-    }());
-
-    var block = /** @class */ (function (_super) {
-        __extends(block, _super);
-        function block(xp, yp) {
-            var _this = _super.call(this, xp, yp, block.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.973;
-            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI$1.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 128, 128);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-            /*setInterval(()=>{
-                this.switch = !this.switch;
-            }, 700);*/
-        }
-        block.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            /*if(this.switch){
-                super.setNewForce(l.degreesToRadians(0), 3);
-            }else{
-                super.setNewForce(l.degreesToRadians(180), 3);
-            }*/
-        };
-        block.objectName = "block";
-        return block;
-    }(objectBase));
-
-    var movingBlockHori = /** @class */ (function (_super) {
-        __extends(movingBlockHori, _super);
-        function movingBlockHori(xp, yp) {
-            var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.873;
-            _this.stickyTop = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI$1.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 256);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-        }
-        movingBlockHori.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
-            if (this.switch) {
-                _super.prototype.setNewForce.call(this, 2, 0);
-            }
-            else {
-                _super.prototype.setNewForce.call(this, -2, 0);
-            }
-            if (roomEvent.getTicks() % 20 == 0) {
-                this.switch = !this.switch;
-            }
-        };
-        movingBlockHori.objectName = "movingBlockHori";
-        return movingBlockHori;
-    }(objectBase));
-
-    var movingBlockVert = /** @class */ (function (_super) {
-        __extends(movingBlockVert, _super);
-        function movingBlockVert(xp, yp) {
-            var _this = _super.call(this, xp, yp, movingBlockVert.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.873;
-            _this.stickyTop = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI$1.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 256);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-        }
-        movingBlockVert.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            if (this.switch) {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 1);
-            }
-            else {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
-            }
-            if (roomEvent.getTicks() % 55 == 0) {
-                this.switch = !this.switch;
-            }
-        };
-        movingBlockVert.objectName = "movingBlockVert";
-        return movingBlockVert;
-    }(objectBase));
-
-    var marker = /** @class */ (function (_super) {
-        __extends(marker, _super);
-        function marker(xp, yp) {
-            var _this = _super.call(this, xp, yp, marker.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.0;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI$1.Graphics();
-                newGraphics.beginFill(0xFF3e50);
-                newGraphics.drawRect(0, 0, 16, 16);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-            /*setInterval(()=>{
-                this.switch = !this.switch;
-            }, 700);*/
-        }
-        marker.prototype.logic = function (l) {
-            this.life--;
-            if (this.life <= 0) {
-                l.objContainer.deleteObject(this);
-            }
-            //super.logic(l);
-            /*if(this.switch){
-                super.setNewForce(l.degreesToRadians(0), 3);
-            }else{
-                super.setNewForce(l.degreesToRadians(180), 3);
-            }*/
-        };
-        marker.objectName = "marker";
-        return marker;
-    }(objectBase));
-
-    var vectorFixedDelta = /** @class */ (function () {
-        function vectorFixedDelta(delta, inputMagnitude) {
-            this.delta = delta;
-            this.Dx = Math.cos(this.delta) * inputMagnitude;
-            this.Dy = Math.sin(this.delta) * inputMagnitude;
-        }
-        vectorFixedDelta.prototype.limitHorizontalMagnitude = function (limit) {
-            throw new Error("Method not implemented.");
-        };
-        vectorFixedDelta.prototype.limitVerticalMagnitude = function (limit) {
-            throw new Error("Method not implemented.");
-        };
-        Object.defineProperty(vectorFixedDelta.prototype, "magnitude", {
-            get: function () {
-                return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
-            },
-            enumerable: false,
-            configurable: true
-        });
-        vectorFixedDelta.prototype.increaseMagnitude = function (addValue) {
-            //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
-            //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;
-            var newXAdd = Math.cos(this.delta) * addValue;
-            var newYAdd = calculations.flippedSin(this.delta) * addValue;
-            if (Math.abs(newXAdd) > 0.00000000000001) {
-                this.Dx += newXAdd;
-            }
-            if (Math.abs(newYAdd) > 0.00000000000001) {
-                this.Dy += newYAdd;
-            }
-        };
-        return vectorFixedDelta;
     }());
 
     var resourcesHand = /** @class */ (function () {
@@ -1194,6 +928,557 @@
         return resourcesHand;
     }());
 
+    var objectBase = /** @class */ (function () {
+        function objectBase(x, y, childObjectName) {
+            this.isTile = false;
+            this.tileStepTime = -1;
+            this.ID = uidGen.new();
+            this._g = new PIXI.Container();
+            this.gSprites = {};
+            this.friction = 0.5;
+            this.airFriction = 0.8;
+            this.resourcesNeeded = [];
+            this.stickyBottom = false;
+            this.stickyTop = false;
+            this.stickyLeftSide = false;
+            this.stickyRightSide = false;
+            this.gravity = vector.null;
+            this.weight = 0.4;
+            this._hasBeenMoved_Tick = 0;
+            this._collisionBox = new boxCollider(0, 0, 0, 0);
+            this._objectName = "iObject";
+            this.moveCollisionTargets = [];
+            this._collisionTargets = [];
+            this._force = new vector(0, 0);
+            this._objectName = childObjectName;
+            this._g.x = x;
+            this._g.y = y;
+        }
+        Object.defineProperty(objectBase.prototype, "g", {
+            get: function () {
+                return this._g;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Object.defineProperty(objectBase.prototype, "collisionBox", {
+            get: function () {
+                return this._collisionBox;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Object.defineProperty(objectBase.prototype, "objectName", {
+            get: function () {
+                return this._objectName;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Object.defineProperty(objectBase.prototype, "collisionTargets", {
+            get: function () {
+                return this._collisionTargets;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Object.defineProperty(objectBase.prototype, "force", {
+            get: function () {
+                return this._force;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        objectBase.prototype.addMoveCollisionTarget = function () {
+            var collNames = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                collNames[_i] = arguments[_i];
+            }
+            for (var i = 0; i < collNames.length; i++) {
+                if (this.moveCollisionTargets.indexOf(collNames[i]) == -1) {
+                    if (objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] == null) {
+                        objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] = new Array();
+                    }
+                    if (objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1) {
+                        objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].push(this.objectName);
+                    }
+                    if (this.moveCollisionTargets.indexOf(collNames[i]) == -1) {
+                        this.moveCollisionTargets.push(collNames[i]);
+                    }
+                }
+            }
+        };
+        objectBase.prototype.addCollisionTarget = function () {
+            var collNames = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                collNames[_i] = arguments[_i];
+            }
+            for (var i = 0; i < collNames.length; i++) {
+                if (this.collisionTargets.indexOf(collNames[i]) == -1) {
+                    if (objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] == null) {
+                        objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] = new Array();
+                    }
+                    if (objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1) {
+                        objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].push(this.objectName);
+                    }
+                    if (this.collisionTargets.indexOf(collNames[i]) == -1) {
+                        this.collisionTargets.push(collNames[i]);
+                    }
+                }
+            }
+        };
+        objectBase.prototype.removeCollisionTarget = function () {
+            var collNames = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                collNames[_i] = arguments[_i];
+            }
+            throw new Error("Function removeCollisionTarget has not been implemented correctly");
+        };
+        objectBase.prototype.removeAllCollisionTargets = function () {
+            this.collisionTargets.length = 0;
+        };
+        objectBase.prototype.style = function (newGraphics) {
+            this.removeAllSprites();
+            this.gSprites = {};
+            var tempG = newGraphics(new PIXI.Container());
+            var oldX = this.g.x;
+            var oldY = this.g.y;
+            this._g = tempG;
+            this._g.x = oldX;
+            this._g.y = oldY;
+        };
+        objectBase.prototype.addSprite = function (settings) {
+            var newAnimation = resourcesHand.getAnimatedSprite(settings.animationName);
+            if (newAnimation != null) {
+                newAnimation.x = settings.x;
+                newAnimation.y = settings.y;
+                newAnimation.animationSpeed = settings.speed;
+                //newAnimation.width = settings.width;
+                //newAnimation.height = settings.height;
+                newAnimation.anchor.set(settings.anchorX, settings.anchorY);
+                newAnimation.scale.set(settings.scaleX, settings.scaleY);
+                newAnimation.rotation = 0;
+                newAnimation.play();
+                this.gSprites[settings.id] = newAnimation;
+                this._g.addChild(newAnimation);
+            }
+            return newAnimation;
+        };
+        objectBase.prototype.hasSprite = function (nameOrId) {
+            return this.gSprites[nameOrId] != null;
+        };
+        objectBase.prototype.removeSprite = function (id) {
+            if (this.gSprites[id] != null) {
+                this._g.removeChild(this.gSprites[id]);
+                delete this.gSprites[id]; //Nothing wrong with using delete, okay?
+            }
+            else {
+                console.log("Wanted to remove ", id, " but could not find it");
+            }
+        };
+        objectBase.prototype.removeAllSprites = function () {
+            var keys = Object.keys(this.gSprites);
+            for (var _i = 0, keys_1 = keys; _i < keys_1.length; _i++) {
+                var k = keys_1[_i];
+                this.removeSprite(k);
+            }
+        };
+        objectBase.prototype.pauseSprite = function (id) {
+            if (this.gSprites[id] != null && this.gSprites[id] instanceof PIXI$1.AnimatedSprite) {
+                this.gSprites[id].stop();
+            }
+        };
+        objectBase.prototype.playSprite = function (id) {
+            if (this.gSprites[id] != null && this.gSprites[id] instanceof PIXI$1.AnimatedSprite) {
+                this.gSprites[id].play();
+            }
+        };
+        objectBase.prototype.scaleXSprites = function (scaleX) {
+            var keys = Object.keys(this.gSprites);
+            for (var _i = 0, keys_2 = keys; _i < keys_2.length; _i++) {
+                var k = keys_2[_i];
+                this.gSprites[k].scale.set(scaleX, this.gSprites[k].scale.y);
+            }
+        };
+        objectBase.prototype.scaleYSprites = function (scaleY) {
+            var keys = Object.keys(this.gSprites);
+            for (var _i = 0, keys_3 = keys; _i < keys_3.length; _i++) {
+                var k = keys_3[_i];
+                this.gSprites[k].scale.set(this.gSprites[k].scale.x, scaleY);
+            }
+        };
+        objectBase.prototype.flipAllSpritesVertical = function () {
+            var keys = Object.keys(this.gSprites);
+            for (var _i = 0, keys_4 = keys; _i < keys_4.length; _i++) {
+                var k = keys_4[_i];
+                this.gSprites[k].height = -this.gSprites[k].height;
+                if (this.gSprites[k].height < 0) {
+                    this.gSprites[k].y += this.gSprites[k].height;
+                }
+                else {
+                    this.gSprites[k].y -= this.gSprites[k].height;
+                }
+            }
+        };
+        objectBase.prototype.setAnimationSpeed = function (id, speed) {
+            if (this.gSprites[id] != null && this.gSprites[id] instanceof PIXI$1.AnimatedSprite) {
+                this.gSprites[id].animationSpeed = speed;
+            }
+        };
+        objectBase.prototype.logic = function (l) {
+            movementOperations.moveByForce(this, this._force, this.collisionTargets, l.objContainer, l.deltaTime);
+        };
+        objectBase.prototype.setCollision = function (xs, ys, width, height) {
+            this.collisionBox.x = xs;
+            this.collisionBox.y = ys;
+            this.collisionBox.width = width;
+            this.collisionBox.height = height;
+        };
+        Object.defineProperty(objectBase.prototype, "x", {
+            get: function () {
+                return this.g.x;
+            },
+            set: function (n) {
+                this.g.x = n;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        Object.defineProperty(objectBase.prototype, "y", {
+            get: function () {
+                return this.g.y;
+            },
+            set: function (n) {
+                this.g.y = n;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        objectBase.prototype.updatePosition = function (x, y) {
+            this.g.x = x;
+            this.g.y = y;
+        };
+        objectBase.prototype.setNewForce = function (xd, yd) {
+            this._force.Dx = xd;
+            this._force.Dy = yd;
+        };
+        objectBase.prototype.addForce = function (xd, yd) {
+            this._force.Dx += xd;
+            this._force.Dx += yd;
+        };
+        objectBase.prototype.setNewForceAngleMagnitude = function (angle, magnitude) {
+            this._force.Dx = Math.cos(angle) * magnitude;
+            this._force.Dy = calculations.flippedSin(angle) * magnitude;
+            //this._force.angle = angle;
+            //this._force.magnitude = magnitude;
+        };
+        objectBase.prototype.addForceAngleMagnitude = function (angle, magnitude) {
+            this._force.Dx += Math.cos(angle) * magnitude;
+            this._force.Dy += calculations.flippedSin(angle) * magnitude;
+        };
+        objectBase.null = new nulliObject(0, 0);
+        objectBase.objectsThatCollideWithKeyObjectName = {};
+        objectBase.objectsThatMoveWithKeyObjectName = {};
+        return objectBase;
+    }());
+
+    var block = /** @class */ (function (_super) {
+        __extends(block, _super);
+        function block(xp, yp) {
+            var _this = _super.call(this, xp, yp, block.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        block.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            /*if(this.switch){
+                super.setNewForce(l.degreesToRadians(0), 3);
+            }else{
+                super.setNewForce(l.degreesToRadians(180), 3);
+            }*/
+        };
+        block.objectName = "block";
+        return block;
+    }(objectBase));
+
+    var movingBlockHori = /** @class */ (function (_super) {
+        __extends(movingBlockHori, _super);
+        function movingBlockHori(xp, yp) {
+            var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.873;
+            _this.stickyTop = true;
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        movingBlockHori.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
+            if (this.switch) {
+                _super.prototype.setNewForce.call(this, 2, 0);
+            }
+            else {
+                _super.prototype.setNewForce.call(this, -2, 0);
+            }
+            if (roomEvent.getTicks() % 20 == 0) {
+                this.switch = !this.switch;
+            }
+        };
+        movingBlockHori.objectName = "movingBlockHori";
+        return movingBlockHori;
+    }(objectBase));
+
+    var movingBlockVert = /** @class */ (function (_super) {
+        __extends(movingBlockVert, _super);
+        function movingBlockVert(xp, yp) {
+            var _this = _super.call(this, xp, yp, movingBlockVert.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.873;
+            _this.stickyTop = true;
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        movingBlockVert.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            if (this.switch) {
+                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 1);
+            }
+            else {
+                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
+            }
+            if (roomEvent.getTicks() % 55 == 0) {
+                this.switch = !this.switch;
+            }
+        };
+        movingBlockVert.objectName = "movingBlockVert";
+        return movingBlockVert;
+    }(objectBase));
+
+    //import anime from 'animejs';
+    var grass = /** @class */ (function (_super) {
+        __extends(grass, _super);
+        function grass(xp, yp) {
+            var _this = _super.call(this, xp, yp, grass.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.life = 1000;
+            _this.grass = null;
+            _this.grassAngle = calculations.degreesToRadians(270);
+            _this.wind = 0;
+            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0xFF3e50);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                _this.grass = new PIXI$1.Graphics();
+                _this.grass.lineStyle(2, 0x00FF00, 1, 1);
+                _this.grass.x = 16;
+                _this.grass.y = 0;
+                _this.grass.moveTo(0, 128);
+                _this.grass.lineTo(0, 64);
+                g.addChild(_this.grass);
+                g.calculateBounds();
+                return g;
+            });
+            return _this;
+            /*anime({
+                targets: battery,
+                charged: '100%',
+                cycles: 130,
+                round: 1,
+                easing: 'linear',
+                elasticity: 600,
+                update: function() {
+                  console.log(JSON.stringify(battery));
+                }
+            });*/
+        }
+        grass.prototype.logic = function (l) {
+            this.grassAngle + calculations.degreesToRadians(-20 + Math.random() * 20);
+            if (calculations.radiansToDegrees(this.grassAngle) > 270) {
+                this.grassAngle *= 0.99;
+            }
+            else if (calculations.radiansToDegrees(this.grassAngle) < 270) {
+                this.grassAngle *= 1.01;
+            }
+            if (this.grass != null) {
+                this.grass.clear();
+                this.grass.lineStyle(2, 0x00FF00, 1, 1);
+                this.grass.x = 16;
+                this.grass.y = 0;
+                this.grass.moveTo(Math.cos(this.grassAngle) * 32, 32 + Math.sin(this.grassAngle) * 32);
+                this.grass.lineTo(0, 32);
+            }
+            if (l.checkKeyHeld("a")) {
+                this.wind = 12;
+            }
+            if (this.wind > 0) {
+                this.grassAngle += calculations.degreesToRadians(this.wind);
+                this.wind *= 0.9;
+                if (this.wind <= 0.01) {
+                    this.wind = 0;
+                }
+            }
+        };
+        grass.objectName = "grass";
+        return grass;
+    }(objectBase));
+
+    var dummySandbag = /** @class */ (function (_super) {
+        __extends(dummySandbag, _super);
+        function dummySandbag(xp, yp) {
+            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.99;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x0000FF);
+                newGraphics.drawRect(0, 0, 64, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName);
+            return _this;
+        }
+        dummySandbag.prototype.logic = function (l) {
+        };
+        dummySandbag.objectName = "dummySandbag";
+        return dummySandbag;
+    }(objectBase));
+
+    var marker = /** @class */ (function (_super) {
+        __extends(marker, _super);
+        function marker(xp, yp) {
+            var _this = _super.call(this, xp, yp, marker.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
+            _super.prototype.style.call(_this, function (g) {
+                var line = new PIXI$1.Graphics();
+                line.lineStyle(25, 0xBB0000, 1, 1);
+                line.x = 32;
+                line.y = 0;
+                line.moveTo(0, 0);
+                line.lineTo(0, 100);
+                line.endFill();
+                g.addChild(line);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        marker.prototype.logic = function (l) {
+            this.life--;
+            if (this.life <= 0) {
+                l.objContainer.deleteObject(this);
+            }
+            //super.logic(l);
+            /*if(this.switch){
+                super.setNewForce(l.degreesToRadians(0), 3);
+            }else{
+                super.setNewForce(l.degreesToRadians(180), 3);
+            }*/
+        };
+        marker.objectName = "marker";
+        return marker;
+    }(objectBase));
+
+    var vectorFixedDelta = /** @class */ (function () {
+        function vectorFixedDelta(delta, inputMagnitude) {
+            this.delta = delta;
+            this.Dx = Math.cos(this.delta) * inputMagnitude;
+            this.Dy = Math.sin(this.delta) * inputMagnitude;
+        }
+        vectorFixedDelta.prototype.limitHorizontalMagnitude = function (limit) {
+            throw new Error("Method not implemented.");
+        };
+        vectorFixedDelta.prototype.limitVerticalMagnitude = function (limit) {
+            throw new Error("Method not implemented.");
+        };
+        Object.defineProperty(vectorFixedDelta.prototype, "magnitude", {
+            get: function () {
+                return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
+            },
+            set: function (newMag) {
+                var newXAdd = Math.cos(this.delta) * newMag;
+                var newYAdd = calculations.flippedSin(this.delta) * newMag;
+                this.Dx = newXAdd;
+                this.Dy = newYAdd;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        vectorFixedDelta.prototype.increaseMagnitude = function (addValue) {
+            //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
+            //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;
+            var newXAdd = Math.cos(this.delta) * addValue;
+            var newYAdd = calculations.flippedSin(this.delta) * addValue;
+            if (Math.abs(newXAdd) > 0.00000000000001) {
+                this.Dx += newXAdd;
+            }
+            if (Math.abs(newYAdd) > 0.00000000000001) {
+                this.Dy += newYAdd;
+            }
+        };
+        return vectorFixedDelta;
+    }());
+
+    var animConfig = /** @class */ (function () {
+        function animConfig(init) {
+            this.animationName = "";
+            this.x = 0;
+            this.y = 0;
+            this.speed = 0.5;
+            this.scaleX = 1;
+            this.scaleY = 1;
+            this.anchorX = 0.5;
+            this.anchorY = 0.5;
+            this.id = "";
+            Object.assign(this, init);
+            if (this.id == "") {
+                this.id = this.animationName;
+            }
+        }
+        return animConfig;
+    }());
+
     var mio = /** @class */ (function (_super) {
         __extends(mio, _super);
         function mio(xp, yp) {
@@ -1202,6 +1487,20 @@
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
             _this.weight = 0.09;
             _this.maxRunSpeed = 13;
+            _this.currentSprite = "catReady";
+            _this.currentSpriteObj = null;
+            _this.jumpAngle = 0;
+            _this.shakeCameraForce = 0;
+            _this.airbornTimer = 0;
+            _this.facingRight = true;
+            _this.climbing = false;
+            _this.canClimb = true;
+            _this.falling = false;
+            _this.climbingTimer = 0;
+            _this.hasJumped = false;
+            _this.constantForce = 0;
+            _this.attacking = false;
+            _this.actionWait = 0;
             _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI$1.Graphics();
@@ -1209,39 +1508,221 @@
                 newGraphics.drawRect(0, 0, 128, 128);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
-                var animation = resourcesHand.getAnimatedSprite("catRun");
-                if (animation != null) {
-                    animation.width = 256;
-                    animation.height = 256;
-                    animation.animationSpeed = 0.3;
-                    animation.play();
-                    animation.x = -64;
-                    animation.y = -64;
-                    g.addChild(animation);
-                }
-                //g.removeChild(animation);
-                g.filters = [];
                 g.calculateBounds();
                 return g;
             });
             _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName);
+            //super.addMoveCollisionTarget(dummySandbag.objectName);
+            //super.addMoveCollisionTarget(dummySandbag.objectName);
+            _super.prototype.addSprite.call(_this, new animConfig({
+                animationName: "catReady",
+                scaleX: 3,
+                scaleY: 3,
+                speed: 0.3,
+                x: 64,
+                y: 0,
+                anchorX: 0.5,
+                anchorY: 0.34,
+            }));
             return _this;
         }
         mio.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
-            if (l.checkKeyHeld("a")) {
+            if (Math.floor(this.force.Dy) == 0 && Math.floor(this.gravity.magnitude) == 0) {
+                this.hasJumped = false;
+            }
+            if (this.climbing == false) {
+                if ((l.checkKeyHeld("a") || l.checkKeyHeld("d")) && this.force.Dx == 0 && Math.floor(this.force.Dy) > 0 && this.canClimb && this.falling == false && this.hasJumped) {
+                    this.climbing = true;
+                    this.gravity.magnitude = 0;
+                    this.climbingTimer = 60;
+                    this.canClimb = false;
+                }
+            }
+            else {
+                if (this.force.Dx != 0 || this.climbingTimer <= 0 || (l.checkKeyHeld("a") || l.checkKeyHeld("d")) == false || (l.checkKeyHeld("a") && l.checkKeyHeld("d"))) {
+                    this.climbing = false;
+                    this.weight = 0.09;
+                    this.falling = true;
+                }
+                else {
+                    this.falling = false;
+                    this.airbornTimer = 0;
+                    this.weight = 0.001;
+                }
+                if (this.climbingTimer > 0) {
+                    this.climbingTimer--;
+                }
+            }
+            if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
+                this.canClimb = true;
+                this.falling = false;
+            }
+            if (l.checkKeyHeld("a") && this.actionWait == 0) {
                 _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 1);
             }
-            if (l.checkKeyHeld("d")) {
+            if (l.checkKeyHeld("d") && this.actionWait == 0) {
                 _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 1);
             }
-            if (l.checkKeyPressed("w")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 32);
+            if (this.climbing == false) {
+                if (this.falling == false && this.hasJumped == false && l.checkKeyPressed("w") && Math.floor(this.gravity.magnitude) == 0 && this.actionWait == 0) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 26);
+                    this.hasJumped = true;
+                }
+            }
+            else {
+                if (l.checkKeyHeld("w")) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 0.5);
+                }
             }
             this.force.limitHorizontalMagnitude(this.maxRunSpeed);
-            l.useCamera = true;
-            l.cameraX = this.g.x;
-            l.cameraY = this.g.y;
+            if (this.force.Dy <= -9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpUp";
+            }
+            else if (this.force.Dy > -9 && this.force.Dy < 9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpMid";
+            }
+            else if (this.force.Dy > 9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpDown";
+            }
+            if (Math.abs(this.force.Dy) < 1) {
+                this.jumpAngle = 0;
+                if (Math.abs(this.force.Dx) <= 1) {
+                    this.currentSprite = "catReady";
+                }
+                else if (this.force.Dx != 0) {
+                    this.currentSprite = "catRun";
+                }
+            }
+            if (this.force.Dy > 1) {
+                if (this.force.Dx > 0 && this.jumpAngle < 0.4) {
+                    this.jumpAngle += 0.015;
+                }
+                else if (this.jumpAngle > -0.4) {
+                    this.jumpAngle -= 0.015;
+                }
+            }
+            if (_super.prototype.hasSprite.call(this, this.currentSprite) == false) {
+                _super.prototype.removeAllSprites.call(this);
+                this.currentSpriteObj = _super.prototype.addSprite.call(this, new animConfig({
+                    animationName: this.currentSprite,
+                    scaleX: 3,
+                    scaleY: 3,
+                    speed: 0.3,
+                    x: 64,
+                    y: 75,
+                    anchorX: 0.5,
+                    anchorY: 0.34,
+                }));
+                if (this.currentSprite == "catReady") {
+                    this.currentSpriteObj.animationSpeed = 0.155;
+                }
+                this.currentSpriteObj.pivot.set(0, 25);
+            }
+            if (this.currentSpriteObj != null) {
+                this.currentSpriteObj.rotation = this.jumpAngle;
+                if (this.climbing) {
+                    if (l.checkKeyHeld("a")) {
+                        this.currentSpriteObj.rotation = calculations.degreesToRadians(90);
+                    }
+                    else if (l.checkKeyHeld("d")) {
+                        this.currentSpriteObj.rotation = calculations.degreesToRadians(270);
+                    }
+                }
+                if (this.currentSprite == "catRun") {
+                    var animWithSpeed = 0.4 * Math.abs(this.force.Dx) / this.maxRunSpeed;
+                    if (animWithSpeed < 0.1)
+                        animWithSpeed = 0.1;
+                    this.currentSpriteObj.animationSpeed = animWithSpeed;
+                }
+            }
+            if (Math.abs(Math.floor(this.force.Dx)) != 0) {
+                if (this.force.Dx > 0) {
+                    _super.prototype.scaleXSprites.call(this, 3);
+                    this.facingRight = true;
+                    if (this.jumpAngle < 0) {
+                        this.jumpAngle *= -1;
+                    }
+                }
+                else if (this.force.Dx < 0) {
+                    _super.prototype.scaleXSprites.call(this, -3);
+                    this.facingRight = false;
+                    if (this.jumpAngle > 0) {
+                        this.jumpAngle *= -1;
+                    }
+                }
+            }
+            if (Math.abs(Math.floor(this.force.Dx)) >= 5) {
+                l.camera.setMoveSpeedX(0.07);
+            }
+            else {
+                l.camera.setMoveSpeedX(0.04);
+            }
+            if (this.force.Dy >= 1) {
+                this.airbornTimer++;
+            }
+            else {
+                if (this.airbornTimer > 25) {
+                    this.shakeCameraForce = this.airbornTimer * 0.7;
+                    if (this.shakeCameraForce > 40) {
+                        this.shakeCameraForce = 40;
+                    }
+                }
+                this.airbornTimer = 0;
+            }
+            this.hangleAttacks(l);
+            if (this.shakeCameraForce > 0) {
+                l.camera.cameraOffsetX = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                l.camera.cameraOffsetY = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                this.shakeCameraForce--;
+            }
+            else {
+                l.camera.cameraOffsetX = 0;
+                l.camera.cameraOffsetY = 0;
+            }
+            var spaceToAdd = 128;
+            if (Math.abs(this.force.Dx) > 2) {
+                spaceToAdd = 256;
+            }
+            var addCamSpace = spaceToAdd;
+            if (this.facingRight == false) {
+                addCamSpace = -spaceToAdd;
+            }
+            var addCamSpaceY = 0;
+            if (Math.floor(this.force.Dy) > 30) {
+                addCamSpaceY = 600;
+            }
+            l.camera.setTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
+        };
+        mio.prototype.hangleAttacks = function (l) {
+            if (l.checkKeyPressed(" ") && this.actionWait == 0) {
+                if (Math.floor(this.gravity.magnitude) != 0) {
+                    this.attacking = true;
+                    this.constantForce = 15;
+                    this.actionWait = 33;
+                    this.airbornTimer += 5;
+                }
+                else {
+                    this.attacking = true;
+                    this.constantForce = 5;
+                    this.actionWait = 12;
+                }
+            }
+            if (this.facingRight) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(350), this.constantForce);
+            }
+            else {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(190), this.constantForce);
+            }
+            if (this.constantForce > 0) {
+                this.constantForce -= 1;
+            }
+            else {
+                this.attacking = false;
+            }
+            if (this.actionWait > 0) {
+                this.actionWait--;
+            }
         };
         mio.objectName = "mio";
         return mio;
@@ -1373,6 +1854,8 @@
                 function (xp, yp) { return new block(xp, yp); },
                 function (xp, yp) { return new movingBlockHori(xp, yp); },
                 function (xp, yp) { return new movingBlockVert(xp, yp); },
+                function (xp, yp) { return new grass(xp, yp); },
+                function (xp, yp) { return new dummySandbag(xp, yp); },
                 function (xp, yp) { return new marker(xp, yp); },
                 function (xp, yp) { return new mio(xp, yp); },
             ];
@@ -1470,7 +1953,7 @@
         return objectContainer;
     }());
 
-    var room1 = "NobwRAtgpgLghgeQEYCsoGMYGcCSA7AGTgE8oAnMALlDBgEsAbKKvAVwYYBow6sBhAPYQkdPHHoC8CAGYAVRlCxVpcBlijdeABThkYMwcNHi6k5avXcAHlQCMAJgAc3YlXsBWAGzcx0KmCQGAXQAazAAX05weiYWdi4efiERMQkpOQUlShU1DUSdPQNk4zTzXOs7JxcqAGZHABYfOD9KAKDQiKjaBTiOTSSjVNN0+SYsnMt83X1pQxSTM2yLPJtKB2cwV0p3ByaWtuCwyOieyjY+xLmS4ZlRxTLJ7WmiwYW8B5XKja3PeoAGPbMVqBQ6dE6xM7xfpXIaSW6ZD79AozGFvRFgVbraqUADsng2viBBw6x26EPOCV4qLS8LG6KehVmxVh7yW5QxX2xjgAnN4wIT-CCSV0YkCKdDmW9afc2Y8sMiXvNSrLPmsqps7H97I1+c0iUKjiLTuLLpKaRk6Sqkc8ma9lRNVViNWtbO57IDBe1DeCxVDTXabhaZQ7rYzqcN0Zj1Vt1gDdfsDWCyb6LlSzYG7uNlqGUenFiGOWrvnZ-gS9Z7QaTRb1KQMlRmEVapmG86yC1Hi2t3DU+QLgV6k9XIam69c4UGs+yGbmA-ns4WnTHPL8Pf3K0byX607ORo2C9PFWO2-OO9jbDjue74-qB1XjVvRyzpZO5QrbfW5+zT87bJe433iW9ZMawlHdn3peUbXDT9JlWDw+RjP9V0Awd7xHaDd0tfdIJbHdI1qBozyQ68K2FH0QP9D9MODecD3fI98O2XYf2IgDEzvTd0NbcCmzojDGN+ONEPsf9yzXMjgOHWsMJ47C334ptVjxTtfxE5D2I3FNpO4icIPk1tGJ5BC7FYsSUI4rTQKo2TaJwmcqMY2wtR1YTRITW9NIo7drN03i7MPFlHNdK9XPUjzyKkqyjxsqd-PowLFK+ISTLUkjxKAocTW86LfLkqCDMStZSyI1K2PCySssfKVcts-S8MK10exKtyb3XCLKpkmrYrqhyGuXFyUpa0iMrQ7SwK6198vq9s7AvELBrCtqKofTrMz0qbepmtZiNCtLzM8yLKJyta-J6hjCpE+oVNM9ylsyladJOvLcM2k83HPYzttKsyNPah7xqe2qNvOrb7BqP4Bq+ob0tQzixp8wHuuBhLQfqGp5qhxaJPuriAb3IGXpBt7KHg5LMb237ltxhH8aRwmUeJ+x8Wu77bux0aoqfCa8j4grQccWxPtU6H9r+6njtpyb6bRC7uXqSHhaxka4c56rEal+yia-Wo-hxDHFYp8qcfhiWsIJzWGe1yh0b+MmDbKu6OaOrn1Z5uKFK2+XHDtm7WvZlXnbVyW3bOy3YKoepPD+FmRcp43VfNV2cwCmXPZxJqWNZv3lcswPE+D5P4tT4mrpXTPY6Np3spdgvmwt4urfqblL2apXYdz6ug7Nun6-tYmdlS3aHf9juqvz7uNZTvurbdK7W8Nx2A878eaJ7qeI0K9xHG3s85rbiyvLHhsJ5D5GG-D7Zt5U-r94OjrHtr3npv7q+z27Xsfsrpej-HJO6-XmCqot47x-MVBeI9D6rUfu7PmL8QExicBXReo8oEn0Lh7OBKlgq3zFibGuaD-5F2nhfYBKlnI4Kpngruq9J5EI3ltUhXJeQUPjnnY+NDT7S2IUA1+zplIsKrj-aiL5OG93oZg7EgkBHf1QRw9BsCZ68K2APaRKCH4EKfq9RR8CCI6mHjnSB6i5GEIwdozs8FVGGLxhomBz8zFnnVPo9uViaY2NDufIBeI7aOM-sglxptjGaK1iQzw6MHFljZgYw6y92EiPkXYkh7gIbhMsdEoRMVaGmJITUPEKTwFRPvtYwJtitEkO1CpHxkTnFpNkXEkxCiSEOG8RE7O1TCmuOKe47hFRKBNxbj+SprSD41KMXUoJYdVSlwVoM4abT-odLGSU4Jkz05CxmTDYZ7SAmLK6eIxuUcKktNmZs+Z2z1pcL2RfL2zTUlbPwZ0s+3TCxozdHkpxJzxb3J2Y8y5kz7Dajeb4iBIyinfIuYAnp-xmEDKORsu+pyvnnLERCwsNReSHNuQi6hYLkXHitnUf4gKqkfKoSvHFAC8UXxycxBBsLRaUITrEpFFLGI1C3tMulcdBG1OZXQlFqwaj1C8ESoZ8LPnYt5Vk1UNR0YYvyXM8VZLJUNOlSJG58qSWMt-tA3Z-KdZ6xFccsVpKmWnR+XqkmcsOWYsVaa56uLGJOEFoauFuCtXCOVQk1UTMdFFhtSa7VbjzWUu9V4dV7zjXuoyaIllF00b63WfS1hMTA0PPBSGnpYNkkwv9VG7m8TSneo+i6pN3LRmesLZmiGcqI1urYam8lfKM0Lh2pyDVkb60erNemxye8c3trrSmrt9rY1bUFmXWlubO3RoLcsnpjU1mcq-mo0FFa50LjAZOgdDLp35vqV6+diCS1cpkeW7tDqGrYP7bWndQ6Z37srQuch16gUFKxUq89o7iZGWPcu-xiLP1NsYvwl9xKO13r3eMjxPSpGgdFYO9JkGlkTJ6SouDRqEM8sA1KnpBLf1+JBQstdKHCwWPQ6629iG-5Qaed+LdN7k1UZ1cG1lsr54MbLau7DKrcNCqFr7DDlGsMjqA4VNlhFy5Tog9R5D0HUU4hpQtbdjHhPmy-fihoPss6CZU2ekTOHUXovY6+hVAbh1qdE57P40Kh4mc1bumTurm2rHqP8hWAmKO6a4-pnjzy2X6w86W093mLMGdWN2XJknlOcaI9xg9hZ3BJPc9pzzMWzlxcfeF0JAWUtBZXbFnz8XwteOM2BzDenQu+fC0opTHHgsFcq0V-V+t37IQgKYUzebHMscKtc8JSDgV3IlRl9dLmrp2yvXV-L6XCuZYjuNs8z6pv-uG7N0b83vZMI-mVoTFW16WZLgtvh+IpNMaDT23rR2fiEui-VmbjW5u9IOZIm7y3CP3f22FiOqyXsDbfbahtxG5MuccBOqgsG3tDY-WtkjLnm4Ywh3Z8DZ200XoYU037p3VOfaq1QWenZEc7a8w1nHTXtg5M+oT+Du2Quk8e+4Erzof23emwBmHwO8dJbPJNpH5XaeZNx9sRnMYwGQ-fXah763thc5-K1lnK3oeS9h3j8pu9+li4B+ZunUuyNbGZxrsz96aO-NwxJmMS3ec05JwLsnaGYw86J2ltnSuOeUFg7Sv7nWHPMYu1tEDIvo5Y72zbx7zOYxy4N11n3aPia2E3XYCPlvicfZD1LhdZ5RdJ6d6tl3tG7A3xhZ7+z0no-qYvuefpHug-85jQdq2Ff9YO+p8n532vlfk3NwC+X73W+p-b5dTs+us93d77Xr7JMBaU9e8P1nOe2+u6dZ9EDkfvfnZj1bRfW3q-W7H4LzfP4LeO5H3PvvC+rWLa7yvkva+y-St1vrQ-zfs+K-n3n62aqL96JnwriXr+TeorYwP0v2-x7xP13zJ0FWFSAK-yP1nxf1Pzf0gM+iH1gJ-0BxG3byQOxGXxAKh1-wQP-wFT40x27zwPQPZ0QMAOuyL2R2xwIItRtjJipx02f3wPAMe3BgNWdGYNS2P3gPYJ13P24On1QNAP4NnX73jS31IPF3INz0ILcDDWkKvxR0bXH1JmwJOxkM1yN1kzfyzQ5RoL5x3wkIX2LUL23xTwEP73BgVibxYL4LYNMP0OrTfgzhULoOsNdwNnD3cNwNkK13oOc1qAUwTU220MNyQyc1ZVCIz0DwiKjxvzrypU0ziKXQIzIMCK8MQKM1AXiI8OD2yIUN6WsyFkz1EMyN0OiN61KP60sNH2cOKLRS0Pt1eQSNX1R1v0hVqJ-HsN4LgKcIfSlywJ-ALwKJr0aItX3yXDLneQAF1uAAALOgAAExWKgGbQYBIHIAADkzIiBSAyAAACWwMAbgAAL3wHWNWD+FJGgHgGQDQEwFwEIG2IoGoAinAAAjOLADgDwDoAgDeAAGUAAHKAKAFYqgP4AAOncG4FFCyBoFFD2P2B+LIEUAEFYDIHQCgBRKJG5BxAhigD+HcGkAAFpBZ0AagyT6g4A-g4AyTHAcRHB3AyT0B7BmTzxpAkko53BoSQS8AABzH4rAeAPQAADUUL5FFOmAAE1wd4iAB3VYmARYvHbLJYqAOgQUxYmAOwCncIOYyIDorIGAMgVgIoqYqAn4fIsyAkokkk8kyk6k2k+kxk5k1k9kzknEbkv4Xk-koU6pL4syGAAQEEn4v4gE4EsEiEqE+ExsJEhQPE-wP4NEjErEnE5M1odErATE7ExQAAegRILIAFkBAsAsBiAjiySjiAAxIIEwIUrQLYmAaQAQMgCALAAM4U7gGUiUqU3ssUmAeUygOMZUlY1UtwLvRYrUnUvUygXkQ0406-To0TM0i0zNa0uwXhACUM8M4ZYM-YPciM-4wEtIUE8EyE0c+My0RMpgLMsAVM7gHMvMzMsyF8jMws4sssisqsms+sgQRswU5s8QNsjsrsgUnssAPsmASUkmKAmCkcsclUtUkmac2c3UqgRco0xI1chSdcyZcImMHckMsMoMvaY87gSMs84YC82M685MREn0B8p8sAD8-Mh89inErAIszIUs8sys6sushs+gJslssCzs7skUocuCsjRCuMsAccyctCnUGc7UzChczwJc3CtQgqAinpQkhWEio8sig8iisiqi086My8hShEqgO83EsyVirixy-YFyni78gSv84SwC0S4C8S9sySyC6S6YWShCocpC7gJS1CtzTU9S+c7C5c1QoHZUfSwsS8FSYyokY8sy3ciy34qy88mMq8uMOyj45MFitM3Mz8zi9M-Mjyvin8wS-8kS0Qfy0CwKiCwMwc0Kgc6CiKhS6Kqc1SjChKrSnCk0lKjeNKzEK9YikBPK-cg6Q87K-K6i6y+i0qhM5ipyqq181yokdy3isYfi38oSgCoCkC1szqqSnq-s+C6UgahioalSuKucrC8apKzwyY1kGa-UyLeaulHK5a8y8MyyqMoqmyhisqhyyq58uqt8tyhGr8xqry861qsSjq8C26-q3qh6u64cwalC4at6jSxKnSqaxYP6tYKOO2LK-wYGz40Gk8iG2i4q2y7aiq3a+G6qji985Ghqk6pq7yi6vyq6iSrqqCmCsKx6uUomicmK9C+Kj67SyajAmWam2wRwLvQG5CRmySFahmtawqtmqGra28na-YZy5G2q3m7i46ws4W9G3ytq8Wm64KgmmWgmyKxS4m16sANS96zS1Wlc3S+qamgfM8em1ofWocQ2mO421myQOikqm8mUWG7mtim2-mu2lGoWtGlql2zG667Gj23G+6uSp65ChWkmgO0alWia0Oym368071Dk-WaO2gUykGxalmmi5O9m6Gzm5EzOly22-awWx2gunyy6gK0u7q8u2Cvq+S56v22Kuu5W4Oxu5K9W1K1uzNJuIWTu2O04eOrusGgqpOvAFOjmi2rmq2vamqnOieh2nip2wu2erGoKhe6W5equqKtepWoO8mtWig6a-e0jPWOmha0ipapm3u8G-u6+we829Oy2oka23O8ez8yet+6e0W12ue7+qWmSv+uW1emu-2wOsmz6im3e8Bjc0jIQ3W5m3K2Bvuja1Oxi+y9BlMx+vmpG3O3B065qmesWohyWkKiu8K8h6u5S9e6hsakOnesBqmiBgVQWTKmBkyuBg25mxBzh2+tB++jB-hxGw6gW1+kRkWjG9qku4hqRpe-Gxen2l6hR+urer6won6qgammVSvbc7R1a3RuO-Ry+pBm+oeu+keh+nm-a7B+qqx9+sRwhr+yRz2shvQVxwBkazekBpu+htRxhgVTwZ1H8Y+7u+B9hgxyGzatOpikxvhuJp+wRl+zys6j+8RtJnG3+5xleuRxW3J4B2h0B+Qop6VVI8poJo2kJ0+sJ9a2prhmG3h1oTB+J5+nBpJ-B2xt2+ekhvGyu2RgByh9xvJkZgp1Rlu4piOP0oy6ZhO2ZiEM+yi8JwxqJ4xmJ0x5pgRixoRrZjplJ4uiWnp0hvp-+32k5oBmh5R76oYhKam1zX1LW+58+8ihB15xZoxhpz5pprOrBjZxJ9p0RghoF92n+0Fw5rJ+W+RqFpR7e2F43cZyFJwLRoGypvR9FhZ02up7h8qnF1Zsxg6-wI6olmxouux4Fsu3pylwmihmloZ6F+l7xuFjW9RiOO3QJtlx5oEZ5xOiJlB+pnhxpgV758x4Vyx0V52z++x9Jxer2lx6lwZ0mulrxiYlVve653pDVtYCp7VqgXVi+rlges2w1vlpM0e7O1pzZy1zp1Jm1kFg5mRqluVp1je4ZmF5Vxlq5lZDOFh3uthnRjhzF957F8N2JvF9ZqNwl1GgFkliVsl-Z6R2W5NgZ2uxRhu11kw91hhnNo+lFk+p5+Zk24Nnl5Z41x8wVhJ+2mNwF+tvZxx+1-p45+V51jtuhy53xtV3pXkaBrVtF6pjF7lpZ4estr5itlp35tpmt4lnZiRhNpt72x1ttjx-JlRsZ7N1DCnKO-t9l0Jzl4d5BkN3ljO8tsegl6d69sV61yV8lxN5t2V1tqhl985t9v-JlhLWm79vdgt4Joto9rFo1-lid01oV7Mi1yDq1rp+NqVilpNhD5d1N9tzx9d99zdz1glO2L91hnug9oNwD0dk9+8iN-FqtiD-O2t297pmjuDx9lN59s5jNt1rNtj6VXI+3XLAdnVodq+yJ1B0toT0DyNy96Nij2N0l+djJsFo5iFldtNxVztqwnxygCOyfSRW0wtnDmZvDkd496J093FsD0TvOqeiT8V3ZhxyzmV7JyFhVl1ljtDj91FCGJg9z3Dzzh57z-j3zj5-zk189n581v5mdut8L216Vuj6L2zpj19hlvQnt3DJmSGZ7bjqpwtmp-Dktwj3L4j-Ls1sjor0z2d0r+9pxqLp9pDhTpVpTur9DsbIihU7Dnjtrw9nzgjsNgzs9wL4z6t8Tm9sLu96Th9h1uTib9Nqbrt5T5zrd+oQytzxb1r3D9r1bzr9b0jnrrbwrq93bqDqjmDxt0bir8b05s7hzho7t2biODKu7vW39uZ-9nTg14DlZ97ozz7kz77yjuNv7hdzJ+jmzxj5DxTi7mbxL8LOahbmHv1ygANoEwEjgTL3T0NkDzb1H-rr7kLvb6DhtnHqzlthjttarlD2r6o6miLSnVLmZ2n1QBgfdnRqX+np7rLtb5ngL1n3r4LvB0Lrnizu13Hyr1Cp0QXonxz8H0nvHYXKgUHGA4J+XmX9L8+23hnxHsdojtZi9tHnbjnn7rH7nyLwHk7w3wn87k3y70XmXdTkWPcx3+3qPunmXxXxnpH8dt3grtn9Hr3zH8ziL3X3nvHl6wPyb0HsApz0Xi3tYLjxa6Ppbm3uPp3oDl37rlPvr9X4R5Jkrg72Do7pd-HgXoPov8Q03lT1DcPhPbNSv2vmPsMx3hP53wTt7pvt7kVwb9vqTzvgH+D-X3vwv+LoIofhLEfrsMf2Bqvh7yX2vmf+vufuG9XqdjX6xzPud7P8rjf8bgvkHnfy0s3piQeTVynk-jl4-ufxW5K8XuKvPLh9zT6e9NenPX7r7xz5jcA+6oI3sHzB6h8t2+OXeFHD-4T9q+Z-aXnXwE5+cNuqvETttzE4Z8zOj-MrrRxf6ICNgyA-voMTQHsdiCoxMJKDX-5-tAB+Ai-oQJy7EDwBavJfhj0oHDdDu6-WTohzf72cP+JfLdtMXzzsDx++AyfiCWn7ADE+DfAQSj1IEe9yB0A73ln2oEydjuUgpAX31kGD8ru7HWIgMjngcCcBp-B5uoL46aCr+wnStmQLv5t9JO1HNfou3Bb59zB2-UZglz34Co1O-1bbDXxUG4DnBQA1wbPyIHz9J24Hbwds326r9-uAQ6zkEPoEWDQhu-awZMh6IR9sBsQpwQ7wSEAc3ByQ6-hAJb7-MYBPvHXs-0kH88-UdnOLoUM-7hDagrAm0lq04Fw9uBCvDQUkP4EpCSOt-VvhkO15P8aB7Qnvp0IYGWDmBoaLAXwj8Jy9HBAAnYTwPGGX86hHg93pAP0H39RBHfbIXr1f7BD3+PQuQZ621DsC9csxUYXbziFVCDhiQo4ZMPqFCDyOIgoblcJ54ICzB+QkIRc1Y7FDM0thbnBpyn67CuB+wsYT8L4H6cphN-NIbMK16wDWhiw0wR0OkHdCoRYQmEaRnMIIJ7Byg+nqoJcE1CJhGI-4boLOHpDcRLQhYSYO755DV2zHB4VYM1qtpD+1vPAbSM+Gx9vhDI34UyJOGp9GhxXXwdjz960DwRvImrpmxJ59CO8o-EUfEIqF7CYhqIqUeiK67aCF+MwpoYYKoEjcchfPZYcSLXb8j1hVaeweHiP4oiPhlQiUUaIR7SjTRmIhocIIoHAishoI-3qqK6GOjSRRQiOq4SZxvCPRsvQ0fH0OEmjXuzIzwXoLZHNCjBNom4XQLVFC8NRIvLdj4Swrq53hSY0USmLRHZcZRhnFkfKOX6Ki4BbQwkfaLuEyCnRmo8kZiD7RlCHB+o5EcmIIF1j-RGY04U2KBEr8-B1w3PpvxWEFDoxvQ3sfnjBxqhqRlYukdUN9FpiwBOgzMayJxE5jrR4g20Xnz9oOi+Ry4x4Y6DlwxgK+W48UYiMlG7ixx6Y2Uc3yDEGCH+Yg-wfmIjGrDuxJYz1unh-CPjEx2418fqz9EfiGxh4qccGJnFKj4B4YokZ2JJGocYxpY+PMKPKFiivRL4n0TBL3HI9zR2Iy0b+JBHKilhPIyMdeKwkrjNauE10O6JHFQTiJbzPTuOM-GL9ARSElsfiK5GBDLxGEqMYxNvGblkCCY9ic+LUE7iSJ74-ceRKC7HirRf4ucWCPQkQj7hN4gUVuzwzOh4c+Ez0QaOrGjjleZE1IapMomXDQxNE9sXRKAl6TnRCWRTC6ARHyShxIwxMbwKUlWTphFEhUZkNnFhiVR2kwscb1QE9jqa7uSoJuMglyT6Rb4yycn2sleC1JVE+yahPCkdidJXYlyTFK3b+4ohJkqsXqM4nFtuJcElno2O-EXCQxoUhydyNEn5TMJwvHrNTTDw6iypxeCSVYK2hops0WwG2G1gEAAA3NqgACEvQAACXbJ0AvchU6op7G9gTYJMAECABNOmlegAAauQD1KGkliqxdYpsTeIPkJp5ALYq4AuJXEoAmIQ0kAA";
+    var room1 = "NobwRAtgpgLghgeQEYCsoGMYGcCSA7AGTgE8oAnMALlDBgEsAbKKvAVwYYBow6sBhAPYQkdPHHoC8CAGYAVRlCxVpcBlijdeABThkYMwcNHi6k5avXcAHlQCMAJgAc3YlXsBWAGzcx0KmCQGAXQAazAAX05weiYWdi4efiERMQkpOQUlShU1DUSdPQNk4zTzXOs7JxcqAGZHABYfOD9KAKDQiKjaBTiOTSSjVNN0+SYsnMt83X1pQxSTM2yLPJtKB2cwV0p3ByaWtuCwyOieyjY+xLmS4ZlRxTLJ7WmiwYW8B5XKja3PeoAGPbMVqBQ6dE6xM7xfpXIaSW6ZD79AozGFvRFgVbraqUADsng2viBBw6x26EPOCV4qLS8LG6KehVmxVh7yW5QxX2xjgAnN4wIT-CCSV0YkCKdDmW9afc2Y8sMiXvNSrLPmsqps7H97I1+c0iUKjiLTuLLpKaRk6Sqkc8ma9lRNVViNWtbO57IDBe1DeCxVDTXabhaZQ7rYzqcN0Zj1Vt1gDdfsDWCyb6LlSzYG7uNlqGUenFiGOWrvnZ-gS9Z7QaTRb1KQMlRmEVapmG86yC1Hi2t3DU+QLgV6k9XIam69c4UGs+yGbmA-ns4WnTHPL8Pf3K0byX607ORo2C9PFWO2-OO9jbDjue74-qB1XjVvRyzpZO5QrbfW5+zT87bJe433iW9ZMawlHdn3peUbXDT9JlWDw+RjP9V0Awd7xHaDd0tfdIJbHdI1qBozyQ68K2FH0QP9D9MODecD3fI98O2XYf2IgDEzvTd0NbcCmzojDGN+ONEPsf9yzXMjgOHWsMJ47C334ptVjxTtfxE5D2I3FNpO4icIPk1tGJ5BC7FYsSUI4rTQKo2TaJwmcqMY2wtR1YTRITW9NIo7drN03i7MPFlHNdK9XPUjzyKkqyjxsqd-PowLFK+ISTLUkjxKAocTW86LfLkqCDMStZSyI1K2PCySssfKVcts-S8MK10exKtyb3XCLKpkmrYrqhyGuXFyUpa0iMrQ7SwK6198vq9s7AvELBrCtqKofTrMz0qbepmtZiNCtLzM8yLKJyta-J6hjCpE+oVNM9ylsyladJOvLcM2k83HPYzttKsyNPah7xqe2qNvOrb7BqP4Bq+ob0tQzixp8wHuuBhLQfqGp5qhxaJPuriAb3IGXpBt7KHg5LMb237ltxhH8aRwmUeJ+x8Wu77bux0aoqfCa8j4grQccWxPtU6H9r+6njtpyb6bRC7uXqSHhaxka4c56rEal+yia-Wo-hxDHFYp8qcfhiWsIJzWGe1yh0b+MmDbKu6OaOrn1Z5uKFK2+XHDtm7WvZlXnbVyW3bOy3YKoepPD+FmRcp43VfNV2cwCmXPZxJqWNZv3lcswPE+D5P4tT4mrpXTPY6Np3spdgvmwt4urfqblL2apXYdz6ug7Nun6-tYmdlS3aHf9juqvz7uNZTvurbdK7W8Nx2A878eaJ7qeI0K9xHG3s85rbiyvLHhsJ5D5GG-D7Zt5U-r94OjrHtr3npv7q+z27Xsfsrpej-HJO6-XmCqot47x-MVBeI9D6rUfu7PmL8QExicBXReo8oEn0Lh7OBKlgq3zFibGuaD-5F2nhfYBKlnI4Kpngruq9J5EI3ltUhXJeQUPjnnY+NDT7S2IUA1+zplIsKrj-aiL5OG93oZg7EgkBHf1QRw9BsCZ68K2APaRKCH4EKfq9RR8CCI6mHjnSB6i5GEIwdozs8FVGGLxhomBz8zFnnVPo9uViaY2NDufIBeI7aOM-sglxptjGaK1iQzw6MHFljZgYw6y92EiPkXYkh7gIbhMsdEoRMVaGmJITUPEKTwFRPvtYwJtitEkO1CpHxkTnFpNkXEkxCiSEOG8RE7O1TCmuOKe47hFRKBNxbj+SprSD41KMXUoJYdVSlwVoM4abT-odLGSU4Jkz05CxmTDYZ7SAmLK6eIxuUcKktNmZs+Z2z1pcL2RfL2zTUlbPwZ0s+3TCxozdHkpxJzxb3J2Y8y5kz7Dajeb4iBIyinfIuYAnp-xmEDKORsu+pyvnnLERCwsNReSHNuQi6hYLkXHitnUf4gKqkfKoSvHFAC8UXxycxBBsLRaUITrEpFFLGI1C3tMulcdBG1OZXQlFqwaj1C8ESoZ8LPnYt5Vk1UNR0YYvyXM8VZLJUNOlSJG58qSWMt-tA3Z-KdZ6xFccsVpKmWnR+XqkmcsOWYsVaa56uLGJOEFoauFuCtXCOVQk1UTMdFFhtSa7VbjzWUu9V4dV7zjXuoyaIllF00b63WfS1hMTA0PPBSGnpYNkkwv9VG7m8TSneo+i6pN3LRmesLZmiGcqI1urYam8lfKM0Lh2pyDVkb60erNemxye8c3trrSmrt9rY1bUFmXWlubO3RoLcsnpjU1mcq-mo0FFa50LjAZOgdDLp35vqV6+diCS1cpkeW7tDqGrYP7bWndQ6Z37srQuch16gUFKxUq89o7iZGWPcu-xiLP1NsYvwl9xKO13r3eMjxPSpGgdFYO9JkGlkTJ6SouDRqEM8sA1KnpBLf1+JBQstdKHCwWPQ6629iG-5Qaed+LdN7k1UZ1cG1lsr54MbLau7DKrcNCqFr7DDlGsMjqA4VNlhFy5Tog9R5D0HUU4hpQtbdjHhPmy-fihoPss6CZU2ekTOHUXovY6+hVAbh1qdE57P40Kh4mc1bumTurm2rHqP8hWAmKO6a4-pnjzy2X6w86W093mLMGdWN2XJknlOcaI9xg9hZ3BJPc9pzzMWzlxcfeF0JAWUtBZXbFnz8XwteOM2BzDenQu+fC0opTHHgsFcq0V-V+t37IQgKYUzebHMscKtc8JSDgV3IlRl9dLmrp2yvXV-L6XCuZYjuNs8z6pv-uG7N0b83vZMI-mVoTFW16WZLgtvh+IpNMaDT23rR2fiEui-VmbjW5u9IOZIm7y3CP3f22FiOqyXsDbfbahtxG5MuccBOqgsG3tDY-WtkjLnm4Ywh3Z8DZ200XoYU037p3VOfaq1QWenZEc7a8w1nHTXtg5M+oT+Du2Quk8e+4Erzof23emwBmHwO8dJbPJNpH5XaeZNx9sRnMYwGQ-fXah763thc5-K1lnK3oeS9h3j8pu9+li4B+ZunUuyNbGZxrsz96aO-NwxJmMS3ec05JwLsnaGYw86J2ltnSuOeUFg7Sv7nWHPMYu1tEDIvo5Y72zbx7zOYxy4N11n3aPia2E3XYCPlvicfZD1LhdZ5RdJ6d6tl3tG7A3xhZ7+z0no-qYvuefpHug-85jQdq2Ff9YO+p8n532vlfk3NwC+X73W+p-b5dTs+us93d77Xr7JMBaU9e8P1nOe2+u6dZ9EDkfvfnZj1bRfW3q-W7H4LzfP4LeO5H3PvvC+rWLa7yvkva+y-St1vrQ-zfs+K-n3n62aqL96JnwriXr+TeorYwP0v2-x7xP13zJ0FWFSAK-yP1nxf1Pzf0gM+iH1gJ-0BxG3byQOxGXxAKh1-wQP-wFT40x27zwPQPZ0QMAOuyL2R2xwIItRtjJipx02f3wPAMe3BgNWdGYNS2P3gPYJ13P24On1QNAP4NnX73jS31IPF3INz0ILcDDWkKvxR0bXH1JmwJOxkM1yN1kzfyzQ5RoL5x3wkIX2LUL23xTwEP73BgVibxYL4LYNMP0OrTfgzhULoOsNdwNnD3cNwNkK13oOc1qAUwTU220MNyQyc1ZVCIz0DwiKjxvzrypU0ziKXQIzIMCK8MQKM1AXiI8OD2yIUN6WsyFkz1EMyN0OiN61KP60sNH2cOKLRS0Pt1eQSNX1R1v0hVqJ-HsN4LgKcIfSlywJ-ALwKJr0aItX3yXDLnGJMKGMwKZgVhxEiwAgAHMyA4AsAlBi9VCgc39XN4iYwVjtsiQAATVgCACAYgAAZTgDwDOKQDgDWK92v06OSOlUFk7CblOP8AuKuNuPuMeOeIiAAF1uAAALOgM4s4qAZtBgEgcgAAOTMiIFIDIAAAJbAwBuAAAvfAWE1YP4UkaAeAZANATAXAQgREigagCKcAACHEsAe4ugCAN4G4gABygCgDOKoD+AADp3BuBRQsgaBRQUT9gmSyBFABBWAyB0AoAJSiR6gYT0BHAVicQABaeWdwM47U7kP4TwTUpAKAIVTU6QHEHkzwKAXUzwc8ewfkjkvAF47gLAeAPQAADUUL5DdOmAAE1wd4iAB3aEmACEvHbLSEqAOgNYiEmAOwCncIUEyIDorIGAMgVgIoqYqAn4fIsyFUs4tUjU7UoVPUpuQ040009wc0y0s46020+0x0506pBksyGAAQDkpklktktITk7k3kygOMEUqgMUhQJU-wP4KUmUuUhU8c1oaUrAWU+UxQAAehFJXIAFkBBtjiAMTNSMSAAxIIEwZ0rQBEmAaQAQMgCALAJsl0sAX0z0701090mAAMwc7gEMs4sMtwLvCE6M2M+MygXkJMlMt4tQgqdMzMzNHMuwXhACdszs4ZVs-YRCrsvAVk9krknkvk4UxsUcpgOcsASc7gBcpc2csyMimc1c9crcncvcw848+gU888y86828p0+8x8mAL0kmKA7i98uML8n8kmP8gCuMqgEC5MxI94hSKCyZcImMeCtsjslsvaNC7gbsrC-s3C5MUUn0IikisAKi5coikyhUrANczITc7crAXc-co8gQE8tYs88QNim8u8pk7i3isjAS3S4S8M0SnUf8mMiS4CzwUCmSiC+qeSnpHEbNJSkBBC1S5C9S1SzSjCns4YPsnCj8vSkcgysyIy8yxUyi6c5cyy2i2y+yxipy5ily1iq8jyziry18ny-i18wSz80MwKtzKM0KoCqSsCvYjAmWWKwsS8FSZS1ClKg6FCokDS5kzK7S3Koc-Cwq-YYq8qii-YEqyq6yuiuyhixy5y1yi8pqji5sl86Ydqn0zq-ynq384K8SwaiK6S1M-YjecazEK9RKulNC1K5KzsjKzC3s7Cgctay0Ai0qzaqcxc6isy7amig66q46pi0QBqtyi6zy66p8viu6-0h6783qsSgaySt64azwyY1kb6hMyLP65CAGuatK4Gpa0G7K8G3S4cuk5MQyuG8imGokPaqysYGy+ihy9GlirG9inGh8tq58uWwmvKgKp6-qwC8myKj60a5UWmtYKOO2aaha2a+klm9C9myQHKiGvCqGjaokLa+G0ysqh2iykW1cw6mqk6+qs69yy6ri+W-G3Gt8omkSvqsAEK9W8KzW8Cz6xYXW2wRwLvBm02wGlS1mrSsGnSvK7m6Gvm0ipGxG525G0W92tGuqjG727GlqwO26wOrqsAFWoKtWsKoaqKmOmmjM71Vwn8Q2-wJmk2oGs2rKi2zmrO9a3moq-mhGp2gW-a4u1GiWsuqW86mWquxWvG3y+65Wx6xusOl6jW966O7Wr6juzNewLgpOgelOmatO5ajO1a62mUHOievOwugume12yykuhe06xqleq6tenihWvyre4m1W3esmyOg+kaig4+6C0jH4s8Hu1oPuySea3u9KtmoevAS2rmse8U5+4y-O6e6i2et2+e2qn+6W5q-+7yoBzeoS7e0O8O5uim1uo+2Ok+0jPWA2pK1OtSgekGrBnB0em28e2Gl+gWt+khj+sWo67+r23+6hv2m6uhpWhh0Bne5h16qO6B+QjhuBuCIQi+vhq+o2m+827BkeyGx+22icyex23apG0hz+8hz28uxR321qlRgOgBuuhuphveyBymwo6mqgXWmoL4xB3h6+-hvhwRlaq2-Knm-B8Rwh1+4hiqmRr+ihhRqhzx6u1RvQPxxh0miOlurWmB-R6VNFfWJB2gY21B02+Ju+xJ7O2x1oe2yRjJl2qq8WnJ9xvJ2W2hnx4B9RkO0plhnRqmhYsazhgVO0oWOplBocNB5BjB9OjmzO6x-SsRu2+xnaoWpxrJ1xyWzG5epRrx9ejqtR7qjRgJiB8pw+yp9ugx3RHh-6hplZppzBhJ3B0RlJvZiRqexxwu5x2Rj205iuv+5Rq5gmop4Okm56h51hipvRl5yZQ0hWJZz504VZ+p8xoRqxh+nZgFuxoFhxw50F45vptxpen2oZ-2jem5+ukppFsplFp5tFsJuZiOJwKa6Jsx2JmJ5pzZ++pJp+1JkqqRzJ3puR-pulyumhxl65+FkB8ZtlyZqB6Z43KpyFPlqJj5pC5mgRn5lpv5mx3ZsltJrpkF9+2ViFxes5+l1e4Zpl1VsZxFpu7RrVkJmZnWnl3pO3OCgV9Bo1-uuJ010V1pvBscghqV7poushmlyFjxhl7xt1oOtVz18B9lqZ31nV9FyFINtYbFsNxpk1jZ4erZ4lgqy1jp-ZwW-wYW+10uyh85-JgBmu3xhFsBrR-e4JiYv12BlZDOYxmJ0x0Nwe35kRi10l+t8lg5pto5lt+RgZ9ttN2F2untzRwJx53Rv-XV55H7bukNtZstr5it2+qN81kl2NyVoh216Rld+Vp1xVmFwBkZ+h259Vr1-tth557l153pXkd5xmnFiEPFxaytyx6t8V9p4iht6VnplG5Nx1qFi5gpz95l-xiZ71gd+YgtwDoBCnA1sD893F756D4R7Z2tudhDhdxt+c5dlDuV2l196Fy5j9jN4pu53Dv91Fg9wthLfW0j5O41iNqjoluDut+j614Fylu1ljh1tt51pV9NlVzNj13t3djl-doIoj03G7GMEjsT8N4VyNqtsVtpmTzp+Tpdql59tj9Djt11jTnjn9nNzV-Dqw0JygcJ3I+3XLZZijy9ix6jmt5Ju9wFuTil+zxTue1DlTt9zjrt0Z797NvtoJ-9rlvzgN6YwMw1oVwVkVyz6N-5qLq1+Nx9mVpT1t3J9dl15VuFzT9L7T5FvNwdwj3LoD2wpgvM8d8T8zyT2D6zuj2z2Lpjhz2r1dhVjjzD7j7d+53Nn1zrvQ4d3DJYyRfrwVids9qds1md29wiuNh9hTp96bl95zjdrjtzxbvjrLgT-T7ryZK7ArsjorydkrmDqzmN47+99J6r5DhL1jlNwZxr9T5r9zjLnTjrgjtbw9lzeKyGZ7Uz8tiTq90rm92jir+dmLxdyb+LpNkHtD1N8Hzd7trNtr5b7zhoodhHiOSarbwr3b-F-b69w77Hv76Lqrs7mr4H5T+r1T991Lr9ll3jjVvD7LwTgzhLX6t71Hi91Om4tkjgNnzHjnyLrnyr07uL87-nurtdoXlLwplrsXkSp0TLvd7V+HoT8LEz3Mw15X1QBgD7s9p31Xr78L6TsbxDhNsF7Jpz0ntT8ntLs3wKi3mHlbuH6o3WhnKOLkWYpXlXl3lnxC93l3z3qT0bnH2Tnn3XvnongXw35L+b27ynv1TzyXx7rM23znBKuwDHFm9P13-F5vzPkb37xj3PnXgnvXwvg32bjDztk3qHttS33T63mPgNuPu2EzoG5v1Pjstviz77sr2dnP8b-HvHxNlxxLwXkv4frD911riv8f2Hnzun2v6XevrsbNef5PlvtPh-9vn78rrX3HvP3vgv3f4npLubw-hbuXwj7tco+F-LrrHxlzh47+SfZ3o-yX7P8V+XvbPu-274A9eeQPfvjN3Y5D9XOkPbdsAOp5S8nusfRvmOzMYL9Bu5AhAcN1f7r8UBm-Lvs2wu6B8wewfG7ngKAHqgz+oA2nuAOn6q4fwjOe-rAMX4cll+NAtfkdy74MCkOO-cFgP2wEucmuW7TgRsG4E08wCvncJsQVGJhIm+D-UQeIIx6r8semvaQb70B5yCA+oPBrmwJF7Ydt6BArzkQJr4y84Ik+M8JGX0EiDKBobIwWFyz6d9c62-WQf7xOYk9WBwvEfvgK4GR8NB4hS-m4JCKKY1Qc8bwar0MHUDjBSAoISdzQH58MBP-IvoPyUEQ8VBWnU-nEJcFaCA2zRFSHPxgEZDfBbvLIQEI75v9zBDHUIdS1-779-+uA8oSfycFV9OW0vZ7t0RswN8gu8AnwWZyoGwCX+kgznp0JCF+8ehxQxQdd3sHH8w+Y-KodXxqE9cdBDvMjhQLmF+DWhhLdoXQJWGf9t+YQvfsX36HKCKeFQ4Yfx1GHEC8uShPhH4WvpnC0e-wy4dOxo5mDghdwpgfrywFXcye7AwYbsMqEgD4hgxPgUB21B6C9cifIEbMMBHzCPeiAwIR0PBE997h6whQTCLsHRDVBv7B7p8NcHjDSMthbnNMLEEGDmhrfYEQd1BEStueJIyEZgMu5B8ohR-U3g3XeG0i9O9I3WvYHMIII0hwgpoecJaELCCR1wqQcSPyFf9Ch8g6EUKON4ijR+iIwgQcMSEMjMQraW-jATxEp92RT-FURINME8jtemo0kY5xsFG9S+HAt4bEKRHVDTRcdC0a6GgHYjFRuIi4faOyGEibhGom1ugKsHhC-+OAl4aHzFE+jjRdIw4Z3TSFQCrR4Y0MYrxDEZ9VRtA9UXkNjEFD4xjwkoVsKpHei1B+wjMf6Ly5d1MRuY5UfmJC6NCixDojXk6I-58jmOUIwUZEP1GAC6xNIq3vmxt5JCO8kldXF2LgGsiIxbQkscsJjF2ctRlY3oU8KTFlDXhQwtMc4JNGojHQfaQLiLDtEdiIO6Q7sZGLVFriyxG410cwPdEH8Bh+4hEeKMnGrcp+QHcdNMnlELjMhy4q4auLBGPiJuz4ocSwNsHCixxB4+sb6OPHTizRCeUdnTV+LtibRSojkSBJBERc+xqA8sZuIeHbjqxsI7YaKMcGHiRhkozMfOjlzGdViQE20TMPxE9juR8HGQWsLdERDYJo4svuOMr4fC6JTYv8fHktGnC2ROEy8beJXFLDwJ-3YiVBIFEwSPRAAwSQhInET8pxv4x0BJKDFtjcJV4oEJBzYlyTQJCkwidxMsGkSNhFIuCZpM-E0SRJk-HrNKNgqUBQcRk2SYuP8GWTHRXEiwXGLsnki9Rno+EamMQnpjRJJ4wztiHhxSScRBY60WrxMG9igpXQniS+L4nqT3xKY6idFKPGNi4psvRvCyIBEpS8xFk-Cd7w37BSKxoU3USOIikfiop2k8-rwJQm613clQQCYWL8mcj2enEmzg1JIlkjmp-E1qQVI0ZfidJP49yQG39wYSkpJkqgGZKXHsS7xYE6yWNJUlFCwpLUjSV6K0nCSJRbki7LrTDwJ5gxqU3YhdPXxUoDSkMG2G1gEAAA3DGgACEvQAACSvJ0BXisUlCZ7G9gTYJMAECAB9O+legAAauQHjJJlIS0JWEvCRpJEUPp5ABEq4DxIEkoAmIJMkAA";
 
     var gameRunner = /** @class */ (function () {
         function gameRunner(gameContainer, gameProperties, app) {
@@ -1495,9 +1978,9 @@
                     _this.objContainer.loopThrough(_this.logicModule);
                     _this.objContainer.purgeObjects();
                     _this.fpsLimiter = _this.frameDelay;
-                    if (_this.logicModule.useCamera) {
-                        _this.app.stage.pivot.x = _this.logicModule.cameraX;
-                        _this.app.stage.pivot.y = _this.logicModule.cameraY;
+                    if (_this.logicModule.camera.getIsInUse()) {
+                        _this.app.stage.pivot.x = Math.round(_this.logicModule.camera.getX() + _this.logicModule.camera.cameraOffsetX);
+                        _this.app.stage.pivot.y = Math.round(_this.logicModule.camera.getY() + _this.logicModule.camera.cameraOffsetY);
                         _this.app.stage.position.x = _this.app.renderer.width / 2;
                         _this.app.stage.position.y = _this.app.renderer.height / 2;
                     }
@@ -1507,6 +1990,7 @@
                             t.animate();
                         }
                     }
+                    _this.logicModule.camera.moveCamera();
                 }
                 if (_this.fpsLimiter > 0) {
                     _this.fpsLimiter--;

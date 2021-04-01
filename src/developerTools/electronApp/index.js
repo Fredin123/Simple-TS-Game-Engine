@@ -235,16 +235,56 @@
         return internalFunction;
     }());
 
-    var barin = /** @class */ (function () {
-        function barin() {
+    var brain = /** @class */ (function () {
+        function brain() {
         }
-        barin.prototype.angleBetweenPoints = function (dy, dx) {
+        brain.angleBetweenPoints = function (dx, dy) {
             return Math.atan2(dy, dx) + Math.PI;
         };
-        barin.prototype.distanceBetweenPoints = function (x1, y1, x2, y2) {
+        brain.distanceBetweenPoints = function (x1, y1, x2, y2) {
             return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
         };
-        return barin;
+        return brain;
+    }());
+
+    var gameCamera = /** @class */ (function () {
+        function gameCamera() {
+            this.isInUse = true;
+            this.cameraX = 0;
+            this.cameraY = 0;
+            this.camMovementSpeedX = 0.08;
+            this.camMovementSpeedY = 0.08;
+            this.targetX = 0;
+            this.targetY = 0;
+            this.cameraOffsetX = 0;
+            this.cameraOffsetY = 0;
+        }
+        gameCamera.prototype.getIsInUse = function () {
+            return this.isInUse;
+        };
+        gameCamera.prototype.getX = function () {
+            return this.cameraX;
+        };
+        gameCamera.prototype.getY = function () {
+            return this.cameraY;
+        };
+        gameCamera.prototype.moveCamera = function () {
+            var angle = brain.angleBetweenPoints((this.cameraX - this.targetX), (this.cameraY - this.targetY));
+            var distance = brain.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
+            this.cameraX += Math.cos(angle) * distance * this.camMovementSpeedX;
+            this.cameraY += Math.sin(angle) * distance * this.camMovementSpeedY;
+        };
+        gameCamera.prototype.setMoveSpeedX = function (moveSpeed) {
+            this.camMovementSpeedX = moveSpeed;
+        };
+        gameCamera.prototype.setMoveSpeedY = function (moveSpeed) {
+            this.camMovementSpeedY = moveSpeed;
+        };
+        gameCamera.prototype.setTarget = function (tx, ty) {
+            this.targetX = tx;
+            this.targetY = ty;
+        };
+        return gameCamera;
     }());
 
     var roomEvent = /** @class */ (function () {
@@ -256,13 +296,10 @@
             this.gameKeysReleased = {};
             this.gameKeysHeld = {};
             this.deltaTime = 1;
-            this.useCamera = false;
-            this.cameraX = 0;
-            this.cameraY = 0;
+            this.camera = new gameCamera();
             this.objContainer = objContainer;
             this.container = con;
             this.keysDown = {};
-            this.b = new barin();
             this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
             document.addEventListener("keydown", this.keyDownListener.bind(this), false);
             document.addEventListener("keyup", this.keyUpListener.bind(this), false);
@@ -371,20 +408,16 @@
         movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
             force.Dx = force.Dx * deltaTime;
             force.Dy = force.Dy * deltaTime;
-            if (Math.abs(force.Dx) <= 0.000000001) {
+            if (Math.abs(force.Dx) <= 0.0000001) {
                 force.Dx = 0;
             }
-            if (Math.abs(force.Dy) <= 0.000000001) {
+            if (Math.abs(force.Dy) <= 0.0000001) {
                 force.Dy = 0;
             }
             var xdiff = force.Dx;
             var ydiff = force.Dy;
-            this.moveForceHorizontal(Math.round(xdiff), 1, target, collisionNames, objContainer);
-            //this.moveForceHorizontal(xdiff - ~~xdiff, 0.01, target, collisionNames, objContainer);
-            //this.moveOutFromCollider(xdiff % 1, 0.01, target, collisionNames, objContainer);
-            this.moveForceVertical(Math.round(ydiff), 1, target, collisionNames, objContainer);
-            //this.moveForceVertical(ydiff - ~~ydiff, 0.01, target, collisionNames, objContainer);
-            //this.moveForceVertical(ydiff - ~~ydiff, 0.001, target, collisionNames, objContainer);
+            this.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
+            this.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
             force.Dx *= target.airFriction;
             force.Dy *= target.airFriction;
             if (target.gravity != vector.null) {
@@ -393,14 +426,14 @@
                 target.gravity.increaseMagnitude(target.weight);
             }
         };
-        movementOperations.moveForceHorizontal = function (magnitude, iteretorSize, target, collisionNames, objContainer) {
+        movementOperations.moveForceHorizontal = function (magnitude, target, collisionNames, objContainer) {
             if (magnitude == 0)
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
             var _loop_1 = function (i) {
                 objectsThatWereCollidingThisObjectWhileMoving.length = 0;
-                target.g.x += iteretorSize * sign;
+                target.g.x += sign;
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
                     //Push object
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
@@ -408,14 +441,14 @@
                             //Move right
                             if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
                                 objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.x += iteretorSize * sign;
+                                testCollisionWith.g.x += sign;
                             }
                         }
                         else {
                             //Move left
                             if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
                                 objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.x += iteretorSize * sign;
+                                testCollisionWith.g.x += sign;
                             }
                         }
                         return false;
@@ -438,8 +471,8 @@
                                 if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.x += iteretorSize * sign;
-                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                        testCollisionWith.g.x += sign;
+                                        if (i >= Math.abs(magnitude) - 1) {
                                             testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                         }
                                     }
@@ -450,8 +483,8 @@
                                 if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.x += iteretorSize * sign;
-                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                        testCollisionWith.g.x += sign;
+                                        if (i >= Math.abs(magnitude) - 1) {
                                             testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                         }
                                     }
@@ -464,9 +497,9 @@
                 var collisionTarget = this_1.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
-                    target.g.x += 1 * iteretorSize * sign;
+                    target.g.x += 1 * sign;
                     objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.y += iteretorSize * sign;
+                        updaterObject.g.y += 1 * sign;
                     });
                     target.force.Dx = 0;
                     var distance = 0;
@@ -485,7 +518,7 @@
                 }
             };
             var this_1 = this;
-            for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
+            for (var i = 0; i < Math.abs(magnitude); i += 1) {
                 var state_1 = _loop_1(i);
                 if (state_1 === "break")
                     break;
@@ -517,27 +550,43 @@
                 });
             }
         };
-        movementOperations.moveForceVertical = function (magnitude, iteretorSize, target, collisionNames, objContainer) {
+        movementOperations.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
             if (magnitude == 0)
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
             var _loop_2 = function (i) {
-                target.g.y += iteretorSize * sign;
+                target.g.y += sign;
                 if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
                         if (sign > 0) {
                             //Move down
                             if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.y += iteretorSize * sign;
+                                testCollisionWith.g.y += sign;
+                                var move = true;
+                                /*if(this.boxIntersectionSpecific(testCollisionWith, testCollisionWith.collisionBox,
+                                    objectBase.objectsThatCollideWithKeyObjectName[testCollisionWith.objectName], objContainer)){
+                                        move = false;
+                                        testCollisionWith.g.y -= sign;
+                                }*/
+                                if (move) {
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                }
                             }
                         }
                         else {
                             //Move up
                             if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.y += iteretorSize * sign;
+                                testCollisionWith.g.y += sign;
+                                var move = true;
+                                /*if(this.boxIntersectionSpecific(testCollisionWith, testCollisionWith.collisionBox,
+                                    objectBase.objectsThatCollideWithKeyObjectName[testCollisionWith.objectName], objContainer)){
+                                        move = false;
+                                        testCollisionWith.g.y -= sign;
+                                }*/
+                                if (move) {
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                }
                             }
                         }
                         return false;
@@ -560,8 +609,8 @@
                                 if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.y += iteretorSize * sign;
-                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                        testCollisionWith.g.y += sign;
+                                        if (i >= Math.abs(magnitude) - 1) {
                                             testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                         }
                                     }
@@ -572,8 +621,8 @@
                                 if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
                                     if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
                                         objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.y += iteretorSize * sign;
-                                        if (i >= Math.abs(magnitude) - iteretorSize) {
+                                        testCollisionWith.g.y += sign;
+                                        if (i >= Math.abs(magnitude) - 1) {
                                             testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                         }
                                     }
@@ -583,12 +632,13 @@
                         });
                     }
                 }
+                //This has to be more optimized
                 var collisionTarget = this_2.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
-                    target.g.y += iteretorSize * sign;
+                    target.g.y += sign;
                     objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.y += iteretorSize * sign;
+                        updaterObject.g.y += sign;
                     });
                     target.force.Dy = 0;
                     var distance = 0;
@@ -609,7 +659,7 @@
                 }
             };
             var this_2 = this;
-            for (var i = 0; i < Math.abs(magnitude); i += iteretorSize) {
+            for (var i = 0; i < Math.abs(magnitude); i += 1) {
                 var state_2 = _loop_2(i);
                 if (state_2 === "break")
                     break;
@@ -691,6 +741,7 @@
             this.resourcesNeeded = [];
             this._objectName = "nulliObject";
             this.collisionTargets = [];
+            this.moveCollisionTargets = [];
             this.force = new vector(0, 0);
             this._hasBeenMoved_Tick = 0;
             this.objectName = "";
@@ -698,6 +749,13 @@
             this.x = 0;
             this.y = 0;
         }
+        nulliObject.prototype.addMoveCollisionTarget = function () {
+            var collNames = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                collNames[_i] = arguments[_i];
+            }
+            throw new Error("Method not implemented.");
+        };
         nulliObject.prototype.setNewForceAngleMagnitude = function (a, b) {
             throw new Error("Method not implemented.");
         };
@@ -742,6 +800,7 @@
             this.tileStepTime = -1;
             this.ID = uidGen.new();
             this._g = new PIXI.Container();
+            this.gSprites = {};
             this.friction = 0.5;
             this.airFriction = 0.8;
             this.resourcesNeeded = [];
@@ -754,6 +813,7 @@
             this._hasBeenMoved_Tick = 0;
             this._collisionBox = new boxCollider(0, 0, 0, 0);
             this._objectName = "iObject";
+            this.moveCollisionTargets = [];
             this._collisionTargets = [];
             this._force = new vector(0, 0);
             this._objectName = childObjectName;
@@ -795,6 +855,25 @@
             enumerable: false,
             configurable: true
         });
+        objectBase.prototype.addMoveCollisionTarget = function () {
+            var collNames = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                collNames[_i] = arguments[_i];
+            }
+            for (var i = 0; i < collNames.length; i++) {
+                if (this.moveCollisionTargets.indexOf(collNames[i]) == -1) {
+                    if (objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] == null) {
+                        objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] = new Array();
+                    }
+                    if (objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1) {
+                        objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].push(this.objectName);
+                    }
+                    if (this.moveCollisionTargets.indexOf(collNames[i]) == -1) {
+                        this.moveCollisionTargets.push(collNames[i]);
+                    }
+                }
+            }
+        };
         objectBase.prototype.addCollisionTarget = function () {
             var collNames = [];
             for (var _i = 0; _i < arguments.length; _i++) {
@@ -825,12 +904,92 @@
             this.collisionTargets.length = 0;
         };
         objectBase.prototype.style = function (newGraphics) {
+            this.removeAllSprites();
+            this.gSprites = {};
             var tempG = newGraphics(new PIXI.Container());
             var oldX = this.g.x;
             var oldY = this.g.y;
             this._g = tempG;
             this._g.x = oldX;
             this._g.y = oldY;
+        };
+        objectBase.prototype.addSprite = function (settings) {
+            var newAnimation = resourcesHand.getAnimatedSprite(settings.animationName);
+            if (newAnimation != null) {
+                newAnimation.x = settings.x;
+                newAnimation.y = settings.y;
+                newAnimation.animationSpeed = settings.speed;
+                //newAnimation.width = settings.width;
+                //newAnimation.height = settings.height;
+                newAnimation.anchor.set(settings.anchorX, settings.anchorY);
+                newAnimation.scale.set(settings.scaleX, settings.scaleY);
+                newAnimation.rotation = 0;
+                newAnimation.play();
+                this.gSprites[settings.id] = newAnimation;
+                this._g.addChild(newAnimation);
+            }
+            return newAnimation;
+        };
+        objectBase.prototype.hasSprite = function (nameOrId) {
+            return this.gSprites[nameOrId] != null;
+        };
+        objectBase.prototype.removeSprite = function (id) {
+            if (this.gSprites[id] != null) {
+                this._g.removeChild(this.gSprites[id]);
+                delete this.gSprites[id]; //Nothing wrong with using delete, okay?
+            }
+            else {
+                console.log("Wanted to remove ", id, " but could not find it");
+            }
+        };
+        objectBase.prototype.removeAllSprites = function () {
+            var keys = Object.keys(this.gSprites);
+            for (var _i = 0, keys_1 = keys; _i < keys_1.length; _i++) {
+                var k = keys_1[_i];
+                this.removeSprite(k);
+            }
+        };
+        objectBase.prototype.pauseSprite = function (id) {
+            if (this.gSprites[id] != null && this.gSprites[id] instanceof PIXI$1.AnimatedSprite) {
+                this.gSprites[id].stop();
+            }
+        };
+        objectBase.prototype.playSprite = function (id) {
+            if (this.gSprites[id] != null && this.gSprites[id] instanceof PIXI$1.AnimatedSprite) {
+                this.gSprites[id].play();
+            }
+        };
+        objectBase.prototype.scaleXSprites = function (scaleX) {
+            var keys = Object.keys(this.gSprites);
+            for (var _i = 0, keys_2 = keys; _i < keys_2.length; _i++) {
+                var k = keys_2[_i];
+                this.gSprites[k].scale.set(scaleX, this.gSprites[k].scale.y);
+            }
+        };
+        objectBase.prototype.scaleYSprites = function (scaleY) {
+            var keys = Object.keys(this.gSprites);
+            for (var _i = 0, keys_3 = keys; _i < keys_3.length; _i++) {
+                var k = keys_3[_i];
+                this.gSprites[k].scale.set(this.gSprites[k].scale.x, scaleY);
+            }
+        };
+        objectBase.prototype.flipAllSpritesVertical = function () {
+            var keys = Object.keys(this.gSprites);
+            for (var _i = 0, keys_4 = keys; _i < keys_4.length; _i++) {
+                var k = keys_4[_i];
+                this.gSprites[k].height = -this.gSprites[k].height;
+                if (this.gSprites[k].height < 0) {
+                    this.gSprites[k].y += this.gSprites[k].height;
+                }
+                else {
+                    this.gSprites[k].y -= this.gSprites[k].height;
+                }
+            }
+        };
+        objectBase.prototype.setAnimationSpeed = function (id, speed) {
+            if (this.gSprites[id] != null && this.gSprites[id] instanceof PIXI$1.AnimatedSprite) {
+                this.gSprites[id].animationSpeed = speed;
+            }
         };
         objectBase.prototype.logic = function (l) {
             movementOperations.moveByForce(this, this._force, this.collisionTargets, l.objContainer, l.deltaTime);
@@ -885,6 +1044,7 @@
         };
         objectBase.null = new nulliObject(0, 0);
         objectBase.objectsThatCollideWithKeyObjectName = {};
+        objectBase.objectsThatMoveWithKeyObjectName = {};
         return objectBase;
     }());
 
@@ -893,7 +1053,7 @@
         function block(xp, yp) {
             var _this = _super.call(this, xp, yp, block.objectName) || this;
             _this.switch = false;
-            _this.friction = 0.973;
+            _this.friction = 0.986;
             _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI$1.Graphics();
@@ -989,6 +1149,103 @@
         return movingBlockVert;
     }(objectBase));
 
+    //import anime from 'animejs';
+    var grass = /** @class */ (function (_super) {
+        __extends(grass, _super);
+        function grass(xp, yp) {
+            var _this = _super.call(this, xp, yp, grass.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.life = 1000;
+            _this.grass = null;
+            _this.grassAngle = calculations.degreesToRadians(270);
+            _this.wind = 0;
+            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0xFF3e50);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                _this.grass = new PIXI$1.Graphics();
+                _this.grass.lineStyle(2, 0x00FF00, 1, 1);
+                _this.grass.x = 16;
+                _this.grass.y = 0;
+                _this.grass.moveTo(0, 128);
+                _this.grass.lineTo(0, 64);
+                g.addChild(_this.grass);
+                g.calculateBounds();
+                return g;
+            });
+            return _this;
+            /*anime({
+                targets: battery,
+                charged: '100%',
+                cycles: 130,
+                round: 1,
+                easing: 'linear',
+                elasticity: 600,
+                update: function() {
+                  console.log(JSON.stringify(battery));
+                }
+            });*/
+        }
+        grass.prototype.logic = function (l) {
+            this.grassAngle + calculations.degreesToRadians(-20 + Math.random() * 20);
+            if (calculations.radiansToDegrees(this.grassAngle) > 270) {
+                this.grassAngle *= 0.99;
+            }
+            else if (calculations.radiansToDegrees(this.grassAngle) < 270) {
+                this.grassAngle *= 1.01;
+            }
+            if (this.grass != null) {
+                this.grass.clear();
+                this.grass.lineStyle(2, 0x00FF00, 1, 1);
+                this.grass.x = 16;
+                this.grass.y = 0;
+                this.grass.moveTo(Math.cos(this.grassAngle) * 32, 32 + Math.sin(this.grassAngle) * 32);
+                this.grass.lineTo(0, 32);
+            }
+            if (l.checkKeyHeld("a")) {
+                this.wind = 12;
+            }
+            if (this.wind > 0) {
+                this.grassAngle += calculations.degreesToRadians(this.wind);
+                this.wind *= 0.9;
+                if (this.wind <= 0.01) {
+                    this.wind = 0;
+                }
+            }
+        };
+        grass.objectName = "grass";
+        return grass;
+    }(objectBase));
+
+    var dummySandbag = /** @class */ (function (_super) {
+        __extends(dummySandbag, _super);
+        function dummySandbag(xp, yp) {
+            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.99;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x0000FF);
+                newGraphics.drawRect(0, 0, 64, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName);
+            return _this;
+        }
+        dummySandbag.prototype.logic = function (l) {
+        };
+        dummySandbag.objectName = "dummySandbag";
+        return dummySandbag;
+    }(objectBase));
+
     var marker = /** @class */ (function (_super) {
         __extends(marker, _super);
         function marker(xp, yp) {
@@ -998,11 +1255,14 @@
             _this.life = 1000;
             _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
             _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI$1.Graphics();
-                newGraphics.beginFill(0xFF3e50);
-                newGraphics.drawRect(0, 0, 16, 16);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
+                var line = new PIXI$1.Graphics();
+                line.lineStyle(25, 0xBB0000, 1, 1);
+                line.x = 32;
+                line.y = 0;
+                line.moveTo(0, 0);
+                line.lineTo(0, 100);
+                line.endFill();
+                g.addChild(line);
                 return g;
             });
             return _this;
@@ -1042,6 +1302,12 @@
             get: function () {
                 return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
             },
+            set: function (newMag) {
+                var newXAdd = Math.cos(this.delta) * newMag;
+                var newYAdd = calculations.flippedSin(this.delta) * newMag;
+                this.Dx = newXAdd;
+                this.Dy = newYAdd;
+            },
             enumerable: false,
             configurable: true
         });
@@ -1060,6 +1326,25 @@
         return vectorFixedDelta;
     }());
 
+    var animConfig = /** @class */ (function () {
+        function animConfig(init) {
+            this.animationName = "";
+            this.x = 0;
+            this.y = 0;
+            this.speed = 0.5;
+            this.scaleX = 1;
+            this.scaleY = 1;
+            this.anchorX = 0.5;
+            this.anchorY = 0.5;
+            this.id = "";
+            Object.assign(this, init);
+            if (this.id == "") {
+                this.id = this.animationName;
+            }
+        }
+        return animConfig;
+    }());
+
     var mio = /** @class */ (function (_super) {
         __extends(mio, _super);
         function mio(xp, yp) {
@@ -1068,6 +1353,20 @@
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
             _this.weight = 0.09;
             _this.maxRunSpeed = 13;
+            _this.currentSprite = "catReady";
+            _this.currentSpriteObj = null;
+            _this.jumpAngle = 0;
+            _this.shakeCameraForce = 0;
+            _this.airbornTimer = 0;
+            _this.facingRight = true;
+            _this.climbing = false;
+            _this.canClimb = true;
+            _this.falling = false;
+            _this.climbingTimer = 0;
+            _this.hasJumped = false;
+            _this.constantForce = 0;
+            _this.attacking = false;
+            _this.actionWait = 0;
             _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI$1.Graphics();
@@ -1075,39 +1374,221 @@
                 newGraphics.drawRect(0, 0, 128, 128);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
-                var animation = resourcesHand.getAnimatedSprite("catRun");
-                if (animation != null) {
-                    animation.width = 256;
-                    animation.height = 256;
-                    animation.animationSpeed = 0.3;
-                    animation.play();
-                    animation.x = -64;
-                    animation.y = -64;
-                    g.addChild(animation);
-                }
-                //g.removeChild(animation);
-                g.filters = [];
                 g.calculateBounds();
                 return g;
             });
             _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName);
+            //super.addMoveCollisionTarget(dummySandbag.objectName);
+            //super.addMoveCollisionTarget(dummySandbag.objectName);
+            _super.prototype.addSprite.call(_this, new animConfig({
+                animationName: "catReady",
+                scaleX: 3,
+                scaleY: 3,
+                speed: 0.3,
+                x: 64,
+                y: 0,
+                anchorX: 0.5,
+                anchorY: 0.34,
+            }));
             return _this;
         }
         mio.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
-            if (l.checkKeyHeld("a")) {
+            if (Math.floor(this.force.Dy) == 0 && Math.floor(this.gravity.magnitude) == 0) {
+                this.hasJumped = false;
+            }
+            if (this.climbing == false) {
+                if ((l.checkKeyHeld("a") || l.checkKeyHeld("d")) && this.force.Dx == 0 && Math.floor(this.force.Dy) > 0 && this.canClimb && this.falling == false && this.hasJumped) {
+                    this.climbing = true;
+                    this.gravity.magnitude = 0;
+                    this.climbingTimer = 60;
+                    this.canClimb = false;
+                }
+            }
+            else {
+                if (this.force.Dx != 0 || this.climbingTimer <= 0 || (l.checkKeyHeld("a") || l.checkKeyHeld("d")) == false || (l.checkKeyHeld("a") && l.checkKeyHeld("d"))) {
+                    this.climbing = false;
+                    this.weight = 0.09;
+                    this.falling = true;
+                }
+                else {
+                    this.falling = false;
+                    this.airbornTimer = 0;
+                    this.weight = 0.001;
+                }
+                if (this.climbingTimer > 0) {
+                    this.climbingTimer--;
+                }
+            }
+            if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
+                this.canClimb = true;
+                this.falling = false;
+            }
+            if (l.checkKeyHeld("a") && this.actionWait == 0) {
                 _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 1);
             }
-            if (l.checkKeyHeld("d")) {
+            if (l.checkKeyHeld("d") && this.actionWait == 0) {
                 _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 1);
             }
-            if (l.checkKeyPressed("w")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 32);
+            if (this.climbing == false) {
+                if (this.falling == false && this.hasJumped == false && l.checkKeyPressed("w") && Math.floor(this.gravity.magnitude) == 0 && this.actionWait == 0) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 26);
+                    this.hasJumped = true;
+                }
+            }
+            else {
+                if (l.checkKeyHeld("w")) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 0.5);
+                }
             }
             this.force.limitHorizontalMagnitude(this.maxRunSpeed);
-            l.useCamera = true;
-            l.cameraX = this.g.x;
-            l.cameraY = this.g.y;
+            if (this.force.Dy <= -9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpUp";
+            }
+            else if (this.force.Dy > -9 && this.force.Dy < 9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpMid";
+            }
+            else if (this.force.Dy > 9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpDown";
+            }
+            if (Math.abs(this.force.Dy) < 1) {
+                this.jumpAngle = 0;
+                if (Math.abs(this.force.Dx) <= 1) {
+                    this.currentSprite = "catReady";
+                }
+                else if (this.force.Dx != 0) {
+                    this.currentSprite = "catRun";
+                }
+            }
+            if (this.force.Dy > 1) {
+                if (this.force.Dx > 0 && this.jumpAngle < 0.4) {
+                    this.jumpAngle += 0.015;
+                }
+                else if (this.jumpAngle > -0.4) {
+                    this.jumpAngle -= 0.015;
+                }
+            }
+            if (_super.prototype.hasSprite.call(this, this.currentSprite) == false) {
+                _super.prototype.removeAllSprites.call(this);
+                this.currentSpriteObj = _super.prototype.addSprite.call(this, new animConfig({
+                    animationName: this.currentSprite,
+                    scaleX: 3,
+                    scaleY: 3,
+                    speed: 0.3,
+                    x: 64,
+                    y: 75,
+                    anchorX: 0.5,
+                    anchorY: 0.34,
+                }));
+                if (this.currentSprite == "catReady") {
+                    this.currentSpriteObj.animationSpeed = 0.155;
+                }
+                this.currentSpriteObj.pivot.set(0, 25);
+            }
+            if (this.currentSpriteObj != null) {
+                this.currentSpriteObj.rotation = this.jumpAngle;
+                if (this.climbing) {
+                    if (l.checkKeyHeld("a")) {
+                        this.currentSpriteObj.rotation = calculations.degreesToRadians(90);
+                    }
+                    else if (l.checkKeyHeld("d")) {
+                        this.currentSpriteObj.rotation = calculations.degreesToRadians(270);
+                    }
+                }
+                if (this.currentSprite == "catRun") {
+                    var animWithSpeed = 0.4 * Math.abs(this.force.Dx) / this.maxRunSpeed;
+                    if (animWithSpeed < 0.1)
+                        animWithSpeed = 0.1;
+                    this.currentSpriteObj.animationSpeed = animWithSpeed;
+                }
+            }
+            if (Math.abs(Math.floor(this.force.Dx)) != 0) {
+                if (this.force.Dx > 0) {
+                    _super.prototype.scaleXSprites.call(this, 3);
+                    this.facingRight = true;
+                    if (this.jumpAngle < 0) {
+                        this.jumpAngle *= -1;
+                    }
+                }
+                else if (this.force.Dx < 0) {
+                    _super.prototype.scaleXSprites.call(this, -3);
+                    this.facingRight = false;
+                    if (this.jumpAngle > 0) {
+                        this.jumpAngle *= -1;
+                    }
+                }
+            }
+            if (Math.abs(Math.floor(this.force.Dx)) >= 5) {
+                l.camera.setMoveSpeedX(0.07);
+            }
+            else {
+                l.camera.setMoveSpeedX(0.04);
+            }
+            if (this.force.Dy >= 1) {
+                this.airbornTimer++;
+            }
+            else {
+                if (this.airbornTimer > 25) {
+                    this.shakeCameraForce = this.airbornTimer * 0.7;
+                    if (this.shakeCameraForce > 40) {
+                        this.shakeCameraForce = 40;
+                    }
+                }
+                this.airbornTimer = 0;
+            }
+            this.hangleAttacks(l);
+            if (this.shakeCameraForce > 0) {
+                l.camera.cameraOffsetX = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                l.camera.cameraOffsetY = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                this.shakeCameraForce--;
+            }
+            else {
+                l.camera.cameraOffsetX = 0;
+                l.camera.cameraOffsetY = 0;
+            }
+            var spaceToAdd = 128;
+            if (Math.abs(this.force.Dx) > 2) {
+                spaceToAdd = 256;
+            }
+            var addCamSpace = spaceToAdd;
+            if (this.facingRight == false) {
+                addCamSpace = -spaceToAdd;
+            }
+            var addCamSpaceY = 0;
+            if (Math.floor(this.force.Dy) > 30) {
+                addCamSpaceY = 600;
+            }
+            l.camera.setTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
+        };
+        mio.prototype.hangleAttacks = function (l) {
+            if (l.checkKeyPressed(" ") && this.actionWait == 0) {
+                if (Math.floor(this.gravity.magnitude) != 0) {
+                    this.attacking = true;
+                    this.constantForce = 15;
+                    this.actionWait = 33;
+                    this.airbornTimer += 5;
+                }
+                else {
+                    this.attacking = true;
+                    this.constantForce = 5;
+                    this.actionWait = 12;
+                }
+            }
+            if (this.facingRight) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(350), this.constantForce);
+            }
+            else {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(190), this.constantForce);
+            }
+            if (this.constantForce > 0) {
+                this.constantForce -= 1;
+            }
+            else {
+                this.attacking = false;
+            }
+            if (this.actionWait > 0) {
+                this.actionWait--;
+            }
         };
         mio.objectName = "mio";
         return mio;
@@ -1239,6 +1720,8 @@
                 function (xp, yp) { return new block(xp, yp); },
                 function (xp, yp) { return new movingBlockHori(xp, yp); },
                 function (xp, yp) { return new movingBlockVert(xp, yp); },
+                function (xp, yp) { return new grass(xp, yp); },
+                function (xp, yp) { return new dummySandbag(xp, yp); },
                 function (xp, yp) { return new marker(xp, yp); },
                 function (xp, yp) { return new mio(xp, yp); },
             ];

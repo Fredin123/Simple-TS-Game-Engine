@@ -23,11 +23,15 @@ export class nulliObject implements iObject{
     resourcesNeeded: string[] = [];
     _objectName: string = "nulliObject";
     collisionTargets: string[] = [];
+    moveCollisionTargets: Array<string> = [];
     force: vector = new vector(0, 0);
     _hasBeenMoved_Tick: number = 0;
 
     constructor(xp: number, yp: number) {
 
+    }
+    addMoveCollisionTarget(...collNames: string[]): void {
+        throw new Error("Method not implemented.");
     }
     setNewForceAngleMagnitude(a: number, b: number): void {
         throw new Error("Method not implemented.");
