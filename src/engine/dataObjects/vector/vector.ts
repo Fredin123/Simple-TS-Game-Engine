@@ -1,4 +1,4 @@
-import { calculations } from "../calculations";
+import { calculations } from "../../calculations";
 import { iVector } from "./iVector";
 import { nullVector } from "./nullVector";
 

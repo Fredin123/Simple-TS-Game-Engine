@@ -1,7 +1,7 @@
 import { objectBase } from "./objectBase";
 import { roomEvent } from "../roomEvent";
 import { iObject } from "./iObject";
-import { vector } from "../vector/vector";
+import { vector } from "../dataObjects/vector/vector";
 import { resourceMeta } from "../preload sources/resourceMeta";
 import { boxCollider } from "./boxCollider";
 

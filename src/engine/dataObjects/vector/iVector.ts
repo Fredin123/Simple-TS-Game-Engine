@@ -1,4 +1,4 @@
-import { nulliObject } from "../objectHandlers/nulliObject";
+import { nulliObject } from "../../objectHandlers/nulliObject";
 import { vector } from "./vector";
 
 export interface iVector{

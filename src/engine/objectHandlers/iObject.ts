@@ -1,11 +1,11 @@
-import { vector } from "../vector/vector";
+import { vector } from "../dataObjects/vector/vector";
 import { roomEvent } from "../roomEvent";
 import { resourceMeta } from "../preload sources/resourceMeta";
 import { boxCollider } from "./boxCollider";
 import { uidGen } from "../tools/uidGen";
 import { objectContainer } from "./objectContainer";
 import { movementOperations } from "../movementOperations";
-import { iVector } from "../vector/iVector";
+import { iVector } from "../dataObjects/vector/iVector";
 import { nulliObject } from "./nulliObject";
 
 

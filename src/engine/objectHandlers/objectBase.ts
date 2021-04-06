@@ -1,4 +1,4 @@
-import { vector } from "../vector/vector";
+import { vector } from "../dataObjects/vector/vector";
 import { roomEvent } from "../roomEvent";
 import { resourceMeta } from "../preload sources/resourceMeta";
 import { boxCollider } from "./boxCollider";
@@ -6,7 +6,7 @@ import { uidGen } from "../tools/uidGen";
 import { objectContainer } from "./objectContainer";
 import { movementOperations } from "../movementOperations";
 import { iObject } from "./iObject";
-import { iVector } from "../vector/iVector";
+import { iVector } from "../dataObjects/vector/iVector";
 import { nulliObject } from "./nulliObject";
 import { calculations } from "../calculations";
 import { resourcesHand } from "../preload sources/resources";
@@ -35,8 +35,8 @@ export class objectBase implements iObject{
     weight: number = 0.4;
     _hasBeenMoved_Tick: number = 0;
 
-    static objectsThatCollideWithKeyObjectName: {[key: string]: Array<string>} = {};
-    static objectsThatMoveWithKeyObjectName: {[key: string]: Array<string>} = {};
+    static objectsThatCollideWith: {[key: string]: Array<string>} = {};
+    static objectsThatMoveWith: {[key: string]: Array<string>} = {};
 
 
     get g(){
@@ -70,13 +70,13 @@ export class objectBase implements iObject{
 
 
     addMoveCollisionTarget(...collNames:string[]){
-        for(let i=0; i<collNames.length; i++){
+        /*for(let i=0; i<collNames.length; i++){
             if(this.moveCollisionTargets.indexOf(collNames[i]) == -1){
-                if(objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] == null){
-                    objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] = new Array<string>();
+                if(objectBase.objectsThatMoveWith[collNames[i]] == null){
+                    objectBase.objectsThatMoveWith[collNames[i]] = new Array<string>();
                 }
-                if(objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1){
-                    objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].push(this.objectName);
+                if(objectBase.objectsThatMoveWith[collNames[i]].indexOf(this.objectName) == -1){
+                    objectBase.objectsThatMoveWith[collNames[i]].push(this.objectName);
                 }
 
                 if(this.moveCollisionTargets.indexOf(collNames[i]) == -1){
@@ -84,23 +84,23 @@ export class objectBase implements iObject{
                 }
                 
             }
-        }
+        }*/
     }
 
 
 
     addCollisionTarget(...collNames:string[]){
         for(let i=0; i<collNames.length; i++){
-            if(this.collisionTargets.indexOf(collNames[i]) == -1){
-                if(objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] == null){
-                    objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] = new Array<string>();
+            if(this._collisionTargets.indexOf(collNames[i]) == -1){
+                if(objectBase.objectsThatCollideWith[collNames[i]] == null){
+                    objectBase.objectsThatCollideWith[collNames[i]] = new Array<string>();
                 }
-                if(objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1){
-                    objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].push(this.objectName);
+                if(objectBase.objectsThatCollideWith[collNames[i]].indexOf(this.objectName) == -1){
+                    objectBase.objectsThatCollideWith[collNames[i]].push(this.objectName);
                 }
 
-                if(this.collisionTargets.indexOf(collNames[i]) == -1){
-                    this.collisionTargets.push(collNames[i]);
+                if(this._collisionTargets.indexOf(collNames[i]) == -1){
+                    this._collisionTargets.push(collNames[i]);
                 }
                 
             }
@@ -110,7 +110,7 @@ export class objectBase implements iObject{
     removeCollisionTarget(...collNames:string[]){
         throw new Error("Function removeCollisionTarget has not been implemented correctly");
         this._collisionTargets = this.collisionTargets.filter(x => { collNames.indexOf(x) == -1 });
-        objectBase.objectsThatCollideWithKeyObjectName[this.objectName] = objectBase.objectsThatCollideWithKeyObjectName[this.objectName].filter(x => { collNames.indexOf(x) == -1 });
+        objectBase.objectsThatCollideWith[this.objectName] = objectBase.objectsThatCollideWith[this.objectName].filter(x => { collNames.indexOf(x) == -1 });
     }
 
     removeAllCollisionTargets(){

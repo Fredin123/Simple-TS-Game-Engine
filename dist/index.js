@@ -422,10 +422,10 @@
         movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
             force.Dx = force.Dx * deltaTime;
             force.Dy = force.Dy * deltaTime;
-            if (Math.abs(force.Dx) <= 0.0000001) {
+            if (Math.abs(force.Dx) <= 0.01) {
                 force.Dx = 0;
             }
-            if (Math.abs(force.Dy) <= 0.0000001) {
+            if (Math.abs(force.Dy) <= 0.01) {
                 force.Dy = 0;
             }
             var xdiff = force.Dx;
@@ -441,29 +441,32 @@
             }
         };
         movementOperations.moveForceHorizontal = function (magnitude, target, collisionNames, objContainer) {
+            var _this = this;
             if (magnitude == 0)
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
+            var collisionTarget = objectBase.null;
             var _loop_1 = function (i) {
                 objectsThatWereCollidingThisObjectWhileMoving.length = 0;
                 target.g.x += sign;
-                if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
+                if (objectBase.objectsThatCollideWith[target.objectName] != null) {
                     //Push object
-                    objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
-                        if (sign > 0) {
-                            //Move right
-                            if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.x += sign;
+                    objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                        if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                            collisionTarget = _this.pushObjectHorizontal(target, testCollisionWith, sign, objContainer);
+                            if (collisionTarget == objectBase.null) {
+                                target.force.Dx *= 1 - testCollisionWith.weight;
                             }
-                        }
-                        else {
-                            //Move left
-                            if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                testCollisionWith.g.x += sign;
-                            }
+                            /*testCollisionWith.g.x += sign;
+                            objContainer.foreachObjectType(testCollisionWith.collisionTargets, (testCollision: iObject)=>{
+                                if(testCollision.objectName != target.objectName &&
+                                    internalFunction.intersecting(testCollisionWith, testCollisionWith.collisionBox, testCollision)){
+                                        testCollisionWith.g.x += sign*-1;
+                                        collisionTarget = testCollisionWith;
+                                }
+                                return false;
+                            });*/
                         }
                         return false;
                     });
@@ -478,7 +481,7 @@
                     }
                     if (target.stickyTop || target.stickyBottom) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
-                        objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                        objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
                             //console.log("Check object: ", testCollisionWith);
                             if (sign > 0) {
                                 //Move right
@@ -508,12 +511,14 @@
                         });
                     }
                 }
-                var collisionTarget = this_1.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                if (collisionTarget == objectBase.null) {
+                    collisionTarget = this_1.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                }
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
                     target.g.x += 1 * sign;
                     objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.y += 1 * sign;
+                        updaterObject.g.x += 1 * sign;
                     });
                     target.force.Dx = 0;
                     var distance = 0;
@@ -547,7 +552,7 @@
                 stickyCheck.expandRightSide(checkDistance);
             }
             if (target.stickyLeftSide || target.stickyRightSide) {
-                objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
                     if (sign > 0) {
                         //Moving right
                         if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
@@ -564,44 +569,50 @@
                 });
             }
         };
+        movementOperations.pushObjectHorizontal = function (pusher, objectBeingPushed, sign, objContainer) {
+            var _this = this;
+            var collided = false;
+            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
+                if (objectBeingPushed.collisionTargets.length == 0) {
+                    return pusher;
+                }
+                objectBeingPushed.g.x += sign;
+                objContainer.foreachObjectType(objectBeingPushed.collisionTargets, function (testCollision) {
+                    if (testCollision.objectName != pusher.objectName &&
+                        internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
+                        && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null) {
+                        objectBeingPushed.g.x += sign * -1;
+                        collided = true;
+                    }
+                    return false;
+                });
+            }
+            if (collided) {
+                return objectBeingPushed;
+            }
+            return objectBase.null;
+        };
         movementOperations.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
             if (magnitude == 0)
                 return;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
+            var collisionTarget = objectBase.null;
             var _loop_2 = function (i) {
                 target.g.y += sign;
-                if (objectBase.objectsThatCollideWithKeyObjectName[target.objectName] != null) {
-                    objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
-                        if (sign > 0) {
-                            //Move down
-                            if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                testCollisionWith.g.y += sign;
-                                var move = true;
-                                /*if(this.boxIntersectionSpecific(testCollisionWith, testCollisionWith.collisionBox,
-                                    objectBase.objectsThatCollideWithKeyObjectName[testCollisionWith.objectName], objContainer)){
-                                        move = false;
-                                        testCollisionWith.g.y -= sign;
-                                }*/
-                                if (move) {
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                if (objectBase.objectsThatCollideWith[target.objectName] != null) {
+                    //Moving objects
+                    objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                        if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                            testCollisionWith.g.y += sign;
+                            objContainer.foreachObjectType(testCollisionWith.collisionTargets, function (testCollision) {
+                                if (testCollision.objectName != target.objectName &&
+                                    internalFunction.intersecting(testCollisionWith, testCollisionWith.collisionBox, testCollision)) {
+                                    testCollisionWith.g.y += sign * -1;
+                                    collisionTarget = testCollisionWith;
                                 }
-                            }
-                        }
-                        else {
-                            //Move up
-                            if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                testCollisionWith.g.y += sign;
-                                var move = true;
-                                /*if(this.boxIntersectionSpecific(testCollisionWith, testCollisionWith.collisionBox,
-                                    objectBase.objectsThatCollideWithKeyObjectName[testCollisionWith.objectName], objContainer)){
-                                        move = false;
-                                        testCollisionWith.g.y -= sign;
-                                }*/
-                                if (move) {
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                }
-                            }
+                                return false;
+                            });
                         }
                         return false;
                     });
@@ -616,7 +627,7 @@
                     }
                     if (target.stickyLeftSide || target.stickyRightSide) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
-                        objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                        objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
                             //console.log("Check object: ", testCollisionWith);
                             if (sign > 0) {
                                 //Move down
@@ -647,7 +658,9 @@
                     }
                 }
                 //This has to be more optimized
-                var collisionTarget = this_2.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                if (collisionTarget == objectBase.null) {
+                    collisionTarget = this_2.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                }
                 if (collisionTarget != objectBase.null) {
                     sign *= -1;
                     target.g.y += sign;
@@ -666,8 +679,6 @@
                         target.gravity.Dy *= distance / 90;
                         target.gravity.Dx *= 1 - (distance / 90);
                     }
-                    //target.gravity.Dy = 0;
-                    //target.force.Dy *= collisionTarget.friction;
                     target.force.Dx *= collisionTarget.friction;
                     return "break";
                 }
@@ -688,7 +699,7 @@
             }
             //Sticky draging
             if (target.stickyTop || target.stickyBottom) {
-                objContainer.foreachObjectType(objectBase.objectsThatCollideWithKeyObjectName[target.objectName], function (testCollisionWith) {
+                objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
                     if (sign > 0) {
                         //Moving down
                         if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
@@ -705,27 +716,15 @@
                 });
             }
         };
-        movementOperations.moveOutFromCollider = function (magnitude, iteretorSize, target, collisionNames, objContainer) {
-            var collisionTarget;
-            while ((collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer)) != objectBase.null) {
-                target.g.x += Math.cos(collisionTarget.force.delta);
-                Math.cos(collisionTarget.force.delta);
-            }
-            /*if(moveX > 0){
-                target.g.x += 5;
-            }else if(moveX < 0){
-                target.g.x -= 5;
-            }*/
-        };
         movementOperations.boxIntersectionSpecific = function (initiator, boxData, targetObjects, objContainer) {
-            return this.boxIntersectionSpecificClass(initiator, boxData, targetObjects, objContainer);
+            return this.boxIntersectionSpecificClass(initiator, boxData, targetObjects, "", objContainer);
         };
         //Collision
         movementOperations.boxIntersectionSpecificClass = (new /** @class */ (function () {
             function class_1() {
-                this.inc = function (initiator, boxData, targetObjects, objContainer) {
+                this.inc = function (initiator, boxData, targetObjects, excludeObject, objContainer) {
                     return objContainer.foreachObjectType(targetObjects, function (testCollisionWith) {
-                        if (internalFunction.intersecting(initiator, boxData, testCollisionWith)) {
+                        if (testCollisionWith.objectName != excludeObject && internalFunction.intersecting(initiator, boxData, testCollisionWith)) {
                             return true;
                         }
                         return false;
@@ -994,19 +993,21 @@
             for (var _i = 0; _i < arguments.length; _i++) {
                 collNames[_i] = arguments[_i];
             }
-            for (var i = 0; i < collNames.length; i++) {
-                if (this.moveCollisionTargets.indexOf(collNames[i]) == -1) {
-                    if (objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] == null) {
-                        objectBase.objectsThatMoveWithKeyObjectName[collNames[i]] = new Array();
+            /*for(let i=0; i<collNames.length; i++){
+                if(this.moveCollisionTargets.indexOf(collNames[i]) == -1){
+                    if(objectBase.objectsThatMoveWith[collNames[i]] == null){
+                        objectBase.objectsThatMoveWith[collNames[i]] = new Array<string>();
                     }
-                    if (objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1) {
-                        objectBase.objectsThatMoveWithKeyObjectName[collNames[i]].push(this.objectName);
+                    if(objectBase.objectsThatMoveWith[collNames[i]].indexOf(this.objectName) == -1){
+                        objectBase.objectsThatMoveWith[collNames[i]].push(this.objectName);
                     }
-                    if (this.moveCollisionTargets.indexOf(collNames[i]) == -1) {
+
+                    if(this.moveCollisionTargets.indexOf(collNames[i]) == -1){
                         this.moveCollisionTargets.push(collNames[i]);
                     }
+                    
                 }
-            }
+            }*/
         };
         objectBase.prototype.addCollisionTarget = function () {
             var collNames = [];
@@ -1014,15 +1015,15 @@
                 collNames[_i] = arguments[_i];
             }
             for (var i = 0; i < collNames.length; i++) {
-                if (this.collisionTargets.indexOf(collNames[i]) == -1) {
-                    if (objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] == null) {
-                        objectBase.objectsThatCollideWithKeyObjectName[collNames[i]] = new Array();
+                if (this._collisionTargets.indexOf(collNames[i]) == -1) {
+                    if (objectBase.objectsThatCollideWith[collNames[i]] == null) {
+                        objectBase.objectsThatCollideWith[collNames[i]] = new Array();
                     }
-                    if (objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].indexOf(this.objectName) == -1) {
-                        objectBase.objectsThatCollideWithKeyObjectName[collNames[i]].push(this.objectName);
+                    if (objectBase.objectsThatCollideWith[collNames[i]].indexOf(this.objectName) == -1) {
+                        objectBase.objectsThatCollideWith[collNames[i]].push(this.objectName);
                     }
-                    if (this.collisionTargets.indexOf(collNames[i]) == -1) {
-                        this.collisionTargets.push(collNames[i]);
+                    if (this._collisionTargets.indexOf(collNames[i]) == -1) {
+                        this._collisionTargets.push(collNames[i]);
                     }
                 }
             }
@@ -1177,8 +1178,8 @@
             this._force.Dy += calculations.flippedSin(angle) * magnitude;
         };
         objectBase.null = new nulliObject(0, 0);
-        objectBase.objectsThatCollideWithKeyObjectName = {};
-        objectBase.objectsThatMoveWithKeyObjectName = {};
+        objectBase.objectsThatCollideWith = {};
+        objectBase.objectsThatMoveWith = {};
         return objectBase;
     }());
 
@@ -1221,6 +1222,8 @@
             _this.switch = false;
             _this.friction = 0.873;
             _this.stickyTop = true;
+            _this.stickyRightSide = true;
+            _this.stickyLeftSide = true;
             _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI$1.Graphics();
@@ -1355,71 +1358,6 @@
         return grass;
     }(objectBase));
 
-    var dummySandbag = /** @class */ (function (_super) {
-        __extends(dummySandbag, _super);
-        function dummySandbag(xp, yp) {
-            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.99;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI$1.Graphics();
-                newGraphics.beginFill(0x0000FF);
-                newGraphics.drawRect(0, 0, 64, 128);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName);
-            return _this;
-        }
-        dummySandbag.prototype.logic = function (l) {
-        };
-        dummySandbag.objectName = "dummySandbag";
-        return dummySandbag;
-    }(objectBase));
-
-    var marker = /** @class */ (function (_super) {
-        __extends(marker, _super);
-        function marker(xp, yp) {
-            var _this = _super.call(this, xp, yp, marker.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.0;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
-            _super.prototype.style.call(_this, function (g) {
-                var line = new PIXI$1.Graphics();
-                line.lineStyle(25, 0xBB0000, 1, 1);
-                line.x = 32;
-                line.y = 0;
-                line.moveTo(0, 0);
-                line.lineTo(0, 100);
-                line.endFill();
-                g.addChild(line);
-                return g;
-            });
-            return _this;
-            /*setInterval(()=>{
-                this.switch = !this.switch;
-            }, 700);*/
-        }
-        marker.prototype.logic = function (l) {
-            this.life--;
-            if (this.life <= 0) {
-                l.objContainer.deleteObject(this);
-            }
-            //super.logic(l);
-            /*if(this.switch){
-                super.setNewForce(l.degreesToRadians(0), 3);
-            }else{
-                super.setNewForce(l.degreesToRadians(180), 3);
-            }*/
-        };
-        marker.objectName = "marker";
-        return marker;
-    }(objectBase));
-
     var vectorFixedDelta = /** @class */ (function () {
         function vectorFixedDelta(delta, inputMagnitude) {
             this.delta = delta;
@@ -1511,7 +1449,7 @@
                 g.calculateBounds();
                 return g;
             });
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName);
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName);
             //super.addMoveCollisionTarget(dummySandbag.objectName);
             //super.addMoveCollisionTarget(dummySandbag.objectName);
             _super.prototype.addSprite.call(_this, new animConfig({
@@ -1726,6 +1664,73 @@
         };
         mio.objectName = "mio";
         return mio;
+    }(objectBase));
+
+    var dummySandbag = /** @class */ (function (_super) {
+        __extends(dummySandbag, _super);
+        function dummySandbag(xp, yp) {
+            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.99;
+            _this.weight = 0.05;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x0000FF);
+                newGraphics.drawRect(0, 0, 64, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, mio.objectName);
+            return _this;
+            //super.addMoveCollisionTarget(mio.objectName);
+        }
+        dummySandbag.prototype.logic = function (l) {
+        };
+        dummySandbag.objectName = "dummySandbag";
+        return dummySandbag;
+    }(objectBase));
+
+    var marker = /** @class */ (function (_super) {
+        __extends(marker, _super);
+        function marker(xp, yp) {
+            var _this = _super.call(this, xp, yp, marker.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
+            _super.prototype.style.call(_this, function (g) {
+                var line = new PIXI$1.Graphics();
+                line.lineStyle(25, 0xBB0000, 1, 1);
+                line.x = 32;
+                line.y = 0;
+                line.moveTo(0, 0);
+                line.lineTo(0, 100);
+                line.endFill();
+                g.addChild(line);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        marker.prototype.logic = function (l) {
+            this.life--;
+            if (this.life <= 0) {
+                l.objContainer.deleteObject(this);
+            }
+            //super.logic(l);
+            /*if(this.switch){
+                super.setNewForce(l.degreesToRadians(0), 3);
+            }else{
+                super.setNewForce(l.degreesToRadians(180), 3);
+            }*/
+        };
+        marker.objectName = "marker";
+        return marker;
     }(objectBase));
 
     var tools = /** @class */ (function () {
@@ -1979,8 +1984,8 @@
                     _this.objContainer.purgeObjects();
                     _this.fpsLimiter = _this.frameDelay;
                     if (_this.logicModule.camera.getIsInUse()) {
-                        _this.app.stage.pivot.x = Math.round(_this.logicModule.camera.getX() + _this.logicModule.camera.cameraOffsetX);
-                        _this.app.stage.pivot.y = Math.round(_this.logicModule.camera.getY() + _this.logicModule.camera.cameraOffsetY);
+                        _this.app.stage.pivot.x = (_this.logicModule.camera.getX() + _this.logicModule.camera.cameraOffsetX);
+                        _this.app.stage.pivot.y = (_this.logicModule.camera.getY() + _this.logicModule.camera.cameraOffsetY);
                         _this.app.stage.position.x = _this.app.renderer.width / 2;
                         _this.app.stage.position.y = _this.app.renderer.height / 2;
                     }

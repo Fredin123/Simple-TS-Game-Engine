@@ -1,4 +1,4 @@
-import { calculations } from "../calculations";
+import { calculations } from "../../calculations";
 import { iVector } from "./iVector";
 
 export class vectorFixedDelta implements iVector{
