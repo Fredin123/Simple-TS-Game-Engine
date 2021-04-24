@@ -9,6 +9,9 @@ export class gameSettings{
     applySettings(a: PIXI.Application){
         this.app = a;
         this.app.renderer.backgroundColor = 0xFFFFFF;
+
+        PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+        
         if(this.stretchToWindow){
             this.windowStretchListener();
             window.addEventListener("resize", this.windowStretchListener.bind(this));

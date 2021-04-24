@@ -69,6 +69,7 @@ export class fileSystemHandlerObjects{
             let tempNewImage = new Image();
             tempNewImage.src = this.system.sticker;
 
+
             var funcNameOnly = tools.getClassNameFromConstructorName(functionAsString); 
             canvasRenderer.classAndImage[funcNameOnly] = tempNewImage;
             this.savedImageDataUrls[funcNameOnly] = this.system.sticker;

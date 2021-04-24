@@ -60,7 +60,9 @@ export class tileSelector{
         this.controls.appendChild(useTileButton);
 
 
-        this.prevCreatedAnimTiles= document.createElement("div");
+        this.prevCreatedAnimTiles = document.createElement("div");
+        this.prevCreatedAnimTiles.style.height = "300px";
+        this.prevCreatedAnimTiles.style.overflowY = "scroll";
         this.controls.appendChild(this.prevCreatedAnimTiles);
 
 
@@ -68,7 +70,6 @@ export class tileSelector{
         this.modal.appendChild(this.controls);
 
         this.canvasContainer = document.createElement("div");
-        this.canvasContainer.className = "flexItem flex1";
         this.canvasContainer.style.border = "solid 1px blue";
         this.canvasContainer.style.overflow = "auto";
         
@@ -98,11 +99,13 @@ export class tileSelector{
 
         this.tileCreator = new animatedTypeCreator("animTileCreator");
 
+
+        setInterval(this.resizeCanvas.bind(this), 3000);
     }
 
 
     private clickUseButton(){
-        if(this.tileCreator.tempSubTile != null){
+        if(this.tileCreator.animation != null){
             let tileAnimation = this.tileCreator.getTileStack();
             if(tileAnimation.name == ""){
                 if(tileAnimation.tiles.length > 1){
@@ -117,8 +120,6 @@ export class tileSelector{
                 }else{
                     this.createAnimationStackFinalize(0);
                 }
-                
-                
             }else{
                 this.callbackSubTile(tileAnimation);
             }
@@ -226,14 +227,22 @@ export class tileSelector{
         
     }
 
+    resizeCanvas(){
+        if(this.resourceName != null && tileSelector.resourceNameAndImage[this.resourceName] != undefined && tileSelector.resourceNameAndImage[this.resourceName].complete){
+            this.canvasRenderer.width = tileSelector.resourceNameAndImage[this.resourceName].width+640;
+            this.canvasRenderer.height = tileSelector.resourceNameAndImage[this.resourceName].height+640;
+            this.canvasRenderer.style.width = (tileSelector.resourceNameAndImage[this.resourceName].width + 640)+"px";
+            this.canvasRenderer.style.height = (tileSelector.resourceNameAndImage[this.resourceName].height+640)+"px";
+        }
+
+        this.renderCanvas();
+        
+    }
 
     loadResource(imageSource: string, resourceName: string){
         tileSelector.resourceNameAndImage[resourceName] = new Image();
         tileSelector.resourceNameAndImage[resourceName].onload = () => {
-            this.canvasRenderer.width = tileSelector.resourceNameAndImage[resourceName].width;
-            this.canvasRenderer.height = tileSelector.resourceNameAndImage[resourceName].height;
-            this.canvasRenderer.style.width = tileSelector.resourceNameAndImage[resourceName].width+"px";
-            this.canvasRenderer.style.height = tileSelector.resourceNameAndImage[resourceName].height+"px";
+            this.resizeCanvas();
             this.canvasContext?.drawImage(tileSelector.resourceNameAndImage[resourceName], 0, 0);
 
 
@@ -263,9 +272,7 @@ export class tileSelector{
                 deleteButton.innerHTML = "delete";
                 deleteButton.addEventListener("mouseup", () => {
                     let pos = tileSelector.resourceCreatedTileAnimations[resourceName].indexOf(tileSet);
-                    console.log("tileSelector.resourceCreatedTileAnimations[resourceName]: ",tileSelector.resourceCreatedTileAnimations[resourceName]);
                     tileSelector.resourceCreatedTileAnimations[resourceName].splice(pos, 1);
-                    console.log("tileSelector.resourceCreatedTileAnimations[resourceName]: ",tileSelector.resourceCreatedTileAnimations[resourceName]);
                     this.populateStoredTileAnimations(resourceName);
                     if(this.tileCreator.animation.name == tileSet.name){
                         this.tileCreator.animation = new tileAnimation();
@@ -324,8 +331,8 @@ export class tileSelector{
 
 
         this.canvasContext!.lineWidth = 1;
-        let mouseGridX = (Math.floor(this.mouseX/gridWidth)*gridWidth) + gridXOffset;
-        let mouseGridY = (Math.floor(this.mouseY/gridHeight)*gridHeight) + gridYOffset;
+        let mouseGridX = (Math.round(this.mouseX/gridWidth)*gridWidth) + gridXOffset;
+        let mouseGridY = (Math.round(this.mouseY/gridHeight)*gridHeight) + gridYOffset;
         this.canvasContext!.strokeStyle = 'red';
         if(this.tileCreator.tempSubTile != null){
 

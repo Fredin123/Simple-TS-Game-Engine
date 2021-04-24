@@ -1,7 +1,7 @@
 import { vector } from "../dataObjects/vector/vector";
 import { roomEvent } from "../roomEvent";
 import { resourceMeta } from "../preload sources/resourceMeta";
-import { boxCollider } from "./boxCollider";
+import { boxCollider } from "./collision/boxCollider";
 import { uidGen } from "../tools/uidGen";
 import { objectContainer } from "./objectContainer";
 import { movementOperations } from "../movementOperations";
@@ -28,8 +28,10 @@ export interface iObject{
     airFriction: number;
     gravity: iVector;
     weight: number;
+    percentage: number;
 
     _hasBeenMoved_Tick : number;
+    _isColliding_Special: boolean;
 
     
     addMoveCollisionTarget(...collNames:string[]): void;
@@ -50,7 +52,8 @@ export interface iObject{
 
     setNewForceAngleMagnitude(a: number, b: number): void
 
-
+    
+    
     x: number;
 
 

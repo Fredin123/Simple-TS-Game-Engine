@@ -76,9 +76,12 @@ contextBridge.exposeInMainWorld('node', {
 
 
   saveRoom: (roomSrc, roomDataCompressed) => {
-    let newFileContent = "export var room1: string = \""+roomDataCompressed+"\";";
+    let parts = roomSrc.split("/");
+    let fileName = parts[parts.length-1].split(".")[0];
+
+    let newFileContent = "export var "+fileName+": string = \""+roomDataCompressed+"\";";
+
     let dirs = roomSrc.split("/");
-    dirs
     let currentFolder = "../../scenes";
     let i=0;
     dirs.forEach(item => {

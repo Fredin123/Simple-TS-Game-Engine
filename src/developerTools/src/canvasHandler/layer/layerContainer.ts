@@ -36,7 +36,9 @@ export class layerContainer{
         this.storedLayers.length = 0;
         for(let i=0; i<arayOfData.length; i++){
             let dataLayer = arayOfData[i];
+            console.log("Imported layer: ",dataLayer);
             let newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
+            newLayer.hidden = dataLayer.hidden;
 
             dataLayer.metaObjectsInLayer.forEach(obj => {
                 if(obj.isCombinationOfTiles == false){
@@ -61,7 +63,7 @@ export class layerContainer{
 
 
 
-    private createLayerOption(layerName: string){
+    private createLayerOption(layerName: string, hidden: boolean){
         let layerOption = document.createElement("div");
         layerOption.className = "layerOptionContainer";
         layerOption.addEventListener("mouseup", this.clickLayerOption.bind(this));
@@ -81,6 +83,7 @@ export class layerContainer{
 
         let hideCheck = document.createElement("input");
         hideCheck.type = "checkbox"; 
+        hideCheck.checked = hidden;
         hideCheck.addEventListener("change", this.clickHideLayer.bind(this));
         layerOption.appendChild(hideCheck);
 
@@ -191,8 +194,14 @@ export class layerContainer{
             width = obj.tile.get(0).width;
             height = obj.tile.get(0).height;
         }else{
-            width = canvasRenderer.classAndImage[obj.name].width;
-            height = canvasRenderer.classAndImage[obj.name].height;
+            if(canvasRenderer.classAndImage[obj.name] != null){
+                width = canvasRenderer.classAndImage[obj.name].width;
+                height = canvasRenderer.classAndImage[obj.name].height;
+            }else{
+                width = 98;
+                height = 98;
+            }
+            
         }
         
         if(mouseTestX - this.gridXOffset >= obj.x && 
@@ -207,36 +216,30 @@ export class layerContainer{
     private moveLayerUp(e: Event){
         let button = e.target as HTMLElement;
         let layerName = button.parentElement?.getElementsByTagName("span")[0].innerHTML;
-        if(layerName != null){
-            for(let l of this.storedLayers){
-                if(l.layerName == layerName){
 
-                    for(let sl of this.storedLayers){
-                        if(sl.zIndex == l.zIndex-1){
-                            l.zIndex=l.zIndex^sl.zIndex;
-                            sl.zIndex=l.zIndex^sl.zIndex;
-                            l.zIndex=l.zIndex^sl.zIndex;
-                            break;
-                        }
-                    }
-
-                    break;
+        let previousName: string | undefined = undefined;
+        if(layerName != undefined){
+            for(let i =0; i<this.storedLayers.length; i++){
+                if(this.storedLayers[i].layerName == layerName && i != 0){
+                    previousName = this.storedLayers[i-1].layerName;
                 }
             }
+        }
+        console.log(previousName);
 
-            this.initializeLayerModule([...this.storedLayers]);
-        }
-        if(layerName != null){
-            if(this.selectedLayer != null){
-                this.selectLayer(this.selectedLayer);
-            }
-        }
+        this.moveLayerDownInOrder(previousName);
+        
         
     }
 
     private moveLayerDown(e: Event){
         let button = e.target as HTMLElement;
         let layerName = button.parentElement?.getElementsByTagName("span")[0].innerHTML;
+        this.moveLayerDownInOrder(layerName);
+    }
+
+
+    private moveLayerDownInOrder(layerName: string | undefined){
         if(layerName != null){
             for(let l of this.storedLayers){
                 if(l.layerName == layerName){
@@ -265,7 +268,6 @@ export class layerContainer{
     }
 
 
-
     initializeLayerModule(layers: layer[]){
         while(this.containerElement.firstChild){
             this.containerElement.removeChild(this.containerElement.firstChild);
@@ -276,8 +278,8 @@ export class layerContainer{
         });
 
         let created = null;
-        for(let layerName of layers){
-            created = this.createLayerOption(layerName.layerName);
+        for(let cLayer of layers){
+            created = this.createLayerOption(cLayer.layerName, cLayer.hidden);
         }
 
         
@@ -314,7 +316,8 @@ export class layerContainer{
         if(layer == undefined){
             alert("The layer does not exist");
         }else{
-            this.initializeLayerModule(this.storedLayers.filter(l => l.layerName != layerName));
+            this.storedLayers = this.storedLayers.filter(l => l.layerName != layerName);
+            this.initializeLayerModule(this.storedLayers);
             this.selectLayer();
         }
 

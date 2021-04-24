@@ -1,7 +1,7 @@
 import { calculations } from "./calculations";
 import { internalFunction } from "./internalFunctions";
 import { logger } from "./logger";
-import { boxCollider } from "./objectHandlers/boxCollider";
+import { boxCollider } from "./objectHandlers/collision/boxCollider";
 import { iObject } from "./objectHandlers/iObject";
 import { objectBase } from "./objectHandlers/objectBase";
 import { objectContainer } from "./objectHandlers/objectContainer";
@@ -85,27 +85,12 @@ export class movementOperations{
                 if(target.stickyTop || target.stickyBottom){
                     //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
-                        //console.log("Check object: ", testCollisionWith);
-                        if(sign > 0){
-                            //Move right
-                            if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
-                                if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.x += sign;
-                                    if(i >= Math.abs(magnitude)-1){
-                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                    }
-                                }
-                            }
-                        }else{
-                            //Move left
-                            if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
-                                if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.x += sign;
-                                    if(i >= Math.abs(magnitude)-1){
-                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                    }
+                        if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
+                            if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
+                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                testCollisionWith.g.x += sign;
+                                if(i >= Math.abs(magnitude)-1){
+                                    testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                 }
                             }
                         }
@@ -190,7 +175,7 @@ export class movementOperations{
     
 
     private static moveForceVertical(magnitude: number, target: iObject, collisionNames: string[], objContainer: objectContainer){
-        if(magnitude == 0) return;
+        if(magnitude == 0)return;
         let sign: number = magnitude>0?1:-1;
         let objectsThatWereCollidingThisObjectWhileMoving = new Array<iObject>();
         let collisionTarget: iObject = objectBase.null;
@@ -226,21 +211,14 @@ export class movementOperations{
                 if(target.stickyLeftSide || target.stickyRightSide){
                     //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
-                        //console.log("Check object: ", testCollisionWith);
-                        if(sign > 0){
-                            //Move down
-                            if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
-                                if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.y += sign;
-                                    if(i >= Math.abs(magnitude)-1){
-                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                    }
+                        if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
+                            if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
+                                objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                testCollisionWith.g.y += sign;
+                                if(i >= Math.abs(magnitude)-1){
+                                    testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                 }
                             }
-                        }else{
-                            //Move up
-                            
                         }
                         return false;
                     });
@@ -278,13 +256,13 @@ export class movementOperations{
                     target.gravity.Dx *= 1-(distance/90);
                 }
 
-                target.force.Dx *= collisionTarget.friction;
+                target.force.Dx *= collisionTarget.friction * target.friction;
+                //target.force.Dx *= target.friction;
+                
                 break;
             }
             
         }
-
-
 
         let stickyCheck: boxCollider = boxCollider.copy(target.collisionBox);
         let checkDistance = Math.abs(magnitude) + 2;
@@ -323,7 +301,7 @@ export class movementOperations{
 
 
 
-    private static pushObjectHorizontal(pusher: iObject, objectBeingPushed: iObject, sign: number, objContainer: objectContainer){
+    public static pushObjectHorizontal(pusher: iObject, objectBeingPushed: iObject, sign: number, objContainer: objectContainer){
         let collided = false;
         if(internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)){
             if(objectBeingPushed.collisionTargets.length == 0){
@@ -346,22 +324,28 @@ export class movementOperations{
         return objectBase.null;
     }
 
-    private static pushObjectVertical(pusher: iObject, objectBeingPushed: iObject, sign: number, objContainer: objectContainer){
+    public static pushObjectVertical(pusher: iObject, objectBeingPushed: iObject, sign: number, objContainer: objectContainer){
         let collided = false;
         if(internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)){
             if(objectBeingPushed.collisionTargets.length == 0){
                 return pusher;
             }
             objectBeingPushed.g.y += sign;
-            objContainer.foreachObjectType(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
-                if(testCollision.objectName != pusher.objectName && 
-                    internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
-                    && this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null){
-                        objectBeingPushed.g.y += sign*-1;
-                        collided = true;
-                }
-                return false;
-            });
+            if(objectBeingPushed._isColliding_Special){
+                objectBeingPushed.g.y += sign*-1;
+                collided = true;
+            }else{
+                objContainer.foreachObjectType(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
+                    if(testCollision.objectName != pusher.objectName && 
+                        internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
+                        && this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null){
+                            objectBeingPushed.g.y += sign*-1;
+                            collided = true;
+                    }
+                    return false;
+                });
+            }
+            
         }
         if(collided){
             return objectBeingPushed;
@@ -385,7 +369,7 @@ export class movementOperations{
             });
         };
     }).inc;
-    private static boxIntersectionSpecific(initiator: iObject, boxData: boxCollider, targetObjects: string[], objContainer: objectContainer): iObject{
+    public static boxIntersectionSpecific(initiator: iObject, boxData: boxCollider, targetObjects: string[], objContainer: objectContainer): iObject{
         return this.boxIntersectionSpecificClass(initiator, boxData, targetObjects, "", objContainer);
     }
 

@@ -36,7 +36,10 @@ export class canvasRenderer{
     private counter: number = 0;
     haveSelectedFromHover: boolean = false;
 
+    private missingImage = new Image();
+
     constructor(canvasName: string){
+        this.missingImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAZQTFRF/wDj////hdfaxwAAAA5JREFUeJxjCGVYxYCEAR6cA/1tfYfmAAAAAElFTkSuQmCC";
         this.canvas = document.getElementById(canvasName) as HTMLCanvasElement;
         this.ctx = this.canvas.getContext("2d");
         this.gridWidth = 16;
@@ -150,28 +153,51 @@ export class canvasRenderer{
             if(layer.hidden == false){
                 layer.metaObjectsInLayer.forEach(meta => {
                     if(meta.tile == null){
-                        if(canvasRenderer.classAndImage[meta.name].complete){
-                            try{
-                                this.drawMouseOverSelection(meta, mouseX, mouseY);
-                                this.ctx?.drawImage(canvasRenderer.classAndImage[meta.name], 
-                                    meta.x + this.gridXOffset, 
-                                    meta.y + this.gridYOffset);
-                            }catch(exception){
+                        
+                        if(canvasRenderer.classAndImage[meta.name] != null){
+                            if(canvasRenderer.classAndImage[meta.name].complete){
+                                if(this.layerHandler.selectedLayer!.layerName == layer.layerName){
+                                    this.drawMouseOverSelection(meta, mouseX, mouseY);
+                                }
                                 
+                                    this.ctx?.drawImage(canvasRenderer.classAndImage[meta.name], 
+                                        meta.x + this.gridXOffset, 
+                                        meta.y + this.gridYOffset);
+                            }
+                        }else{
+                            if(this.missingImage.complete){
+                                this.ctx?.drawImage(this.missingImage, 
+                                        0, 
+                                        0, 
+                                        8, 
+                                        8,
+                                        meta.x + this.gridXOffset, meta.y + this.gridYOffset, 98, 98);
                             }
                             
                         }
+                        
                     }else{
                         let tileToDraw = meta.tile.get(this.counter);
-                        this.drawMouseOverSelection(meta, mouseX, mouseY);
+                        if(this.layerHandler.selectedLayer!.layerName == layer.layerName){
+                            this.drawMouseOverSelection(meta, mouseX, mouseY);
+                        }
+                        
                         if(tileSelector.resourceNameAndImage[tileToDraw.resourceName] != null){
-                            this.ctx?.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, 
+                            this.ctx?.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], 
+                                tileToDraw.startX, 
                                 tileToDraw.startY, 
                                 tileToDraw.width, 
                                 tileToDraw.height,
                                 meta.x + this.gridXOffset, meta.y + this.gridYOffset, tileToDraw.width, tileToDraw.height);
                         }else{
-                            console.log(tileToDraw.resourceName+" has not been initialized");
+                            if(this.missingImage.complete){
+                                this.ctx?.drawImage(this.missingImage, 
+                                    tileToDraw.startX, 
+                                    tileToDraw.startY, 
+                                    tileToDraw.width, 
+                                    tileToDraw.height,
+                                    meta.x + this.gridXOffset, meta.y + this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                            }
                         }
                         
                     }
@@ -192,8 +218,13 @@ export class canvasRenderer{
                 width = obj.tile.get(this.counter).width;
                 height = obj.tile.get(this.counter).height;
             }else{
-                width = canvasRenderer.classAndImage[obj.name].width;
-                height = canvasRenderer.classAndImage[obj.name].height;
+                if(canvasRenderer.classAndImage[obj.name] != null){
+                    width = canvasRenderer.classAndImage[obj.name].width;
+                    height = canvasRenderer.classAndImage[obj.name].height;
+                }else{
+                    width = 98;
+                    height = 98;
+                }
             }
             this.ctx!.strokeStyle = 'red';
             this.ctx!.lineWidth = 5;

@@ -30,6 +30,8 @@ export class resourcesHand{
     static loadFromResources(loadedResources: string[], onCompleteCallback: ()=>void, alternativePath: string){
         resourcesHand.resourcesToLoad = loadedResources;
 
+        loadedResources = loadedResources.filter(x => x.indexOf(".json") != -1 || (x.indexOf(".png") != -1 && loadedResources.indexOf(x.replace(".png", ".json")) == -1) );
+
         resourcesHand.resourcesToLoad.forEach(resourceDir => {
             let resourceDirsSplit = resourceDir.split("/");
             let resourceName = resourceDirsSplit[resourceDirsSplit.length-1];
@@ -40,11 +42,14 @@ export class resourcesHand{
             resourcesHand.resourcesToLoad.forEach(resource => {
                 let split = resource.split("/");
                 let name = split[split.length-1];
+                
                 if(name.indexOf(".json") != -1){
                     resourcesHand.storeAnimatedArray(name);
                 }else if(split[0] == "_generated_tiles"){
                     resourcesHand.storeStaticTile(name);
                 }else if(split[0] == "tiles"){
+                    resourcesHand.storeStaticTile(name);
+                }else if(name.indexOf(".png") != -1){
                     resourcesHand.storeStaticTile(name);
                 }
             });

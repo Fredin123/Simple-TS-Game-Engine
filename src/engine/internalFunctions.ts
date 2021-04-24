@@ -1,7 +1,5 @@
-import { logger } from "./logger";
-import { boxCollider } from "./objectHandlers/boxCollider";
+import { boxCollider } from "./objectHandlers/collision/boxCollider";
 import { iObject } from "./objectHandlers/iObject";
-import { objectBase } from "./objectHandlers/objectBase";
 
 export class internalFunction{
     

@@ -1,7 +1,12 @@
 import { brain } from "./brain";
 import { gameCamera } from "./gameCamera";
+import { internalFunction } from "./internalFunctions";
+import { boxCollider } from "./objectHandlers/collision/boxCollider";
+import { iObject } from "./objectHandlers/iObject";
 import { objectBase } from "./objectHandlers/objectBase";
 import { objectContainer } from "./objectHandlers/objectContainer";
+import { interaction } from "./text interaction/interaction";
+import { task } from "./tools/task";
 
 
 
@@ -11,6 +16,7 @@ export class roomEvent {
     container: HTMLElement;
     private keysDown: Record<string, boolean> = {};
     objContainer: objectContainer;
+     
 
     private gameKeysPressed: Record<string, boolean> = {};
     private gameKeysReleased: Record<string, boolean> = {};
@@ -20,10 +26,14 @@ export class roomEvent {
     deltaTime: number = 1;
 
     public camera: gameCamera = new gameCamera();
+    public tasker: task;
 
-    constructor(con: HTMLElement, objContainer: objectContainer){
+    interaction: interaction = new interaction();
+
+    constructor(con: HTMLElement, objContainer: objectContainer, tasker: task){
         this.objContainer = objContainer;
         this.container = con;
+        this.tasker = tasker;
         this.keysDown = {};
 
         this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
@@ -120,7 +130,7 @@ export class roomEvent {
     }
 
 
-    foreachObjectTypeBoolean(type: string, func: (arg0: objectBase)=>boolean): boolean{
+    foreachObjectTypeBoolean(type: string, func: (arg0: iObject)=>boolean): boolean{
         var specificObjects = this.objContainer.getSpecificObjects(type);
         specificObjects.forEach(element => {
             if(element.objectName == type){
@@ -133,29 +143,45 @@ export class roomEvent {
     }
 
 
-    foreachObjectType(type: string, func: (arg0: objectBase)=>boolean): Array<objectBase>{
-        var returnResult: Array<objectBase> = new Array<objectBase>();
+    foreachObjectType(type: string, func: (arg0: objectBase)=>boolean): Array<iObject>{
+        var returnResult: Array<iObject> = new Array<objectBase>();
         var specificObjects = this.objContainer.getSpecificObjects(type);
-        specificObjects.forEach(element => {
-            if(element.objectName == type){
-                if(func(element)){
-                    returnResult.push(element);
+        if(specificObjects != null){
+            specificObjects.forEach(element => {
+                if(element.objectName == type){
+                    if(func(element)){
+                        returnResult.push(element);
+                    }
                 }
-            }
-        });
+            });
+        }
         return returnResult;
     }
-    
 
 
+    isCollidingWith(colSource: objectBase, colSourceCollisionBox: boxCollider, colTargetType: string[]): iObject | null{
+        let colliding:iObject | null = null;
+        this.objContainer.foreachObjectType(colTargetType, (obj: iObject) => {
+            if(internalFunction.intersecting(colSource, colSourceCollisionBox, obj)){
+                colliding = obj;
+                return true;
+            }
+            return false;
+        });
+        return colliding;
+    }
 
-    
-    
 
-    
-
-
-
+    isCollidingWithMultiple(colSource: objectBase, colSourceCollisionBox: boxCollider, colTargetType: string[]): iObject[]{
+        let colliding:iObject[] = [];
+        this.objContainer.foreachObjectType(colTargetType, (obj: iObject) => {
+            if(internalFunction.intersecting(colSource, colSourceCollisionBox, obj)){
+                colliding.push(obj);
+            }
+            return false;
+        });
+        return colliding;
+    }
     
 
 

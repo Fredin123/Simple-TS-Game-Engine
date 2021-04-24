@@ -35,6 +35,9 @@ export class gameCamera{
         this.cameraX += Math.cos(angle) * distance * this.camMovementSpeedX;
         this.cameraY += Math.sin(angle) * distance * this.camMovementSpeedY;
         
+        this.cameraX = Math.floor(this.cameraX);
+        this.cameraY = Math.floor(this.cameraY);
+        
     }
 
     public setMoveSpeedX(moveSpeed: number){

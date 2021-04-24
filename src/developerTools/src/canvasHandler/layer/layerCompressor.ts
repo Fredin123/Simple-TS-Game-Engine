@@ -26,6 +26,7 @@ export class layerCompressor{
     private static compressLayer(l: layer, roomName: string){
         //get each static tile from the layer
         let compressedLayer: layer = new layer(l.layerName, l.zIndex);
+        compressedLayer.hidden = l.hidden;
         let staticTiles = l.metaObjectsInLayer.filter(t => t.tile != null && t.tile.tiles.length == 1);
         if(staticTiles.length > 0){
             let combinedStaticTiles = layerCompressor.combineStaticTilesIntoOne(staticTiles, roomName);

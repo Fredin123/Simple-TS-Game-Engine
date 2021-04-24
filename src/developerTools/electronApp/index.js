@@ -39,15 +39,6 @@
 
       d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     }
-    /** @deprecated */
-
-    function __spreadArrays() {
-      for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
-
-      for (var r = Array(s), k = 0, i = 0; i < il; i++) for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++) r[k] = a[j];
-
-      return r;
-    }
 
     var calculations = /** @class */ (function () {
         function calculations() {
@@ -273,6 +264,8 @@
             var distance = brain.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
             this.cameraX += Math.cos(angle) * distance * this.camMovementSpeedX;
             this.cameraY += Math.sin(angle) * distance * this.camMovementSpeedY;
+            this.cameraX = Math.floor(this.cameraX);
+            this.cameraY = Math.floor(this.cameraY);
         };
         gameCamera.prototype.setMoveSpeedX = function (moveSpeed) {
             this.camMovementSpeedX = moveSpeed;
@@ -287,8 +280,23 @@
         return gameCamera;
     }());
 
+    var interaction = /** @class */ (function () {
+        function interaction() {
+            this.isInUse = false;
+            this.inputContainer = new PIXI.Container();
+        }
+        interaction.prototype.openText = function (text) {
+            this.isInUse = true;
+            var newAnimation = resourcesHand.getStaticTile("panel_1");
+            if (newAnimation != null) {
+                this.inputContainer.addChild(newAnimation);
+            }
+        };
+        return interaction;
+    }());
+
     var roomEvent = /** @class */ (function () {
-        function roomEvent(con, objContainer) {
+        function roomEvent(con, objContainer, tasker) {
             this.mouseXPosition = 0;
             this.mouseYPosition = 0;
             this.keysDown = {};
@@ -297,8 +305,10 @@
             this.gameKeysHeld = {};
             this.deltaTime = 1;
             this.camera = new gameCamera();
+            this.interaction = new interaction();
             this.objContainer = objContainer;
             this.container = con;
+            this.tasker = tasker;
             this.keysDown = {};
             this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
             document.addEventListener("keydown", this.keyDownListener.bind(this), false);
@@ -389,14 +399,37 @@
         roomEvent.prototype.foreachObjectType = function (type, func) {
             var returnResult = new Array();
             var specificObjects = this.objContainer.getSpecificObjects(type);
-            specificObjects.forEach(function (element) {
-                if (element.objectName == type) {
-                    if (func(element)) {
-                        returnResult.push(element);
+            if (specificObjects != null) {
+                specificObjects.forEach(function (element) {
+                    if (element.objectName == type) {
+                        if (func(element)) {
+                            returnResult.push(element);
+                        }
                     }
-                }
-            });
+                });
+            }
             return returnResult;
+        };
+        roomEvent.prototype.isCollidingWith = function (colSource, colSourceCollisionBox, colTargetType) {
+            var colliding = null;
+            this.objContainer.foreachObjectType(colTargetType, function (obj) {
+                if (internalFunction.intersecting(colSource, colSourceCollisionBox, obj)) {
+                    colliding = obj;
+                    return true;
+                }
+                return false;
+            });
+            return colliding;
+        };
+        roomEvent.prototype.isCollidingWithMultiple = function (colSource, colSourceCollisionBox, colTargetType) {
+            var colliding = [];
+            this.objContainer.foreachObjectType(colTargetType, function (obj) {
+                if (internalFunction.intersecting(colSource, colSourceCollisionBox, obj)) {
+                    colliding.push(obj);
+                }
+                return false;
+            });
+            return colliding;
         };
         roomEvent.ticks = 0;
         return roomEvent;
@@ -444,15 +477,6 @@
                             if (collisionTarget == objectBase.null) {
                                 target.force.Dx *= 1 - testCollisionWith.weight;
                             }
-                            /*testCollisionWith.g.x += sign;
-                            objContainer.foreachObjectType(testCollisionWith.collisionTargets, (testCollision: iObject)=>{
-                                if(testCollision.objectName != target.objectName &&
-                                    internalFunction.intersecting(testCollisionWith, testCollisionWith.collisionBox, testCollision)){
-                                        testCollisionWith.g.x += sign*-1;
-                                        collisionTarget = testCollisionWith;
-                                }
-                                return false;
-                            });*/
                         }
                         return false;
                     });
@@ -468,28 +492,12 @@
                     if (target.stickyTop || target.stickyBottom) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                         objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                            //console.log("Check object: ", testCollisionWith);
-                            if (sign > 0) {
-                                //Move right
-                                if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
-                                    if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
-                                        objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.x += sign;
-                                        if (i >= Math.abs(magnitude) - 1) {
-                                            testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                        }
-                                    }
-                                }
-                            }
-                            else {
-                                //Move left
-                                if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
-                                    if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
-                                        objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.x += sign;
-                                        if (i >= Math.abs(magnitude) - 1) {
-                                            testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                        }
+                            if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                                if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.x += sign;
+                                    if (i >= Math.abs(magnitude) - 1) {
+                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                     }
                                 }
                             }
@@ -555,30 +563,8 @@
                 });
             }
         };
-        movementOperations.pushObjectHorizontal = function (pusher, objectBeingPushed, sign, objContainer) {
-            var _this = this;
-            var collided = false;
-            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
-                if (objectBeingPushed.collisionTargets.length == 0) {
-                    return pusher;
-                }
-                objectBeingPushed.g.x += sign;
-                objContainer.foreachObjectType(objectBeingPushed.collisionTargets, function (testCollision) {
-                    if (testCollision.objectName != pusher.objectName &&
-                        internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
-                        && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null) {
-                        objectBeingPushed.g.x += sign * -1;
-                        collided = true;
-                    }
-                    return false;
-                });
-            }
-            if (collided) {
-                return objectBeingPushed;
-            }
-            return objectBase.null;
-        };
         movementOperations.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
+            var _this = this;
             if (magnitude == 0)
                 return;
             var sign = magnitude > 0 ? 1 : -1;
@@ -590,15 +576,10 @@
                     //Moving objects
                     objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
                         if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                            testCollisionWith.g.y += sign;
-                            objContainer.foreachObjectType(testCollisionWith.collisionTargets, function (testCollision) {
-                                if (testCollision.objectName != target.objectName &&
-                                    internalFunction.intersecting(testCollisionWith, testCollisionWith.collisionBox, testCollision)) {
-                                    testCollisionWith.g.y += sign * -1;
-                                    collisionTarget = testCollisionWith;
-                                }
-                                return false;
-                            });
+                            collisionTarget = _this.pushObjectVertical(target, testCollisionWith, sign, objContainer);
+                            if (collisionTarget == objectBase.null) {
+                                target.force.Dy *= 1 - testCollisionWith.weight;
+                            }
                         }
                         return false;
                     });
@@ -614,28 +595,12 @@
                     if (target.stickyLeftSide || target.stickyRightSide) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                         objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                            //console.log("Check object: ", testCollisionWith);
-                            if (sign > 0) {
-                                //Move down
-                                if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
-                                    if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
-                                        objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.y += sign;
-                                        if (i >= Math.abs(magnitude) - 1) {
-                                            testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                        }
-                                    }
-                                }
-                            }
-                            else {
-                                //Move up
-                                if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
-                                    if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
-                                        objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                        testCollisionWith.g.y += sign;
-                                        if (i >= Math.abs(magnitude) - 1) {
-                                            testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                        }
+                            if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                                if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.y += sign;
+                                    if (i >= Math.abs(magnitude) - 1) {
+                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
                                     }
                                 }
                             }
@@ -665,7 +630,7 @@
                         target.gravity.Dy *= distance / 90;
                         target.gravity.Dx *= 1 - (distance / 90);
                     }
-                    target.force.Dx *= collisionTarget.friction;
+                    target.force.Dx *= collisionTarget.friction * target.friction;
                     return "break";
                 }
             };
@@ -701,6 +666,58 @@
                     return false;
                 });
             }
+        };
+        movementOperations.pushObjectHorizontal = function (pusher, objectBeingPushed, sign, objContainer) {
+            var _this = this;
+            var collided = false;
+            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
+                if (objectBeingPushed.collisionTargets.length == 0) {
+                    return pusher;
+                }
+                objectBeingPushed.g.x += sign;
+                objContainer.foreachObjectType(objectBeingPushed.collisionTargets, function (testCollision) {
+                    if (testCollision.objectName != pusher.objectName &&
+                        internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
+                        && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null) {
+                        objectBeingPushed.g.x += sign * -1;
+                        collided = true;
+                    }
+                    return false;
+                });
+            }
+            if (collided) {
+                return objectBeingPushed;
+            }
+            return objectBase.null;
+        };
+        movementOperations.pushObjectVertical = function (pusher, objectBeingPushed, sign, objContainer) {
+            var _this = this;
+            var collided = false;
+            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
+                if (objectBeingPushed.collisionTargets.length == 0) {
+                    return pusher;
+                }
+                objectBeingPushed.g.y += sign;
+                if (objectBeingPushed._isColliding_Special) {
+                    objectBeingPushed.g.y += sign * -1;
+                    collided = true;
+                }
+                else {
+                    objContainer.foreachObjectType(objectBeingPushed.collisionTargets, function (testCollision) {
+                        if (testCollision.objectName != pusher.objectName &&
+                            internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
+                            && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null) {
+                            objectBeingPushed.g.y += sign * -1;
+                            collided = true;
+                        }
+                        return false;
+                    });
+                }
+            }
+            if (collided) {
+                return objectBeingPushed;
+            }
+            return objectBase.null;
         };
         movementOperations.boxIntersectionSpecific = function (initiator, boxData, targetObjects, objContainer) {
             return this.boxIntersectionSpecificClass(initiator, boxData, targetObjects, "", objContainer);
@@ -743,6 +760,8 @@
             this.moveCollisionTargets = [];
             this.force = new vector(0, 0);
             this._hasBeenMoved_Tick = 0;
+            this._isColliding_Special = false;
+            this.percentage = 0;
             this.objectName = "";
             this.collisionBox = new boxCollider(0, 0, 0, 0);
             this.x = 0;
@@ -800,8 +819,9 @@
             this.ID = uidGen.new();
             this._g = new PIXI.Container();
             this.gSprites = {};
-            this.friction = 0.5;
-            this.airFriction = 0.8;
+            this.friction = 0.98;
+            this.airFriction = 0.9;
+            this.percentage = 0;
             this.resourcesNeeded = [];
             this.stickyBottom = false;
             this.stickyTop = false;
@@ -810,6 +830,8 @@
             this.gravity = vector.null;
             this.weight = 0.4;
             this._hasBeenMoved_Tick = 0;
+            this._isColliding_Special = false;
+            this.onLayer = 0;
             this._collisionBox = new boxCollider(0, 0, 0, 0);
             this._objectName = "iObject";
             this.moveCollisionTargets = [];
@@ -1152,6 +1174,1180 @@
         return movingBlockVert;
     }(objectBase));
 
+    var vectorFixedDelta = /** @class */ (function () {
+        function vectorFixedDelta(delta, inputMagnitude) {
+            this.delta = delta;
+            this.Dx = Math.cos(this.delta) * inputMagnitude;
+            this.Dy = Math.sin(this.delta) * inputMagnitude;
+        }
+        vectorFixedDelta.prototype.limitHorizontalMagnitude = function (limit) {
+            throw new Error("Method not implemented.");
+        };
+        vectorFixedDelta.prototype.limitVerticalMagnitude = function (limit) {
+            throw new Error("Method not implemented.");
+        };
+        Object.defineProperty(vectorFixedDelta.prototype, "magnitude", {
+            get: function () {
+                return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
+            },
+            set: function (newMag) {
+                var newXAdd = Math.cos(this.delta) * newMag;
+                var newYAdd = calculations.flippedSin(this.delta) * newMag;
+                this.Dx = newXAdd;
+                this.Dy = newYAdd;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        vectorFixedDelta.prototype.increaseMagnitude = function (addValue) {
+            //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
+            //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;
+            var newXAdd = Math.cos(this.delta) * addValue;
+            var newYAdd = calculations.flippedSin(this.delta) * addValue;
+            if (Math.abs(newXAdd) > 0.00000000000001) {
+                this.Dx += newXAdd;
+            }
+            if (Math.abs(newYAdd) > 0.00000000000001) {
+                this.Dy += newYAdd;
+            }
+        };
+        return vectorFixedDelta;
+    }());
+
+    var animConfig = /** @class */ (function () {
+        function animConfig(init) {
+            this.animationName = "";
+            this.x = 0;
+            this.y = 0;
+            this.speed = 0.5;
+            this.scaleX = 1;
+            this.scaleY = 1;
+            this.anchorX = 0.5;
+            this.anchorY = 0.5;
+            this.id = "";
+            Object.assign(this, init);
+            if (this.id == "") {
+                this.id = this.animationName;
+            }
+        }
+        return animConfig;
+    }());
+
+    var tinyBlock32 = /** @class */ (function (_super) {
+        __extends(tinyBlock32, _super);
+        function tinyBlock32(xp, yp) {
+            var _this = _super.call(this, xp, yp, tinyBlock32.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 32, 32);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        tinyBlock32.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            /*if(this.switch){
+                super.setNewForce(l.degreesToRadians(0), 3);
+            }else{
+                super.setNewForce(l.degreesToRadians(180), 3);
+            }*/
+        };
+        tinyBlock32.objectName = "tinyBlock32";
+        return tinyBlock32;
+    }(objectBase));
+
+    var wideBlock = /** @class */ (function (_super) {
+        __extends(wideBlock, _super);
+        function wideBlock(xp, yp) {
+            var _this = _super.call(this, xp, yp, wideBlock.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 640, 64);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 640, 64);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        wideBlock.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            /*if(this.switch){
+                super.setNewForce(l.degreesToRadians(0), 3);
+            }else{
+                super.setNewForce(l.degreesToRadians(180), 3);
+            }*/
+        };
+        wideBlock.objectName = "wideBlock";
+        return wideBlock;
+    }(objectBase));
+
+    var hitbox = /** @class */ (function (_super) {
+        __extends(hitbox, _super);
+        function hitbox(xp, yp) {
+            var _this = _super.call(this, xp, yp, hitbox.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.haveHitThese = [];
+            _this.life = 10;
+            _this.targets = [dummySandbag.objectName];
+            _this.creator = null;
+            _this.offsetX = 0;
+            _this.offsetY = 0;
+            _this.hitboxDirection = null;
+            _this.aerial = false;
+            return _this;
+        }
+        hitbox.prototype.setOffset = function (offX, offY) {
+            this.offsetX = offX;
+            this.offsetY = offY;
+        };
+        hitbox.prototype.setSize = function (width, height) {
+            _super.prototype.setCollision.call(this, 0, 0, width, height);
+            _super.prototype.style.call(this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x00FF50);
+                newGraphics.drawRect(0, 0, width, height);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+        };
+        hitbox.prototype.logic = function (l) {
+            var _this = this;
+            this.life--;
+            if (this.creator != null) {
+                this.moveWithCreator();
+                if (this.life <= 0) {
+                    l.objContainer.deleteObject(this);
+                }
+                else {
+                    for (var _i = 0, _a = this.targets; _i < _a.length; _i++) {
+                        var t = _a[_i];
+                        l.foreachObjectType(t, function (obj) {
+                            var _a, _b, _c, _d;
+                            if (_this.haveHitThese.indexOf(obj.ID) == -1
+                                && internalFunction.intersecting(_this, _this.collisionBox, obj)) {
+                                _this.haveHitThese.push(obj.ID);
+                                if (_this.hitboxDirection != null) {
+                                    if (_this.creator.facingRight) {
+                                        obj.addForceAngleMagnitude((_a = _this.hitboxDirection) === null || _a === void 0 ? void 0 : _a.delta, (_b = _this.hitboxDirection) === null || _b === void 0 ? void 0 : _b.magnitude);
+                                    }
+                                    else {
+                                        obj.addForceAngleMagnitude(calculations.PI - ((_c = _this.hitboxDirection) === null || _c === void 0 ? void 0 : _c.delta), (_d = _this.hitboxDirection) === null || _d === void 0 ? void 0 : _d.magnitude);
+                                    }
+                                }
+                            }
+                            return true;
+                        });
+                    }
+                }
+            }
+            else {
+                l.objContainer.deleteObject(this);
+            }
+        };
+        hitbox.prototype.moveWithCreator = function () {
+            if (this.creator != null) {
+                this.g.x = this.creator.g.x + (this.creator.collisionBox.width / 2) - (this.collisionBox.width / 2);
+                this.g.y = this.creator.g.y + this.creator.collisionBox.height / 2;
+                if (this.creator.facingRight) {
+                    this.g.x += this.offsetX;
+                    this.g.y += this.offsetY;
+                }
+                else {
+                    this.g.x -= this.offsetX;
+                    this.g.y += this.offsetY;
+                }
+            }
+        };
+        hitbox.objectName = "hitbox";
+        return hitbox;
+    }(objectBase));
+
+    var tools = /** @class */ (function () {
+        function tools() {
+        }
+        /*download(filename: string, text:string) {
+            var element = document.createElement('a');
+            console.log(text)
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
+            element.setAttribute('download', filename);
+          
+            element.style.display = 'none';
+            document.body.appendChild(element);
+          
+            element.click();
+          
+            document.body.removeChild(element);
+        }*/
+        tools.download = function (filename, text, type) {
+            if (type === void 0) { type = "text/plain"; }
+            // Create an invisible A element
+            var a = document.createElement("a");
+            a.style.display = "none";
+            document.body.appendChild(a);
+            // Set the HREF to a Blob representation of the data to be downloaded
+            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
+            // Use download attribute to set set desired file name
+            a.setAttribute("download", filename);
+            // Trigger the download by simulating click
+            a.click();
+            // Cleanup
+            window.URL.revokeObjectURL(a.href);
+            document.body.removeChild(a);
+        };
+        tools.upload = function (callback) {
+            var _this = this;
+            var element = document.createElement("input");
+            element.type = "file";
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.onchange = function (e) {
+                _this.uploadOnChange(e, callback);
+            };
+            element.click();
+        };
+        tools.getClassNameFromConstructorName = function (constructorName) {
+            var funcNameOnly = constructorName.replace("function ", "");
+            var paramsStartIndex = funcNameOnly.indexOf("(");
+            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
+            return funcNameOnly;
+        };
+        tools.functionName = function (func) {
+            console.log(func.toString());
+            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
+            return result ? result[1] : ''; // for an anonymous function there won't be a match
+        };
+        tools.uploadOnChange = function (e, callback) {
+            var ev = e;
+            console.log(ev.target.files);
+            var reader = new FileReader();
+            reader.readAsText(ev.target.files[0], "UTF-8");
+            reader.onload = function (evt) {
+                var _a, _b;
+                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
+                callback(LZString.decompressFromEncodedURIComponent(t));
+            };
+            reader.onerror = function (evt) {
+                alert("Could not read file");
+            };
+        };
+        tools.createHitbox = function (_a) {
+            var startupTime = _a.startupTime, x = _a.x, y = _a.y, creator = _a.creator, life = _a.life, size = _a.size, offset = _a.offset, hitboxDirection = _a.hitboxDirection, aerial = _a.aerial;
+            var newHitbox = new hitbox(x, y);
+            newHitbox.creator = creator;
+            newHitbox.life = life;
+            newHitbox.setSize(size[0], size[1]);
+            newHitbox.setOffset(offset[0], offset[1]);
+            newHitbox.hitboxDirection = hitboxDirection;
+            newHitbox.aerial = aerial;
+            var hitboxData = [startupTime, newHitbox];
+            return hitboxData;
+        };
+        return tools;
+    }());
+
+    var ladder = /** @class */ (function (_super) {
+        __extends(ladder, _super);
+        function ladder(xp, yp) {
+            var _this = _super.call(this, xp, yp, ladder.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 32, 64, 224);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0xFF3e50);
+                newGraphics.drawRect(0, 32, 64, 224);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.calculateBounds();
+                return g;
+            });
+            _super.prototype.addSprite.call(_this, new animConfig({
+                animationName: "ladder",
+                scaleX: 2,
+                scaleY: 2,
+                speed: 0.3,
+                x: 4,
+                y: 0,
+                anchorX: 0,
+                anchorY: 0,
+            }));
+            return _this;
+        }
+        ladder.prototype.logic = function (l) {
+        };
+        ladder.objectName = "ladder";
+        return ladder;
+    }(objectBase));
+
+    var textPrompt = /** @class */ (function (_super) {
+        __extends(textPrompt, _super);
+        function textPrompt(xp, yp) {
+            var _this = _super.call(this, xp, yp, textPrompt.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.text = "[SPACE]";
+            _super.prototype.setCollision.call(_this, 0, 32, 64, 64);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x003eff);
+                newGraphics.drawRect(0, 32, 64, 64);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                var text = new PIXI$1.Text('[SPACE]', { fontFamily: 'Arial', fontSize: 24, fill: 0xff1010, align: 'center' });
+                g.addChild(text);
+                g.calculateBounds();
+                return g;
+            });
+            return _this;
+        }
+        textPrompt.prototype.logic = function (l) {
+            l.interaction.openText(this.text);
+        };
+        textPrompt.objectName = "textPrompt";
+        return textPrompt;
+    }(objectBase));
+
+    var player = /** @class */ (function (_super) {
+        __extends(player, _super);
+        function player(xp, yp) {
+            var _this = _super.call(this, xp, yp, player.objectName) || this;
+            _this.airFriction = 0.98;
+            _this.friction = 0.8;
+            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
+            _this.weight = 0.06;
+            _this.maxRunSpeed = 9;
+            _this.normalRunSpeed = 9;
+            _this.superRunSpeed = 14;
+            _this.currentSprite = "warriorIdle";
+            _this.currentSpriteObj = null;
+            _this.shakeCameraForce = 0;
+            _this.airbornTimer = 0;
+            _this.facingRight = true;
+            _this.falling = false;
+            _this.hasJumped = false;
+            _this.climbindLadder = false;
+            _this.canJumpLadders = false;
+            _this.atLadderTop = false;
+            _this.releasedJumpKeyAtLadderTop = false;
+            _this.constantForce = 0;
+            _this.attacking = false;
+            _this.actionWait = 0;
+            _this.hitboxToCreate = null;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 125);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0xFF3e50);
+                newGraphics.drawRect(0, 0, 64, 125);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.calculateBounds();
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName, tinyBlock32.objectName, wideBlock.objectName);
+            _this.updateCurrentSprite();
+            return _this;
+        }
+        player.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            if (Math.floor(this.force.Dy) == 0 && Math.floor(this.gravity.magnitude) == 0) {
+                this.hasJumped = false;
+            }
+            if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
+                this.falling = false;
+            }
+            if (l.checkKeyHeld("Control")) {
+                this.maxRunSpeed = this.superRunSpeed;
+            }
+            else {
+                this.maxRunSpeed = this.normalRunSpeed;
+            }
+            var collisionWith = l.isCollidingWith(this, this.collisionBox, [ladder.objectName]);
+            if (collisionWith != null) {
+                if ((l.checkKeyHeld("w") || l.checkKeyHeld("s"))) {
+                    this.force.Dx = 0;
+                }
+                if ((l.checkKeyHeld("w") || l.checkKeyHeld("s")) && this.climbindLadder == false) {
+                    this.climbindLadder = true;
+                    if (l.checkKeyHeld("a") == false && l.checkKeyHeld("d") == false) {
+                        this.canJumpLadders = true;
+                    }
+                }
+                if (this.climbindLadder) {
+                    this.gravity.magnitude = 0;
+                    this.force.Dx *= 0.4;
+                    this.force.Dy *= 0.2;
+                    this.g.x = collisionWith.g.x;
+                    if (l.checkKeyHeld("w")) {
+                        this.g.y -= 5;
+                        while (l.isCollidingWith(this, this.collisionBox, [ladder.objectName]) == null ||
+                            l.isCollidingWith(this, this.collisionBox, this.collisionTargets) != null) {
+                            this.g.y += 1;
+                            this.atLadderTop = true;
+                        }
+                    }
+                    if (l.checkKeyHeld("w") && this.atLadderTop == true && this.releasedJumpKeyAtLadderTop) {
+                        this.g.y -= 1;
+                        _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 11);
+                    }
+                    if (l.checkKeyReleased("w") && this.atLadderTop == true) {
+                        this.releasedJumpKeyAtLadderTop = true;
+                    }
+                    if (l.checkKeyHeld("s")) {
+                        this.g.y += 8;
+                        if (l.isCollidingWith(this, this.collisionBox, this.collisionTargets) != null) {
+                            this.g.y = collisionWith.g.y + (collisionWith.collisionBox.y / 2) + collisionWith.collisionBox.height / 2 - 1;
+                        }
+                    }
+                    var movedBetweenLadder = false;
+                    if (l.checkKeyReleased("d")) {
+                        this.canJumpLadders = true;
+                    }
+                    if (l.checkKeyReleased("a")) {
+                        this.canJumpLadders = true;
+                    }
+                    if (l.checkKeyHeld("a")) {
+                        if (this.canJumpLadders) {
+                            this.g.x -= this.collisionBox.width;
+                            movedBetweenLadder = true;
+                            if (l.isCollidingWith(this, this.collisionBox, this.collisionTargets) != null) {
+                                this.g.x += this.collisionBox.width;
+                                movedBetweenLadder = false;
+                            }
+                            if (movedBetweenLadder && l.checkKeyHeld("w")) {
+                                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(135), 11);
+                                this.atLadderTop = false;
+                                this.canJumpLadders = false;
+                                this.climbindLadder = false;
+                                this.releasedJumpKeyAtLadderTop = false;
+                            }
+                            else if (movedBetweenLadder) {
+                                this.releasedJumpKeyAtLadderTop = false;
+                                this.canJumpLadders = false;
+                            }
+                        }
+                    }
+                    if (l.checkKeyHeld("d")) {
+                        if (this.canJumpLadders) {
+                            this.g.x += this.collisionBox.width;
+                            movedBetweenLadder = true;
+                            if (l.isCollidingWith(this, this.collisionBox, this.collisionTargets) != null) {
+                                this.g.x -= this.collisionBox.width;
+                                movedBetweenLadder = false;
+                            }
+                            if (movedBetweenLadder && l.checkKeyHeld("w")) {
+                                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(45), 11);
+                                this.atLadderTop = false;
+                                this.canJumpLadders = false;
+                                this.climbindLadder = false;
+                                this.releasedJumpKeyAtLadderTop = false;
+                            }
+                            else if (movedBetweenLadder) {
+                                this.releasedJumpKeyAtLadderTop = false;
+                                this.canJumpLadders = false;
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                this.atLadderTop = false;
+                this.canJumpLadders = false;
+                this.climbindLadder = false;
+                this.releasedJumpKeyAtLadderTop = false;
+                if (this.falling == false && this.hasJumped == false && l.checkKeyPressed("w") && Math.floor(this.gravity.magnitude) == 0 && this.actionWait == 0) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 11);
+                    this.hasJumped = true;
+                }
+            }
+            if (this.climbindLadder == false) {
+                if (l.checkKeyHeld("a") && this.actionWait == 0) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), (1 / 13) * this.maxRunSpeed);
+                }
+                if (l.checkKeyHeld("d") && this.actionWait == 0) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), (1 / 13) * this.maxRunSpeed);
+                }
+            }
+            this.force.limitHorizontalMagnitude(this.maxRunSpeed);
+            if (this.attacking == false) {
+                if (this.force.Dy <= -9 && this.gravity.magnitude > 0) {
+                    this.currentSprite = "warriorJump";
+                }
+                else if (this.force.Dy > -9 && this.force.Dy < 9 && this.gravity.magnitude > 0) {
+                    this.currentSprite = "warriorJump";
+                }
+                else if (this.force.Dy > 9 && this.gravity.magnitude > 0) {
+                    this.currentSprite = "warriorFall";
+                }
+                if (Math.abs(this.force.Dy) < 1) {
+                    if (Math.abs(this.force.Dx) <= 1) {
+                        this.currentSprite = "warriorIdle";
+                    }
+                    else if (this.force.Dx != 0) {
+                        this.currentSprite = "warriorRun";
+                    }
+                }
+            }
+            if (_super.prototype.hasSprite.call(this, this.currentSprite) == false) {
+                this.updateCurrentSprite();
+            }
+            if (this.currentSpriteObj != null) {
+                if (this.currentSprite == "warriorRun") {
+                    var animWithSpeed = 0.3 * Math.abs(this.force.Dx) / this.superRunSpeed;
+                    if (animWithSpeed < 0.01)
+                        animWithSpeed = 0.01;
+                    this.currentSpriteObj.animationSpeed = animWithSpeed;
+                }
+                else if (this.currentSprite == "warriorIdle") {
+                    this.currentSpriteObj.animationSpeed = 0.155;
+                }
+            }
+            if (Math.abs(Math.floor(this.force.Dx)) != 0) {
+                if (this.force.Dx > 0) {
+                    _super.prototype.scaleXSprites.call(this, 4);
+                    this.facingRight = true;
+                }
+                else if (this.force.Dx < 0) {
+                    _super.prototype.scaleXSprites.call(this, -4);
+                    this.facingRight = false;
+                }
+                if (this.facingRight == true) {
+                    this.currentSpriteObj.pivot.set(3, 15);
+                }
+                else {
+                    this.currentSpriteObj.pivot.set(-12, 15);
+                }
+            }
+            if (this.climbindLadder) {
+                this.currentSpriteObj.pivot.set(3, 15);
+            }
+            if (Math.abs(Math.floor(this.force.Dx)) >= 5) {
+                l.camera.setMoveSpeedX(0.07);
+            }
+            else {
+                l.camera.setMoveSpeedX(0.04);
+            }
+            if (this.climbindLadder == false) {
+                if (this.force.Dy >= 1) {
+                    this.airbornTimer++;
+                }
+                else {
+                    if (this.airbornTimer > 25) {
+                        this.shakeCameraForce = this.airbornTimer * 0.7;
+                        if (this.shakeCameraForce > 40) {
+                            this.shakeCameraForce = 40;
+                        }
+                    }
+                    this.airbornTimer = 0;
+                }
+            }
+            else {
+                this.airbornTimer = 0;
+            }
+            var collisionInteraction = l.isCollidingWith(this, this.collisionBox, [textPrompt.objectName]);
+            if (l.checkKeyPressed(" ") && collisionInteraction != null) {
+                collisionInteraction.logic(l);
+            }
+            else {
+                this.hangleAttacks(l);
+            }
+            if (this.shakeCameraForce > 0) {
+                l.camera.cameraOffsetX = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                l.camera.cameraOffsetY = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                this.shakeCameraForce--;
+            }
+            else {
+                l.camera.cameraOffsetX = 0;
+                l.camera.cameraOffsetY = 0;
+            }
+            var spaceToAdd = 128;
+            if (Math.abs(this.force.Dx) > 2) {
+                spaceToAdd = 256;
+            }
+            var addCamSpace = spaceToAdd;
+            if (this.facingRight == false) {
+                addCamSpace = -spaceToAdd;
+            }
+            var addCamSpaceY = 0;
+            if (Math.floor(this.force.Dy) > 30) {
+                addCamSpaceY = 600;
+            }
+            l.camera.setTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
+            if (this.hitboxToCreate != null) {
+                if (this.hitboxToCreate[0] > 0) {
+                    this.hitboxToCreate[0]--;
+                    if (this.hitboxToCreate[0] == 0) {
+                        l.objContainer.addObject(this.hitboxToCreate[1], this.onLayer);
+                    }
+                }
+                if (this.hitboxToCreate != null && this.hitboxToCreate[1].aerial && (Math.round(this.gravity.Dy) == 0)) {
+                    this.hitboxToCreate[1].life *= 0.8;
+                }
+            }
+            if (l.checkKeyReleased("p") && this.attacking == false) {
+                l.objContainer.deleteObject(this);
+                l.objContainer.addObject(new mio(this.g.x, this.g.y - 32), this.onLayer);
+            }
+        };
+        player.prototype.hangleAttacks = function (l) {
+            if (l.checkKeyPressed(" ") && this.actionWait == 0 && this.climbindLadder == false) {
+                if (Math.floor(this.gravity.magnitude) != 0) {
+                    //Air attack
+                    this.currentSprite = "warriorAttack";
+                    this.currentSpriteObj.animationSpeed = 0.4;
+                    this.attacking = true;
+                    this.constantForce = 12;
+                    this.actionWait = 45;
+                    this.airbornTimer += 5;
+                    this.hitboxToCreate = tools.createHitbox({
+                        startupTime: 4,
+                        x: this.g.x,
+                        y: this.g.y,
+                        creator: this,
+                        life: 24,
+                        size: [64, 64],
+                        offset: [48, 32],
+                        hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 24),
+                        aerial: true
+                    });
+                }
+                else {
+                    //ground attack
+                    this.currentSprite = "warriorDashAttack";
+                    this.currentSpriteObj.animationSpeed = 0.21;
+                    this.attacking = true;
+                    this.constantForce = 3;
+                    this.actionWait = 35;
+                    this.hitboxToCreate = tools.createHitbox({
+                        startupTime: 7,
+                        x: this.g.x,
+                        y: this.g.y,
+                        creator: this,
+                        life: 7,
+                        size: [98, 48],
+                        offset: [64, -5],
+                        hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 8),
+                        aerial: false
+                    });
+                }
+            }
+            if (this.facingRight) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(350), this.constantForce);
+            }
+            else {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(190), this.constantForce);
+            }
+            if (this.constantForce > 0) {
+                this.constantForce -= 1;
+            }
+            if (this.actionWait > 0) {
+                this.actionWait--;
+            }
+            else {
+                this.attacking = false;
+            }
+        };
+        player.prototype.updateCurrentSprite = function () {
+            _super.prototype.removeAllSprites.call(this);
+            this.currentSpriteObj = _super.prototype.addSprite.call(this, new animConfig({
+                animationName: this.currentSprite,
+                scaleX: 4,
+                scaleY: 4,
+                speed: 0.3,
+                x: 64,
+                y: 77,
+                anchorX: 0.5,
+                anchorY: 0.34,
+            }));
+            if (this.facingRight == true) {
+                this.currentSpriteObj.pivot.set(0, 15);
+            }
+            else {
+                this.currentSpriteObj.pivot.set(-15, 15);
+            }
+            this.g.calculateBounds();
+        };
+        player.objectName = "player";
+        return player;
+    }(objectBase));
+
+    var dummySandbag = /** @class */ (function (_super) {
+        __extends(dummySandbag, _super);
+        function dummySandbag(xp, yp) {
+            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
+            _this.switch = false;
+            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0);
+            _this.friction = 0.90;
+            _this.airFriction = 0.96;
+            _this.weight = 0.06;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x0000FF);
+                newGraphics.drawRect(0, 0, 64, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, tinyBlock32.objectName, wideBlock.objectName, mio.objectName, player.objectName);
+            return _this;
+            //super.addMoveCollisionTarget(mio.objectName);
+        }
+        dummySandbag.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        dummySandbag.objectName = "dummySandbag";
+        return dummySandbag;
+    }(objectBase));
+
+    var mio = /** @class */ (function (_super) {
+        __extends(mio, _super);
+        function mio(xp, yp) {
+            var _this = _super.call(this, xp, yp, mio.objectName) || this;
+            _this.airFriction = 0.93;
+            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
+            _this.weight = 0.09;
+            _this.maxRunSpeed = 13;
+            _this.normalRunSpeed = 13;
+            _this.superRunSpeed = 19;
+            _this.currentSprite = "catReady";
+            _this.currentSpriteObj = null;
+            _this.jumpAngle = 0;
+            _this.shakeCameraForce = 0;
+            _this.airbornTimer = 0;
+            _this.facingRight = true;
+            _this.climbing = false;
+            _this.canClimb = true;
+            _this.falling = false;
+            _this.climbingTimer = 0;
+            _this.hasJumped = false;
+            _this.constantForce = 0;
+            _this.attacking = false;
+            _this.actionWait = 0;
+            _this.hitboxToCreate = null;
+            _this.jumpsquateLength = 4;
+            _this.jumpSquatCounter = -1;
+            _super.prototype.setCollision.call(_this, 0, 40, 128, 88);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0xFF3e50);
+                newGraphics.drawRect(0, 40, 128, 88);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.calculateBounds();
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName, tinyBlock32.objectName, wideBlock.objectName);
+            _this.updateCurrentSprite();
+            return _this;
+        }
+        mio.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            if (Math.floor(this.force.Dy) == 0 && Math.floor(this.gravity.magnitude) == 0) {
+                this.hasJumped = false;
+            }
+            if (this.climbing == false) {
+                if ((l.checkKeyHeld("a") || l.checkKeyHeld("d")) && this.force.Dx == 0 && Math.floor(this.force.Dy) > 0 && this.canClimb && this.falling == false && this.hasJumped) {
+                    this.climbing = true;
+                    this.gravity.magnitude = 0;
+                    this.climbingTimer = 70;
+                    this.canClimb = false;
+                }
+            }
+            else {
+                if (this.force.Dx != 0 || this.climbingTimer <= 0 || (l.checkKeyHeld("a") || l.checkKeyHeld("d")) == false || (l.checkKeyHeld("a") && l.checkKeyHeld("d"))) {
+                    this.climbing = false;
+                    this.weight = 0.09;
+                    this.falling = true;
+                }
+                else {
+                    this.falling = false;
+                    this.airbornTimer = 0;
+                    this.weight = 0.001;
+                }
+                if (this.climbingTimer > 0) {
+                    this.climbingTimer--;
+                }
+            }
+            if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
+                this.canClimb = true;
+                this.falling = false;
+            }
+            if (l.checkKeyHeld("Control")) {
+                this.maxRunSpeed = this.superRunSpeed;
+            }
+            else {
+                this.maxRunSpeed = this.normalRunSpeed;
+            }
+            if (l.checkKeyHeld("a") && this.actionWait == 0) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), (1 / 13) * this.maxRunSpeed);
+            }
+            if (l.checkKeyHeld("d") && this.actionWait == 0) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), (1 / 13) * this.maxRunSpeed);
+            }
+            if (this.climbing == false) {
+                if (this.falling == false && this.hasJumped == false && l.checkKeyPressed("w") && Math.floor(this.gravity.magnitude) == 0 && this.actionWait == 0) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 26);
+                    this.hasJumped = true;
+                }
+            }
+            else {
+                if (l.checkKeyHeld("w")) {
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 0.5);
+                }
+            }
+            this.force.limitHorizontalMagnitude(this.maxRunSpeed);
+            if (this.climbing && this.force.Dy < 0) {
+                this.currentSprite = "catRun";
+            }
+            else if (this.force.Dy <= -9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpUp";
+            }
+            else if (this.force.Dy > -9 && this.force.Dy < 9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpMid";
+            }
+            else if (this.force.Dy > 9 && this.gravity.magnitude > 0) {
+                this.currentSprite = "catJumpDown";
+            }
+            if (Math.abs(this.force.Dy) < 1) {
+                this.jumpAngle = 0;
+                if (Math.abs(this.force.Dx) <= 1) {
+                    this.currentSprite = "catReady";
+                }
+                else if (this.force.Dx != 0) {
+                    this.currentSprite = "catRun";
+                }
+            }
+            if (this.force.Dy > 1) {
+                if (this.force.Dx > 0 && this.jumpAngle < 0.4) {
+                    this.jumpAngle += 0.015;
+                }
+                else if (this.jumpAngle > -0.4) {
+                    this.jumpAngle -= 0.015;
+                }
+            }
+            if (_super.prototype.hasSprite.call(this, this.currentSprite) == false) {
+                _super.prototype.removeAllSprites.call(this);
+                this.updateCurrentSprite();
+            }
+            if (this.currentSpriteObj != null) {
+                this.currentSpriteObj.rotation = this.jumpAngle;
+                if (this.climbing) {
+                    if (l.checkKeyHeld("a")) {
+                        this.currentSpriteObj.rotation = calculations.degreesToRadians(90);
+                    }
+                    else if (l.checkKeyHeld("d")) {
+                        this.currentSpriteObj.rotation = calculations.degreesToRadians(270);
+                    }
+                }
+                if (this.currentSprite == "catRun") {
+                    var animWithSpeed = 0.5 * Math.abs(this.force.Dx) / this.superRunSpeed;
+                    if (animWithSpeed < 0.1)
+                        animWithSpeed = 0.1;
+                    this.currentSpriteObj.animationSpeed = animWithSpeed;
+                }
+            }
+            if (Math.abs(Math.floor(this.force.Dx)) != 0) {
+                if (this.force.Dx > 0) {
+                    _super.prototype.scaleXSprites.call(this, 3);
+                    this.facingRight = true;
+                    if (this.jumpAngle < 0) {
+                        this.jumpAngle *= -1;
+                    }
+                }
+                else if (this.force.Dx < 0) {
+                    _super.prototype.scaleXSprites.call(this, -3);
+                    this.facingRight = false;
+                    if (this.jumpAngle > 0) {
+                        this.jumpAngle *= -1;
+                    }
+                }
+            }
+            if (Math.abs(Math.floor(this.force.Dx)) >= 5) {
+                l.camera.setMoveSpeedX(0.07);
+            }
+            else {
+                l.camera.setMoveSpeedX(0.04);
+            }
+            if (this.force.Dy >= 1) {
+                this.airbornTimer++;
+            }
+            else {
+                if (this.airbornTimer > 25) {
+                    this.shakeCameraForce = this.airbornTimer * 0.7;
+                    if (this.shakeCameraForce > 40) {
+                        this.shakeCameraForce = 40;
+                    }
+                }
+                this.airbornTimer = 0;
+            }
+            this.hangleAttacks(l);
+            if (this.shakeCameraForce > 0) {
+                l.camera.cameraOffsetX = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                l.camera.cameraOffsetY = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                this.shakeCameraForce--;
+            }
+            else {
+                l.camera.cameraOffsetX = 0;
+                l.camera.cameraOffsetY = 0;
+            }
+            var spaceToAdd = 128;
+            if (Math.abs(this.force.Dx) > 2) {
+                spaceToAdd = 256;
+            }
+            var addCamSpace = spaceToAdd;
+            if (this.facingRight == false) {
+                addCamSpace = -spaceToAdd;
+            }
+            var addCamSpaceY = 0;
+            if (Math.floor(this.force.Dy) > 30) {
+                addCamSpaceY = 600;
+            }
+            l.camera.setTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
+            if (this.hitboxToCreate != null) {
+                if (this.hitboxToCreate[0] > 0) {
+                    this.hitboxToCreate[0]--;
+                    if (this.hitboxToCreate[0] == 0) {
+                        l.objContainer.addObject(this.hitboxToCreate[1], this.onLayer);
+                    }
+                }
+                if (this.hitboxToCreate != null && this.hitboxToCreate[1].aerial && (this.climbing || Math.round(this.gravity.Dy) == 0)) {
+                    this.hitboxToCreate[1].life *= 0.8;
+                }
+            }
+            if (l.checkKeyReleased("p") && this.attacking == false) {
+                l.objContainer.deleteObject(this);
+                l.objContainer.addObject(new player(this.g.x, this.g.y - 32), this.onLayer);
+            }
+        };
+        mio.prototype.hangleAttacks = function (l) {
+            if (l.checkKeyPressed(" ") && this.actionWait == 0 && this.climbing == false) {
+                if (Math.floor(this.gravity.magnitude) != 0) {
+                    this.attacking = true;
+                    this.constantForce = 15;
+                    this.actionWait = 33;
+                    this.airbornTimer += 5;
+                    this.hitboxToCreate = tools.createHitbox({
+                        startupTime: 4,
+                        x: this.g.x,
+                        y: this.g.y,
+                        creator: this,
+                        life: 24,
+                        size: [64, 80],
+                        offset: [60, 54],
+                        hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 32),
+                        aerial: true
+                    });
+                }
+                else {
+                    this.attacking = true;
+                    this.constantForce = 10;
+                    this.actionWait = 25;
+                    this.hitboxToCreate = tools.createHitbox({
+                        startupTime: 4,
+                        x: this.g.x,
+                        y: this.g.y,
+                        creator: this,
+                        life: 6,
+                        size: [98, 48],
+                        offset: [64, 5],
+                        hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 16),
+                        aerial: false
+                    });
+                }
+            }
+            if (this.facingRight) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(350), this.constantForce);
+            }
+            else {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(190), this.constantForce);
+            }
+            if (this.constantForce > 0) {
+                this.constantForce -= 1;
+            }
+            else {
+                this.attacking = false;
+            }
+            if (this.actionWait > 0) {
+                this.actionWait--;
+            }
+        };
+        mio.prototype.updateCurrentSprite = function () {
+            _super.prototype.removeAllSprites.call(this);
+            this.currentSpriteObj = _super.prototype.addSprite.call(this, new animConfig({
+                animationName: this.currentSprite,
+                scaleX: 3,
+                scaleY: 3,
+                speed: 0.3,
+                x: 64,
+                y: 77,
+                anchorX: 0.5,
+                anchorY: 0.34,
+            }));
+            if (this.currentSprite == "catReady") {
+                this.currentSpriteObj.animationSpeed = 0.155;
+            }
+            this.currentSpriteObj.pivot.set(0, 25);
+        };
+        mio.objectName = "mio";
+        return mio;
+    }(objectBase));
+
+    var collisionSlopeLeft = /** @class */ (function (_super) {
+        __extends(collisionSlopeLeft, _super);
+        function collisionSlopeLeft(xp, yp) {
+            var _this = _super.call(this, xp, yp, collisionSlopeLeft.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 192);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 192);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                var myGraph = new PIXI$1.Graphics();
+                // Move it to the beginning of the line
+                myGraph.position.set(64, 128);
+                // Draw the line (endPoint should be relative to myGraph's position)
+                myGraph.lineStyle(5, 0xffffff)
+                    .moveTo(0, 0)
+                    .lineTo(128, -64);
+                g.addChild(myGraph);
+                return g;
+            });
+            return _this;
+        }
+        collisionSlopeLeft.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            var targets = l.isCollidingWithMultiple(this, this.collisionBox, [player.objectName, mio.objectName, dummySandbag.objectName]);
+            for (var _i = 0, targets_1 = targets; _i < targets_1.length; _i++) {
+                var target = targets_1[_i];
+                if (target.force.Dy > 0) {
+                    var index = (target.g.x + target.collisionBox.x + (target.collisionBox.width / 2)) - this.g.x;
+                    if (index < 64) {
+                        index = 64;
+                    }
+                    else if (index > 192) {
+                        index = 192;
+                    }
+                    var ratio = (index - 64) / 128;
+                    var extraCheckTop = 0;
+                    if (target.force.Dx < -1) {
+                        extraCheckTop = 32;
+                    }
+                    if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + 64 + 64 * (1 - ratio) - extraCheckTop) {
+                        target.gravity.magnitude = 0;
+                        target.force.Dy = 0;
+                        target.force.Dx *= 0.916;
+                        target.g.y = this.g.y + target.collisionBox.y - (target.collisionBox.height) + 64 + (64 * (1 - ratio));
+                        target._isColliding_Special = true;
+                    }
+                    else if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + 64 + 64 * (1 - ratio) - 1) {
+                        target.force.Dy = 0;
+                        target.gravity.magnitude = 0;
+                        target._isColliding_Special = true;
+                    }
+                    else {
+                        target._isColliding_Special = false;
+                    }
+                }
+                else if (target.force.Dy < 0) {
+                    target._isColliding_Special = false;
+                }
+            }
+        };
+        collisionSlopeLeft.objectName = "collisionSlopeLeft";
+        return collisionSlopeLeft;
+    }(objectBase));
+
+    var collisionSlopeRight = /** @class */ (function (_super) {
+        __extends(collisionSlopeRight, _super);
+        function collisionSlopeRight(xp, yp) {
+            var _this = _super.call(this, xp, yp, collisionSlopeRight.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 192);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI$1.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 192);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                var myGraph = new PIXI$1.Graphics();
+                // Move it to the beginning of the line
+                myGraph.position.set(64, 64);
+                // Draw the line (endPoint should be relative to myGraph's position)
+                myGraph.lineStyle(5, 0xffffff)
+                    .moveTo(0, 0)
+                    .lineTo(128, 64);
+                g.addChild(myGraph);
+                return g;
+            });
+            return _this;
+        }
+        collisionSlopeRight.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            var targets = l.isCollidingWithMultiple(this, this.collisionBox, [player.objectName, mio.objectName, dummySandbag.objectName]);
+            for (var _i = 0, targets_1 = targets; _i < targets_1.length; _i++) {
+                var target = targets_1[_i];
+                if (target.force.Dy > 0) {
+                    var index = (target.g.x + target.collisionBox.x + (target.collisionBox.width / 2)) - this.g.x;
+                    if (index < 64) {
+                        index = 64;
+                    }
+                    else if (index > 192) {
+                        index = 192;
+                    }
+                    var ratio = (index - 64) / 128;
+                    var extraCheckTop = 0;
+                    if (target.force.Dx > 1) {
+                        extraCheckTop = 32;
+                    }
+                    if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + 64 + 64 * (ratio) - extraCheckTop) {
+                        target.gravity.magnitude = 0;
+                        target.force.Dy = 0;
+                        target.force.Dx *= 0.916;
+                        target.g.y = this.g.y + target.collisionBox.y - (target.collisionBox.height) + 64 + (64 * (ratio));
+                        target._isColliding_Special = true;
+                    }
+                    else if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + 64 + 64 * (ratio) - 1) {
+                        target.force.Dy = 0;
+                        target.gravity.magnitude = 0;
+                        target._isColliding_Special = true;
+                    }
+                    else {
+                        target._isColliding_Special = false;
+                    }
+                }
+                else if (target.force.Dy < 0) {
+                    target._isColliding_Special = false;
+                }
+            }
+        };
+        collisionSlopeRight.objectName = "collisionSlopeRight";
+        return collisionSlopeRight;
+    }(objectBase));
+
     //import anime from 'animejs';
     var grass = /** @class */ (function (_super) {
         __extends(grass, _super);
@@ -1224,341 +2420,6 @@
         return grass;
     }(objectBase));
 
-    var vectorFixedDelta = /** @class */ (function () {
-        function vectorFixedDelta(delta, inputMagnitude) {
-            this.delta = delta;
-            this.Dx = Math.cos(this.delta) * inputMagnitude;
-            this.Dy = Math.sin(this.delta) * inputMagnitude;
-        }
-        vectorFixedDelta.prototype.limitHorizontalMagnitude = function (limit) {
-            throw new Error("Method not implemented.");
-        };
-        vectorFixedDelta.prototype.limitVerticalMagnitude = function (limit) {
-            throw new Error("Method not implemented.");
-        };
-        Object.defineProperty(vectorFixedDelta.prototype, "magnitude", {
-            get: function () {
-                return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
-            },
-            set: function (newMag) {
-                var newXAdd = Math.cos(this.delta) * newMag;
-                var newYAdd = calculations.flippedSin(this.delta) * newMag;
-                this.Dx = newXAdd;
-                this.Dy = newYAdd;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        vectorFixedDelta.prototype.increaseMagnitude = function (addValue) {
-            //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
-            //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;
-            var newXAdd = Math.cos(this.delta) * addValue;
-            var newYAdd = calculations.flippedSin(this.delta) * addValue;
-            if (Math.abs(newXAdd) > 0.00000000000001) {
-                this.Dx += newXAdd;
-            }
-            if (Math.abs(newYAdd) > 0.00000000000001) {
-                this.Dy += newYAdd;
-            }
-        };
-        return vectorFixedDelta;
-    }());
-
-    var animConfig = /** @class */ (function () {
-        function animConfig(init) {
-            this.animationName = "";
-            this.x = 0;
-            this.y = 0;
-            this.speed = 0.5;
-            this.scaleX = 1;
-            this.scaleY = 1;
-            this.anchorX = 0.5;
-            this.anchorY = 0.5;
-            this.id = "";
-            Object.assign(this, init);
-            if (this.id == "") {
-                this.id = this.animationName;
-            }
-        }
-        return animConfig;
-    }());
-
-    var mio = /** @class */ (function (_super) {
-        __extends(mio, _super);
-        function mio(xp, yp) {
-            var _this = _super.call(this, xp, yp, mio.objectName) || this;
-            _this.airFriction = 0.93;
-            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
-            _this.weight = 0.09;
-            _this.maxRunSpeed = 13;
-            _this.currentSprite = "catReady";
-            _this.currentSpriteObj = null;
-            _this.jumpAngle = 0;
-            _this.shakeCameraForce = 0;
-            _this.airbornTimer = 0;
-            _this.facingRight = true;
-            _this.climbing = false;
-            _this.canClimb = true;
-            _this.falling = false;
-            _this.climbingTimer = 0;
-            _this.hasJumped = false;
-            _this.constantForce = 0;
-            _this.attacking = false;
-            _this.actionWait = 0;
-            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI$1.Graphics();
-                newGraphics.beginFill(0xFF3e50);
-                newGraphics.drawRect(0, 0, 128, 128);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                g.calculateBounds();
-                return g;
-            });
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName);
-            //super.addMoveCollisionTarget(dummySandbag.objectName);
-            //super.addMoveCollisionTarget(dummySandbag.objectName);
-            _super.prototype.addSprite.call(_this, new animConfig({
-                animationName: "catReady",
-                scaleX: 3,
-                scaleY: 3,
-                speed: 0.3,
-                x: 64,
-                y: 0,
-                anchorX: 0.5,
-                anchorY: 0.34,
-            }));
-            return _this;
-        }
-        mio.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            if (Math.floor(this.force.Dy) == 0 && Math.floor(this.gravity.magnitude) == 0) {
-                this.hasJumped = false;
-            }
-            if (this.climbing == false) {
-                if ((l.checkKeyHeld("a") || l.checkKeyHeld("d")) && this.force.Dx == 0 && Math.floor(this.force.Dy) > 0 && this.canClimb && this.falling == false && this.hasJumped) {
-                    this.climbing = true;
-                    this.gravity.magnitude = 0;
-                    this.climbingTimer = 60;
-                    this.canClimb = false;
-                }
-            }
-            else {
-                if (this.force.Dx != 0 || this.climbingTimer <= 0 || (l.checkKeyHeld("a") || l.checkKeyHeld("d")) == false || (l.checkKeyHeld("a") && l.checkKeyHeld("d"))) {
-                    this.climbing = false;
-                    this.weight = 0.09;
-                    this.falling = true;
-                }
-                else {
-                    this.falling = false;
-                    this.airbornTimer = 0;
-                    this.weight = 0.001;
-                }
-                if (this.climbingTimer > 0) {
-                    this.climbingTimer--;
-                }
-            }
-            if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
-                this.canClimb = true;
-                this.falling = false;
-            }
-            if (l.checkKeyHeld("a") && this.actionWait == 0) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 1);
-            }
-            if (l.checkKeyHeld("d") && this.actionWait == 0) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 1);
-            }
-            if (this.climbing == false) {
-                if (this.falling == false && this.hasJumped == false && l.checkKeyPressed("w") && Math.floor(this.gravity.magnitude) == 0 && this.actionWait == 0) {
-                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 26);
-                    this.hasJumped = true;
-                }
-            }
-            else {
-                if (l.checkKeyHeld("w")) {
-                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 0.5);
-                }
-            }
-            this.force.limitHorizontalMagnitude(this.maxRunSpeed);
-            if (this.force.Dy <= -9 && this.gravity.magnitude > 0) {
-                this.currentSprite = "catJumpUp";
-            }
-            else if (this.force.Dy > -9 && this.force.Dy < 9 && this.gravity.magnitude > 0) {
-                this.currentSprite = "catJumpMid";
-            }
-            else if (this.force.Dy > 9 && this.gravity.magnitude > 0) {
-                this.currentSprite = "catJumpDown";
-            }
-            if (Math.abs(this.force.Dy) < 1) {
-                this.jumpAngle = 0;
-                if (Math.abs(this.force.Dx) <= 1) {
-                    this.currentSprite = "catReady";
-                }
-                else if (this.force.Dx != 0) {
-                    this.currentSprite = "catRun";
-                }
-            }
-            if (this.force.Dy > 1) {
-                if (this.force.Dx > 0 && this.jumpAngle < 0.4) {
-                    this.jumpAngle += 0.015;
-                }
-                else if (this.jumpAngle > -0.4) {
-                    this.jumpAngle -= 0.015;
-                }
-            }
-            if (_super.prototype.hasSprite.call(this, this.currentSprite) == false) {
-                _super.prototype.removeAllSprites.call(this);
-                this.currentSpriteObj = _super.prototype.addSprite.call(this, new animConfig({
-                    animationName: this.currentSprite,
-                    scaleX: 3,
-                    scaleY: 3,
-                    speed: 0.3,
-                    x: 64,
-                    y: 75,
-                    anchorX: 0.5,
-                    anchorY: 0.34,
-                }));
-                if (this.currentSprite == "catReady") {
-                    this.currentSpriteObj.animationSpeed = 0.155;
-                }
-                this.currentSpriteObj.pivot.set(0, 25);
-            }
-            if (this.currentSpriteObj != null) {
-                this.currentSpriteObj.rotation = this.jumpAngle;
-                if (this.climbing) {
-                    if (l.checkKeyHeld("a")) {
-                        this.currentSpriteObj.rotation = calculations.degreesToRadians(90);
-                    }
-                    else if (l.checkKeyHeld("d")) {
-                        this.currentSpriteObj.rotation = calculations.degreesToRadians(270);
-                    }
-                }
-                if (this.currentSprite == "catRun") {
-                    var animWithSpeed = 0.4 * Math.abs(this.force.Dx) / this.maxRunSpeed;
-                    if (animWithSpeed < 0.1)
-                        animWithSpeed = 0.1;
-                    this.currentSpriteObj.animationSpeed = animWithSpeed;
-                }
-            }
-            if (Math.abs(Math.floor(this.force.Dx)) != 0) {
-                if (this.force.Dx > 0) {
-                    _super.prototype.scaleXSprites.call(this, 3);
-                    this.facingRight = true;
-                    if (this.jumpAngle < 0) {
-                        this.jumpAngle *= -1;
-                    }
-                }
-                else if (this.force.Dx < 0) {
-                    _super.prototype.scaleXSprites.call(this, -3);
-                    this.facingRight = false;
-                    if (this.jumpAngle > 0) {
-                        this.jumpAngle *= -1;
-                    }
-                }
-            }
-            if (Math.abs(Math.floor(this.force.Dx)) >= 5) {
-                l.camera.setMoveSpeedX(0.07);
-            }
-            else {
-                l.camera.setMoveSpeedX(0.04);
-            }
-            if (this.force.Dy >= 1) {
-                this.airbornTimer++;
-            }
-            else {
-                if (this.airbornTimer > 25) {
-                    this.shakeCameraForce = this.airbornTimer * 0.7;
-                    if (this.shakeCameraForce > 40) {
-                        this.shakeCameraForce = 40;
-                    }
-                }
-                this.airbornTimer = 0;
-            }
-            this.hangleAttacks(l);
-            if (this.shakeCameraForce > 0) {
-                l.camera.cameraOffsetX = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
-                l.camera.cameraOffsetY = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
-                this.shakeCameraForce--;
-            }
-            else {
-                l.camera.cameraOffsetX = 0;
-                l.camera.cameraOffsetY = 0;
-            }
-            var spaceToAdd = 128;
-            if (Math.abs(this.force.Dx) > 2) {
-                spaceToAdd = 256;
-            }
-            var addCamSpace = spaceToAdd;
-            if (this.facingRight == false) {
-                addCamSpace = -spaceToAdd;
-            }
-            var addCamSpaceY = 0;
-            if (Math.floor(this.force.Dy) > 30) {
-                addCamSpaceY = 600;
-            }
-            l.camera.setTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
-        };
-        mio.prototype.hangleAttacks = function (l) {
-            if (l.checkKeyPressed(" ") && this.actionWait == 0) {
-                if (Math.floor(this.gravity.magnitude) != 0) {
-                    this.attacking = true;
-                    this.constantForce = 15;
-                    this.actionWait = 33;
-                    this.airbornTimer += 5;
-                }
-                else {
-                    this.attacking = true;
-                    this.constantForce = 5;
-                    this.actionWait = 12;
-                }
-            }
-            if (this.facingRight) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(350), this.constantForce);
-            }
-            else {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(190), this.constantForce);
-            }
-            if (this.constantForce > 0) {
-                this.constantForce -= 1;
-            }
-            else {
-                this.attacking = false;
-            }
-            if (this.actionWait > 0) {
-                this.actionWait--;
-            }
-        };
-        mio.objectName = "mio";
-        return mio;
-    }(objectBase));
-
-    var dummySandbag = /** @class */ (function (_super) {
-        __extends(dummySandbag, _super);
-        function dummySandbag(xp, yp) {
-            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.99;
-            _this.weight = 0.05;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI$1.Graphics();
-                newGraphics.beginFill(0x0000FF);
-                newGraphics.drawRect(0, 0, 64, 128);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, mio.objectName);
-            return _this;
-            //super.addMoveCollisionTarget(mio.objectName);
-        }
-        dummySandbag.prototype.logic = function (l) {
-        };
-        dummySandbag.objectName = "dummySandbag";
-        return dummySandbag;
-    }(objectBase));
-
     var marker = /** @class */ (function (_super) {
         __extends(marker, _super);
         function marker(xp, yp) {
@@ -1599,77 +2460,6 @@
         return marker;
     }(objectBase));
 
-    var tools = /** @class */ (function () {
-        function tools() {
-        }
-        /*download(filename: string, text:string) {
-            var element = document.createElement('a');
-            console.log(text)
-            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
-            element.setAttribute('download', filename);
-          
-            element.style.display = 'none';
-            document.body.appendChild(element);
-          
-            element.click();
-          
-            document.body.removeChild(element);
-        }*/
-        tools.download = function (filename, text, type) {
-            if (type === void 0) { type = "text/plain"; }
-            // Create an invisible A element
-            var a = document.createElement("a");
-            a.style.display = "none";
-            document.body.appendChild(a);
-            // Set the HREF to a Blob representation of the data to be downloaded
-            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
-            // Use download attribute to set set desired file name
-            a.setAttribute("download", filename);
-            // Trigger the download by simulating click
-            a.click();
-            // Cleanup
-            window.URL.revokeObjectURL(a.href);
-            document.body.removeChild(a);
-        };
-        tools.upload = function (callback) {
-            var _this = this;
-            var element = document.createElement("input");
-            element.type = "file";
-            element.style.display = "none";
-            document.body.appendChild(element);
-            element.onchange = function (e) {
-                _this.uploadOnChange(e, callback);
-            };
-            element.click();
-        };
-        tools.getClassNameFromConstructorName = function (constructorName) {
-            var funcNameOnly = constructorName.replace("function ", "");
-            var paramsStartIndex = funcNameOnly.indexOf("(");
-            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
-            return funcNameOnly;
-        };
-        tools.functionName = function (func) {
-            console.log(func.toString());
-            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
-            return result ? result[1] : ''; // for an anonymous function there won't be a match
-        };
-        tools.uploadOnChange = function (e, callback) {
-            var ev = e;
-            console.log(ev.target.files);
-            var reader = new FileReader();
-            reader.readAsText(ev.target.files[0], "UTF-8");
-            reader.onload = function (evt) {
-                var _a, _b;
-                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
-                callback(LZString.decompressFromEncodedURIComponent(t));
-            };
-            reader.onerror = function (evt) {
-                alert("Could not read file");
-            };
-        };
-        return tools;
-    }());
-
     var tileMetaObj = /** @class */ (function (_super) {
         __extends(tileMetaObj, _super);
         function tileMetaObj(xp, yp) {
@@ -1704,6 +2494,7 @@
                             animation.animationSpeed = (60 / (tAnim.animationSpeed * 60)) / 60;
                         }
                         animation.play();
+                        animation.roundPixels = false;
                         g.addChild(animation);
                     }
                 }
@@ -1723,12 +2514,20 @@
             this.availibleObjects = [
                 //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
                 function (xp, yp) { return new block(xp, yp); },
+                function (xp, yp) { return new collisionSlopeLeft(xp, yp); },
+                function (xp, yp) { return new collisionSlopeRight(xp, yp); },
                 function (xp, yp) { return new movingBlockHori(xp, yp); },
                 function (xp, yp) { return new movingBlockVert(xp, yp); },
+                function (xp, yp) { return new tinyBlock32(xp, yp); },
+                function (xp, yp) { return new wideBlock(xp, yp); },
                 function (xp, yp) { return new grass(xp, yp); },
                 function (xp, yp) { return new dummySandbag(xp, yp); },
+                function (xp, yp) { return new ladder(xp, yp); },
+                function (xp, yp) { return new textPrompt(xp, yp); },
+                function (xp, yp) { return new hitbox(xp, yp); },
                 function (xp, yp) { return new marker(xp, yp); },
                 function (xp, yp) { return new mio(xp, yp); },
+                function (xp, yp) { return new player(xp, yp); },
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
@@ -1776,6 +2575,7 @@
         }
         resourcesHand.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
             resourcesHand.resourcesToLoad = loadedResources;
+            loadedResources = loadedResources.filter(function (x) { return x.indexOf(".json") != -1 || (x.indexOf(".png") != -1 && loadedResources.indexOf(x.replace(".png", ".json")) == -1); });
             resourcesHand.resourcesToLoad.forEach(function (resourceDir) {
                 var resourceDirsSplit = resourceDir.split("/");
                 var resourceName = resourceDirsSplit[resourceDirsSplit.length - 1];
@@ -1792,6 +2592,9 @@
                         resourcesHand.storeStaticTile(name);
                     }
                     else if (split[0] == "tiles") {
+                        resourcesHand.storeStaticTile(name);
+                    }
+                    else if (name.indexOf(".png") != -1) {
                         resourcesHand.storeStaticTile(name);
                     }
                 });
@@ -2209,10 +3012,11 @@
             useTileButton.addEventListener("mouseup", this.clickUseButton.bind(this));
             this.controls.appendChild(useTileButton);
             this.prevCreatedAnimTiles = document.createElement("div");
+            this.prevCreatedAnimTiles.style.height = "300px";
+            this.prevCreatedAnimTiles.style.overflowY = "scroll";
             this.controls.appendChild(this.prevCreatedAnimTiles);
             this.modal.appendChild(this.controls);
             this.canvasContainer = document.createElement("div");
-            this.canvasContainer.className = "flexItem flex1";
             this.canvasContainer.style.border = "solid 1px blue";
             this.canvasContainer.style.overflow = "auto";
             this.canvasRenderer.className = "tileModalCanvas";
@@ -2232,10 +3036,11 @@
                 _this.renderCanvas();
             }, 500);
             this.tileCreator = new animatedTypeCreator("animTileCreator");
+            setInterval(this.resizeCanvas.bind(this), 3000);
         }
         tileSelector.prototype.clickUseButton = function () {
             var _this = this;
-            if (this.tileCreator.tempSubTile != null) {
+            if (this.tileCreator.animation != null) {
                 var tileAnimation_1 = this.tileCreator.getTileStack();
                 if (tileAnimation_1.name == "") {
                     if (tileAnimation_1.tiles.length > 1) {
@@ -2328,15 +3133,21 @@
             this.populateStoredTileAnimations(resourceName);
             this.modal.style.display = "flex";
         };
+        tileSelector.prototype.resizeCanvas = function () {
+            if (this.resourceName != null && tileSelector.resourceNameAndImage[this.resourceName] != undefined && tileSelector.resourceNameAndImage[this.resourceName].complete) {
+                this.canvasRenderer.width = tileSelector.resourceNameAndImage[this.resourceName].width + 640;
+                this.canvasRenderer.height = tileSelector.resourceNameAndImage[this.resourceName].height + 640;
+                this.canvasRenderer.style.width = (tileSelector.resourceNameAndImage[this.resourceName].width + 640) + "px";
+                this.canvasRenderer.style.height = (tileSelector.resourceNameAndImage[this.resourceName].height + 640) + "px";
+            }
+            this.renderCanvas();
+        };
         tileSelector.prototype.loadResource = function (imageSource, resourceName) {
             var _this = this;
             tileSelector.resourceNameAndImage[resourceName] = new Image();
             tileSelector.resourceNameAndImage[resourceName].onload = function () {
                 var _a;
-                _this.canvasRenderer.width = tileSelector.resourceNameAndImage[resourceName].width;
-                _this.canvasRenderer.height = tileSelector.resourceNameAndImage[resourceName].height;
-                _this.canvasRenderer.style.width = tileSelector.resourceNameAndImage[resourceName].width + "px";
-                _this.canvasRenderer.style.height = tileSelector.resourceNameAndImage[resourceName].height + "px";
+                _this.resizeCanvas();
                 (_a = _this.canvasContext) === null || _a === void 0 ? void 0 : _a.drawImage(tileSelector.resourceNameAndImage[resourceName], 0, 0);
                 _this.renderCanvas();
             };
@@ -2361,9 +3172,7 @@
                     deleteButton.innerHTML = "delete";
                     deleteButton.addEventListener("mouseup", function () {
                         var pos = tileSelector.resourceCreatedTileAnimations[resourceName].indexOf(tileSet);
-                        console.log("tileSelector.resourceCreatedTileAnimations[resourceName]: ", tileSelector.resourceCreatedTileAnimations[resourceName]);
                         tileSelector.resourceCreatedTileAnimations[resourceName].splice(pos, 1);
-                        console.log("tileSelector.resourceCreatedTileAnimations[resourceName]: ", tileSelector.resourceCreatedTileAnimations[resourceName]);
                         _this.populateStoredTileAnimations(resourceName);
                         if (_this.tileCreator.animation.name == tileSet.name) {
                             _this.tileCreator.animation = new tileAnimation();
@@ -2410,8 +3219,8 @@
                 (_h = this.canvasContext) === null || _h === void 0 ? void 0 : _h.stroke();
             }
             this.canvasContext.lineWidth = 1;
-            var mouseGridX = (Math.floor(this.mouseX / gridWidth) * gridWidth) + gridXOffset;
-            var mouseGridY = (Math.floor(this.mouseY / gridHeight) * gridHeight) + gridYOffset;
+            var mouseGridX = (Math.round(this.mouseX / gridWidth) * gridWidth) + gridXOffset;
+            var mouseGridY = (Math.round(this.mouseY / gridHeight) * gridHeight) + gridYOffset;
             this.canvasContext.strokeStyle = 'red';
             if (this.tileCreator.tempSubTile != null) {
                 this.canvasContext.beginPath();
@@ -2458,6 +3267,7 @@
         layerCompressor.compressLayer = function (l, roomName) {
             //get each static tile from the layer
             var compressedLayer = new layer(l.layerName, l.zIndex);
+            compressedLayer.hidden = l.hidden;
             var staticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length == 1; });
             if (staticTiles.length > 0) {
                 var combinedStaticTiles = layerCompressor.combineStaticTilesIntoOne(staticTiles, roomName);
@@ -2566,7 +3376,9 @@
             this.storedLayers.length = 0;
             var _loop_1 = function (i) {
                 var dataLayer = arayOfData[i];
+                console.log("Imported layer: ", dataLayer);
                 var newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
+                newLayer.hidden = dataLayer.hidden;
                 dataLayer.metaObjectsInLayer.forEach(function (obj) {
                     if (obj.isCombinationOfTiles == false) {
                         var newObj = new objectMetaData(obj.x, obj.y, obj.name, obj.tile);
@@ -2586,7 +3398,7 @@
         layerContainer.prototype.exportRoom = function () {
             return LZString.compressToEncodedURIComponent(JSON.stringify(layerCompressor.compressRoom(this.currentRoom, this.storedLayers)));
         };
-        layerContainer.prototype.createLayerOption = function (layerName) {
+        layerContainer.prototype.createLayerOption = function (layerName, hidden) {
             var layerOption = document.createElement("div");
             layerOption.className = "layerOptionContainer";
             layerOption.addEventListener("mouseup", this.clickLayerOption.bind(this));
@@ -2603,6 +3415,7 @@
             layerOption.appendChild(moveDownButton);
             var hideCheck = document.createElement("input");
             hideCheck.type = "checkbox";
+            hideCheck.checked = hidden;
             hideCheck.addEventListener("change", this.clickHideLayer.bind(this));
             layerOption.appendChild(hideCheck);
             this.containerElement.appendChild(layerOption);
@@ -2715,8 +3528,14 @@
                 height = obj.tile.get(0).height;
             }
             else {
-                width = canvasRenderer.classAndImage[obj.name].width;
-                height = canvasRenderer.classAndImage[obj.name].height;
+                if (canvasRenderer.classAndImage[obj.name] != null) {
+                    width = canvasRenderer.classAndImage[obj.name].width;
+                    height = canvasRenderer.classAndImage[obj.name].height;
+                }
+                else {
+                    width = 98;
+                    height = 98;
+                }
             }
             if (mouseTestX - this.gridXOffset >= obj.x &&
                 mouseTestX - this.gridXOffset < obj.x + width &&
@@ -2730,40 +3549,30 @@
             var _a;
             var button = e.target;
             var layerName = (_a = button.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
-            if (layerName != null) {
-                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
-                    var l = _b[_i];
-                    if (l.layerName == layerName) {
-                        for (var _c = 0, _d = this.storedLayers; _c < _d.length; _c++) {
-                            var sl = _d[_c];
-                            if (sl.zIndex == l.zIndex - 1) {
-                                l.zIndex = l.zIndex ^ sl.zIndex;
-                                sl.zIndex = l.zIndex ^ sl.zIndex;
-                                l.zIndex = l.zIndex ^ sl.zIndex;
-                                break;
-                            }
-                        }
-                        break;
+            var previousName = undefined;
+            if (layerName != undefined) {
+                for (var i = 0; i < this.storedLayers.length; i++) {
+                    if (this.storedLayers[i].layerName == layerName && i != 0) {
+                        previousName = this.storedLayers[i - 1].layerName;
                     }
                 }
-                this.initializeLayerModule(__spreadArrays(this.storedLayers));
             }
-            if (layerName != null) {
-                if (this.selectedLayer != null) {
-                    this.selectLayer(this.selectedLayer);
-                }
-            }
+            console.log(previousName);
+            this.moveLayerDownInOrder(previousName);
         };
         layerContainer.prototype.moveLayerDown = function (e) {
             var _a;
             var button = e.target;
             var layerName = (_a = button.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
+            this.moveLayerDownInOrder(layerName);
+        };
+        layerContainer.prototype.moveLayerDownInOrder = function (layerName) {
             if (layerName != null) {
-                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
-                    var l = _b[_i];
+                for (var _i = 0, _a = this.storedLayers; _i < _a.length; _i++) {
+                    var l = _a[_i];
                     if (l.layerName == layerName) {
-                        for (var _c = 0, _d = this.storedLayers; _c < _d.length; _c++) {
-                            var sl = _d[_c];
+                        for (var _b = 0, _c = this.storedLayers; _b < _c.length; _b++) {
+                            var sl = _c[_b];
                             if (sl.zIndex == l.zIndex + 1) {
                                 l.zIndex = l.zIndex ^ sl.zIndex;
                                 sl.zIndex = l.zIndex ^ sl.zIndex;
@@ -2790,8 +3599,8 @@
                 return a.zIndex - b.zIndex;
             });
             for (var _i = 0, layers_1 = layers; _i < layers_1.length; _i++) {
-                var layerName = layers_1[_i];
-                this.createLayerOption(layerName.layerName);
+                var cLayer = layers_1[_i];
+                this.createLayerOption(cLayer.layerName, cLayer.hidden);
             }
         };
         layerContainer.prototype.selectFirstLayer = function () {
@@ -2820,7 +3629,8 @@
                 alert("The layer does not exist");
             }
             else {
-                this.initializeLayerModule(this.storedLayers.filter(function (l) { return l.layerName != layerName; }));
+                this.storedLayers = this.storedLayers.filter(function (l) { return l.layerName != layerName; });
+                this.initializeLayerModule(this.storedLayers);
                 this.selectLayer();
             }
         };
@@ -2838,6 +3648,8 @@
             this.layers = [];
             this.counter = 0;
             this.haveSelectedFromHover = false;
+            this.missingImage = new Image();
+            this.missingImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAZQTFRF/wDj////hdfaxwAAAA5JREFUeJxjCGVYxYCEAR6cA/1tfYfmAAAAAElFTkSuQmCC";
             this.canvas = document.getElementById(canvasName);
             this.ctx = this.canvas.getContext("2d");
             this.gridWidth = 16;
@@ -2924,25 +3736,34 @@
             this.layerHandler.storedLayers.forEach(function (layer) {
                 if (layer.hidden == false) {
                     layer.metaObjectsInLayer.forEach(function (meta) {
-                        var _a, _b;
+                        var _a, _b, _c, _d;
                         if (meta.tile == null) {
-                            if (canvasRenderer.classAndImage[meta.name].complete) {
-                                try {
-                                    _this.drawMouseOverSelection(meta, mouseX, mouseY);
+                            if (canvasRenderer.classAndImage[meta.name] != null) {
+                                if (canvasRenderer.classAndImage[meta.name].complete) {
+                                    if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
+                                        _this.drawMouseOverSelection(meta, mouseX, mouseY);
+                                    }
                                     (_a = _this.ctx) === null || _a === void 0 ? void 0 : _a.drawImage(canvasRenderer.classAndImage[meta.name], meta.x + _this.gridXOffset, meta.y + _this.gridYOffset);
                                 }
-                                catch (exception) {
+                            }
+                            else {
+                                if (_this.missingImage.complete) {
+                                    (_b = _this.ctx) === null || _b === void 0 ? void 0 : _b.drawImage(_this.missingImage, 0, 0, 8, 8, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, 98, 98);
                                 }
                             }
                         }
                         else {
                             var tileToDraw = meta.tile.get(_this.counter);
-                            _this.drawMouseOverSelection(meta, mouseX, mouseY);
+                            if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
+                                _this.drawMouseOverSelection(meta, mouseX, mouseY);
+                            }
                             if (tileSelector.resourceNameAndImage[tileToDraw.resourceName] != null) {
-                                (_b = _this.ctx) === null || _b === void 0 ? void 0 : _b.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                                (_c = _this.ctx) === null || _c === void 0 ? void 0 : _c.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
                             }
                             else {
-                                console.log(tileToDraw.resourceName + " has not been initialized");
+                                if (_this.missingImage.complete) {
+                                    (_d = _this.ctx) === null || _d === void 0 ? void 0 : _d.drawImage(_this.missingImage, tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                                }
                             }
                         }
                     });
@@ -2961,8 +3782,14 @@
                     height = obj.tile.get(this.counter).height;
                 }
                 else {
-                    width = canvasRenderer.classAndImage[obj.name].width;
-                    height = canvasRenderer.classAndImage[obj.name].height;
+                    if (canvasRenderer.classAndImage[obj.name] != null) {
+                        width = canvasRenderer.classAndImage[obj.name].width;
+                        height = canvasRenderer.classAndImage[obj.name].height;
+                    }
+                    else {
+                        width = 98;
+                        height = 98;
+                    }
                 }
                 this.ctx.strokeStyle = 'red';
                 this.ctx.lineWidth = 5;

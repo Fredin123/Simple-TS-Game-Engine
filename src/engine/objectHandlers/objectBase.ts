@@ -1,7 +1,7 @@
 import { vector } from "../dataObjects/vector/vector";
 import { roomEvent } from "../roomEvent";
 import { resourceMeta } from "../preload sources/resourceMeta";
-import { boxCollider } from "./boxCollider";
+import { boxCollider } from "./collision/boxCollider";
 import { uidGen } from "../tools/uidGen";
 import { objectContainer } from "./objectContainer";
 import { movementOperations } from "../movementOperations";
@@ -21,8 +21,9 @@ export class objectBase implements iObject{
     readonly ID: string =  uidGen.new();
     private _g: PIXI.Container = new PIXI.Container();
     private gSprites : {[key: string]: PIXI.AnimatedSprite} = {};
-    friction: number = 0.5;
-    airFriction: number = 0.8;
+    friction: number = 0.98;
+    airFriction: number = 0.9;
+    percentage: number = 0;
 
     resourcesNeeded: string[] = [];
 
@@ -34,9 +35,12 @@ export class objectBase implements iObject{
     gravity: iVector = vector.null;
     weight: number = 0.4;
     _hasBeenMoved_Tick: number = 0;
+    _isColliding_Special: boolean = false;
 
     static objectsThatCollideWith: {[key: string]: Array<string>} = {};
     static objectsThatMoveWith: {[key: string]: Array<string>} = {};
+
+    onLayer: number = 0;
 
 
     get g(){
@@ -230,7 +234,7 @@ export class objectBase implements iObject{
     }
 
     
-    
+
     
 
     get x(){

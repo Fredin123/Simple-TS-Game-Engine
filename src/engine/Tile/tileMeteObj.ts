@@ -45,6 +45,7 @@ export class tileMetaObj extends objectBase{
                     }
                     
                     animation!.play();
+                    animation.roundPixels = false;
                     g.addChild(animation);
                 }
             }

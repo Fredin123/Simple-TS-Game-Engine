@@ -3,7 +3,7 @@ import { roomEvent } from "../roomEvent";
 import { iObject } from "./iObject";
 import { vector } from "../dataObjects/vector/vector";
 import { resourceMeta } from "../preload sources/resourceMeta";
-import { boxCollider } from "./boxCollider";
+import { boxCollider } from "./collision/boxCollider";
 
 export class nulliObject implements iObject{
     isTile = false;
@@ -26,6 +26,8 @@ export class nulliObject implements iObject{
     moveCollisionTargets: Array<string> = [];
     force: vector = new vector(0, 0);
     _hasBeenMoved_Tick: number = 0;
+    _isColliding_Special: boolean = false;
+    percentage: number = 0;
 
     constructor(xp: number, yp: number) {
 
@@ -66,6 +68,7 @@ export class nulliObject implements iObject{
     logic(l: roomEvent){
 
     };
+
 
 
 
