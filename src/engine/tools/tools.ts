@@ -1,7 +1,7 @@
-import { hitbox } from "../../objects/hitboxes/hitbox";
 import { iVector } from "../dataObjects/vector/iVector";
 import { iObject } from "../objectHandlers/iObject";
 import { roomEvent } from "../roomEvent";
+import { hitbox } from "./hitbox";
 
 interface HTMLInputEvent extends Event {
     target: HTMLInputElement & EventTarget;

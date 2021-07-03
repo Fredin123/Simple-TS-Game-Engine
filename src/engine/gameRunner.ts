@@ -7,7 +7,6 @@ import { objectBase } from './objectHandlers/objectBase';
 import { iObject } from './objectHandlers/iObject';
 import { tileMetaObj } from './Tile/tileMeteObj';
 import { task } from './tools/task';
-import { scene_home } from '../scenes/scene_home';
 import { roomData } from '../shared/roomData';
 import {TiltShiftFilter} from '@pixi/filter-tilt-shift';
 import {GodrayFilter} from '@pixi/filter-godray';
@@ -15,6 +14,7 @@ import {AdvancedBloomFilter} from '@pixi/filter-advanced-bloom';
 import {BloomFilter} from '@pixi/filter-bloom';
 import {AdjustmentFilter} from '@pixi/filter-adjustment';
 import {SimpleLightmapFilter} from '@pixi/filter-simple-lightmap';
+import { firstRoom } from '../scenes/firstRoom';
 
 declare var LZString: any;
 
@@ -101,7 +101,7 @@ export class gameRunner {
             
         });
 
-        this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(scene_home)));
+        this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(firstRoom)));
     }
 
 
