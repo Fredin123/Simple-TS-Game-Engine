@@ -40,22 +40,6 @@
       d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     }
 
-    var internalFunction = /** @class */ (function () {
-        function internalFunction() {
-        }
-        internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
-            var x1 = initiator.g.x + initiadorCollisionBox.x;
-            var y1 = initiator.g.y + initiadorCollisionBox.y;
-            var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
-            var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
-            return (x1 < x2 + collisionTarget.collisionBox.width &&
-                x1 + initiadorCollisionBox.width > x2 &&
-                y1 < y2 + collisionTarget.collisionBox.height &&
-                y1 + initiadorCollisionBox.height > y2);
-        };
-        return internalFunction;
-    }());
-
     var calculations = /** @class */ (function () {
         function calculations() {
         }
@@ -229,6 +213,22 @@
         };
         uidGen.generatedIds = [];
         return uidGen;
+    }());
+
+    var internalFunction = /** @class */ (function () {
+        function internalFunction() {
+        }
+        internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
+            var x1 = initiator.g.x + initiadorCollisionBox.x;
+            var y1 = initiator.g.y + initiadorCollisionBox.y;
+            var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
+            var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
+            return (x1 < x2 + collisionTarget.collisionBox.width &&
+                x1 + initiadorCollisionBox.width > x2 &&
+                y1 < y2 + collisionTarget.collisionBox.height &&
+                y1 + initiadorCollisionBox.height > y2);
+        };
+        return internalFunction;
     }());
 
     var brain = /** @class */ (function () {
@@ -1085,6 +1085,80 @@
         return objectBase;
     }());
 
+    var block = /** @class */ (function (_super) {
+        __extends(block, _super);
+        function block(xp, yp) {
+            var _this = _super.call(this, xp, yp, block.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        block.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            /*if(this.switch){
+                super.setNewForce(l.degreesToRadians(0), 3);
+            }else{
+                super.setNewForce(l.degreesToRadians(180), 3);
+            }*/
+        };
+        block.objectName = "block";
+        return block;
+    }(objectBase));
+
+    var player = /** @class */ (function (_super) {
+        __extends(player, _super);
+        function player(xp, yp) {
+            var _this = _super.call(this, xp, yp, player.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0xFF0000);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        player.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            if (l.checkKeyHeld("a")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 2);
+            }
+            else if (l.checkKeyHeld("d")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 2);
+            }
+            if (l.checkKeyHeld("w")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 2);
+            }
+            else if (l.checkKeyHeld("s")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 2);
+            }
+            this.force.limitHorizontalMagnitude(10);
+            this.force.limitVerticalMagnitude(10);
+            l.camera.setTarget(this.g.x, this.g.y);
+        };
+        player.objectName = "player";
+        return player;
+    }(objectBase));
+
     var hitbox = /** @class */ (function (_super) {
         __extends(hitbox, _super);
         function hitbox(xp, yp) {
@@ -1299,8 +1373,9 @@
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
-            //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
-            //{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+                //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+                function (xp, yp) { return new block(xp, yp); },
+                function (xp, yp) { return new player(xp, yp); },
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
@@ -1564,7 +1639,7 @@
             this.hidden = false;
             this.scrollSpeedX = 1;
             this.scrollSpeedY = 1;
-            this.settings = "{scrollSpeedX: 1, scrollSpeedY: 1}";
+            this.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1, \"blur\": 0}";
             this.layerName = layerName;
             this.zIndex = zIndex;
         }

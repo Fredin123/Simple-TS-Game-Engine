@@ -1,4 +1,6 @@
 //{NEW IMPORTS START HERE}
+import { block } from "../objects/block";
+import { player } from "../objects/player";
 //{NEW IMPORTS END HERE}
 
 
@@ -15,6 +17,8 @@ import { tileMetaObj } from "../engine/Tile/tileMeteObj";
 export class objectGenerator{
     private availibleObjects: Array<(xp: number, yp: number) => objectBase> = [
         //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+		(xp: number, yp: number)=>{return new block(xp, yp);},
+		(xp: number, yp: number)=>{return new player(xp, yp);},
 //{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
 
     ];

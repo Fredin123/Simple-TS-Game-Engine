@@ -106,6 +106,7 @@ export class gameRunner {
 
 
     loadRoom(loadRoom: roomData){
+        console.log("loadRoom: ",loadRoom);
         this.objContainer.removeObjects();
 
         this.cameraBounds[0] = loadRoom.cameraBoundsX ?? 0;

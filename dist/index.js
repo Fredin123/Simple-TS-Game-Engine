@@ -953,6 +953,80 @@
         return objectBase;
     }());
 
+    var block = /** @class */ (function (_super) {
+        __extends(block, _super);
+        function block(xp, yp) {
+            var _this = _super.call(this, xp, yp, block.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        block.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            /*if(this.switch){
+                super.setNewForce(l.degreesToRadians(0), 3);
+            }else{
+                super.setNewForce(l.degreesToRadians(180), 3);
+            }*/
+        };
+        block.objectName = "block";
+        return block;
+    }(objectBase));
+
+    var player = /** @class */ (function (_super) {
+        __extends(player, _super);
+        function player(xp, yp) {
+            var _this = _super.call(this, xp, yp, player.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0xFF0000);
+                newGraphics.drawRect(0, 0, 128, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+        }
+        player.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            if (l.checkKeyHeld("a")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 2);
+            }
+            else if (l.checkKeyHeld("d")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 2);
+            }
+            if (l.checkKeyHeld("w")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 2);
+            }
+            else if (l.checkKeyHeld("s")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 2);
+            }
+            this.force.limitHorizontalMagnitude(10);
+            this.force.limitVerticalMagnitude(10);
+            l.camera.setTarget(this.g.x, this.g.y);
+        };
+        player.objectName = "player";
+        return player;
+    }(objectBase));
+
     var hitbox = /** @class */ (function (_super) {
         __extends(hitbox, _super);
         function hitbox(xp, yp) {
@@ -1167,8 +1241,9 @@
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
-            //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
-            //{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+                //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+                function (xp, yp) { return new block(xp, yp); },
+                function (xp, yp) { return new player(xp, yp); },
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
@@ -1666,7 +1741,7 @@
         return task;
     }());
 
-    var firstRoom = "";
+    var firstRoom = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALnVQBsSAacaeJNLbATUOLMslgRQxwHUBLTABcAFs1IUqHWt2wAJGHwDmwwWNYgARhDABrRXDqYAwshLI4hEAGIAZnfshKJCAE94AEQiCIhANqhYbwB5DQArGDBBbABJdAAZV3g-UEE+Ehg1CT5sEygNPnQvPmR0IJsAFTSYbEIbCBJsGEpsgAUIOEEy3PzC1JLa+sbKAA9CAEYAJgAOShdxgBZ5ykLYSw0zXRAAX3IUqszmnOQ8gqKSssr0moI6hqaQVvbOm27TvvQBu5HxiYB2ADoAJzAkGgkFLEBzAh-CbLahrDY6ba7ECpdIHB5HE69YqlCpVa63IaYtodLrHHpnD43Qb3UYEX4AVlhkIWEJWGQImkRyL26KI4kOrxx53xV0+xMeZJeFLeuIldMITJZUJhcNWXPWyE2Oz5nJYWSxlPeFwJCsOpOewqp5pA9LGAAYJhCoQBaCaMgBs6s53O1SN1qP2AvU2WtJrF1VtUqtspF1KJioIYzGzNmhHdXp9CP9vKD-INQrjVNN4ppXxJT3J2Jt5eJ9umDvTBEz3pAHJzOpRaP1gsx4dxpajdfuMerxvlI++yfmDpmrJbHrbHc1PMDPYxYeLEcuw8TFqrMpr71t9s98ym-wd15vt+vKp+1+zq9z6+Dhf728HkcJtIP0oHfopztcYximF0lU9ecVz9Ls9U3I05VFXdfwrMcjwnID9xAghAV+NsoWZaD4RfOD817UNEPjIdUMlbBLXHJCEz-HDXQAZgmJsF0mJ92xI2CA27d8+y3Y9vxQ6N6MPQDmIrekuKhKYOOfAS8w3ENDRkmjJIYjCmNPDNpnnN1Zy4mCtTI9SP1EzC8Qk4D0JkgyCDYz0ATBDzgQglsxk9Mz+IswT4I0osxOQs0HKkgCvywlj6XmQFGSBTywW811fP8jVVLfAsRKoksfx06SYtk+tCHmVNkpS8Fm0BZd+IAB2cNwLByijNJK7TIt0pzgPpNUFz84issC7YAF1KGEARMBgUr7mwMADDIABlBqYBgTB8GTSgFqWkhVvWzAmG2kBGkEVJ0EUa4QGAAAdU7FtMfa1o23B7oIAACMZyA++7dqeg6NoYd6vq2RwQGa+AADl+ISFqvvBgAvWIZvkrYxq2IA";
 
     var gameRunner = /** @class */ (function () {
         function gameRunner(gameContainer, gameProperties, app) {
@@ -1734,6 +1809,7 @@
         }
         gameRunner.prototype.loadRoom = function (loadRoom) {
             var _a, _b, _c, _d;
+            console.log("loadRoom: ", loadRoom);
             this.objContainer.removeObjects();
             this.cameraBounds[0] = (_a = loadRoom.cameraBoundsX) !== null && _a !== void 0 ? _a : 0;
             this.cameraBounds[1] = (_b = loadRoom.cameraBoundsY) !== null && _b !== void 0 ? _b : 0;
