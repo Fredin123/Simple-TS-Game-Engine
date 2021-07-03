@@ -34,7 +34,6 @@ export class animatedTypeCreator{
 
 
     setTileSet(tileSet: tileAnimation){
-        console.log("use this tile set: ",tileSet);
         this.animation = tileSet;
         this.tempSubTile = null;
         this.createElementsForTiles(this.animation.tiles);

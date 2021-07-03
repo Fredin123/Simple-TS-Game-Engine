@@ -29,10 +29,18 @@
                 <div id="idCursorTypeContainer"></div>
                 <button id="zoomIn"> Zoom in</button>
                 <button id="zoomOut">Zoom out</button>
-                
-                
-                
+            </div>
 
+            <div>
+                camera bounds:
+                x: <input id="cameraBoundsX" type="number">
+                y: <input id="cameraBoundsY" type="number">
+                width: <input id="cameraBoundsWidth" type="number">
+                height: <input id="cameraBoundsHeight" type="number">
+            </div>
+
+            <div>
+                background Color: <input id="backgroundColorInput" type="text">
             </div>
             
             <div id="canvasAndFilesCon" class="flexContainerhori takeAllSpace">
@@ -72,6 +80,7 @@
 
             hideCreateSprites();
         </script>
+        <script src="./howler.min.js"></script>
         <script src="./pixi.min.js"></script>
         <script src="./prettyFileSystem.min.js"></script>
         <script src="./lz-string.min.js"></script>

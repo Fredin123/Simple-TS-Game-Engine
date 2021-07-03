@@ -9,9 +9,10 @@ import { iObject } from "./iObject";
 import { iVector } from "../dataObjects/vector/iVector";
 import { nulliObject } from "./nulliObject";
 import { calculations } from "../calculations";
-import { resourcesHand } from "../preload sources/resources";
+import { resourcesHand } from "../preload sources/resourcesHand";
 import { animConfig } from "./animConfig";
 import { AnimatedSprite } from "pixi.js";
+import * as PIXI from 'pixi.js'
 
 
 export class objectBase implements iObject{
@@ -148,9 +149,11 @@ export class objectBase implements iObject{
             newAnimation.scale.set(settings.scaleX, settings.scaleY);
             newAnimation.rotation = 0;
             newAnimation.play();
+            
             this.gSprites[settings.id] = newAnimation;
             this._g.addChild(newAnimation);
         }
+        
         return newAnimation;
     }
 

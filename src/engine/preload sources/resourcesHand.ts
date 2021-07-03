@@ -1,5 +1,10 @@
 import { objectGenerator } from "../../shared/objectGenerator";
 import { tileAnimation } from "../../shared/tile/tileAnimation";
+import { calculations } from "../calculations";
+import * as PIXI from 'pixi.js'
+//import { Howl } from 'howler';
+
+declare var Howl: any;
 
 export class resourcesHand{
     private static app: PIXI.Application;
@@ -9,6 +14,9 @@ export class resourcesHand{
     
     private static animatedSprite: {[key: string]: Array<PIXI.Texture>} = {};
     private static staticTile: {[key: string] : PIXI.Texture} = {};
+    
+    private static audio: {[key: string] : any} = {};
+    
 
     constructor(app: PIXI.Application, onCompleteCallback: ()=>void, alternativePath: string = ""){
         resourcesHand.app = app;
@@ -30,7 +38,11 @@ export class resourcesHand{
     static loadFromResources(loadedResources: string[], onCompleteCallback: ()=>void, alternativePath: string){
         resourcesHand.resourcesToLoad = loadedResources;
 
-        loadedResources = loadedResources.filter(x => x.indexOf(".json") != -1 || (x.indexOf(".png") != -1 && loadedResources.indexOf(x.replace(".png", ".json")) == -1) );
+        let audioToLoad = loadedResources.filter(x => x.indexOf(".wav") != -1 || x.indexOf(".ogg") != -1);
+        resourcesHand.loadAudio(audioToLoad);
+
+
+        loadedResources = loadedResources.filter(x => x.indexOf(".mp4") != -1 || x.indexOf(".json") != -1 || (x.indexOf(".png") != -1 && loadedResources.indexOf(x.replace(".png", ".json")) == -1) );
 
         resourcesHand.resourcesToLoad.forEach(resourceDir => {
             let resourceDirsSplit = resourceDir.split("/");
@@ -42,7 +54,7 @@ export class resourcesHand{
             resourcesHand.resourcesToLoad.forEach(resource => {
                 let split = resource.split("/");
                 let name = split[split.length-1];
-                
+
                 if(name.indexOf(".json") != -1){
                     resourcesHand.storeAnimatedArray(name);
                 }else if(split[0] == "_generated_tiles"){
@@ -51,6 +63,8 @@ export class resourcesHand{
                     resourcesHand.storeStaticTile(name);
                 }else if(name.indexOf(".png") != -1){
                     resourcesHand.storeStaticTile(name);
+                }else if(name.indexOf(".mp4") != -1){
+                    resourcesHand.storeVideoAsAnimatedTexture("resources/"+resource, name);
                 }
             });
             
@@ -59,15 +73,38 @@ export class resourcesHand{
         });
     }
 
+
+    static loadAudio(audioFiles: string[]){
+        for(let audioToLoad of audioFiles){
+            let dirParts = audioToLoad.split("/");
+
+            resourcesHand.audio[dirParts[dirParts.length-1]] = new Howl({
+                src: ['resources/'+audioToLoad]
+            });
+        }
+    }
+
+    static playAudio(name: string){
+        resourcesHand.audio[name].play();
+    }
+
+    static playAudioVolume(name: string, volume: number){
+        resourcesHand.audio[name].volume(volume);
+        resourcesHand.audio[name].play();
+    }
+
+    static playRandomAudio(names: string[]){
+        resourcesHand.audio[names[calculations.getRandomInt(0, names.length-1)]].play();
+    }
+
     static generateAnimatedTiles(animationMeta: tileAnimation){
         if(resourcesHand.animatedSprite[animationMeta.name] == null){
             resourcesHand.animatedSprite[animationMeta.name] = [];
         }
         for(let tile of animationMeta.tiles){
-            console.log("find tile.resourceName: "+tile.resourceName);
             let parts = tile.resourceName.split("/");
-            console.log("in: ", resourcesHand.app.loader.resources);
-            let newTex = new PIXI.Texture(resourcesHand.app.loader.resources[parts[parts.length-1]].texture.baseTexture, 
+            
+            let newTex = new PIXI.Texture(resourcesHand.app.loader.resources[parts[parts.length-1]].texture!.baseTexture, 
                 new PIXI.Rectangle(tile.startX, tile.startY, tile.width, tile.height));
             
             resourcesHand.animatedSprite[animationMeta.name].push(newTex);
@@ -101,11 +138,28 @@ export class resourcesHand{
         //const animeFromSheet = new PIXI.AnimatedSprite(animation);
     }
 
-    static getAnimatedSprite(name: string){
-        if(name.indexOf(".") != -1){
-            name = name.split(".")[0];
+    static storeVideoAsAnimatedTexture(resourcelocation: string, resourceName: string){
+        /*const texture = PIXI.Texture.from(resourcelocation);
+
+        var textVid = new PIXI.AnimatedSprite(texture);
+
+
+        if(resourcesHand.animatedSprite[resourceName] == null){
+            resourcesHand.animatedSprite[resourceName] = [];
         }
-        name += ".json";
+        resourcesHand.animatedSprite[resourceName].push(textVid);*/
+
+        console.log("After adding video texture: ", resourcesHand.animatedSprite[resourceName]);
+    }
+
+    static getAnimatedSprite(name: string){
+        if(name.indexOf(".mp4") == -1){
+            if(name.indexOf(".") != -1){
+                name = name.split(".")[0];
+            }
+            name += ".json";
+        }
+        
         if(resourcesHand.animatedSprite[name] != null){
             return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
         }
@@ -127,7 +181,7 @@ export class resourcesHand{
         return new PIXI.Sprite(resourcesHand.staticTile[genName]);
     }
 
-    static resourcePNG(resourceName: string): PIXI.Texture{
+    static resourcePNG(resourceName: string): PIXI.Texture | undefined{
         for(let resourceDir of resourcesHand.resourcesToLoad){
             let splitDirs = resourceDir.split("/");
             let nameAndMeta = splitDirs[splitDirs.length-1];
@@ -140,11 +194,6 @@ export class resourcesHand{
         }
         
         throw new Error("PNG resource does not exist: "+resourceName);
-    }
-
-
-    static createAnimatedSpriteFromTile(tileAnim: tileAnimation){
-
     }
     
 }

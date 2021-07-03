@@ -1,5 +1,5 @@
 import { brain } from "./brain";
-import { calculations } from "./calculations";
+import * as PIXI from 'pixi.js'
 
 export class gameCamera{
     private isInUse: boolean = true;
@@ -27,7 +27,7 @@ export class gameCamera{
         return this.cameraY;
     }
 
-    public moveCamera(){
+    public moveCamera(app: PIXI.Application, cameraBounds: number[]){
         let angle = brain.angleBetweenPoints((this.cameraX - this.targetX), (this.cameraY - this.targetY));
             
         let distance = brain.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
@@ -38,6 +38,26 @@ export class gameCamera{
         this.cameraX = Math.floor(this.cameraX);
         this.cameraY = Math.floor(this.cameraY);
         
+        
+        if(cameraBounds[0] + cameraBounds[1] + cameraBounds[2] + cameraBounds[3] != 0){
+            
+            if(this.cameraX - (app.renderer.width/2) < cameraBounds[0]){
+                this.cameraX = cameraBounds[0] + (app.renderer.width/2);
+            }
+
+            if(this.cameraX + (app.renderer.width/2) > cameraBounds[0] + cameraBounds[2]){
+                this.cameraX = cameraBounds[0] + cameraBounds[2] - (app.renderer.width/2);
+            }
+
+
+            if(this.cameraY - (app.renderer.height/2) < cameraBounds[1]){
+                this.cameraY = cameraBounds[1] + (app.renderer.height/2);
+            }
+
+            if(this.cameraY + (app.renderer.height/2) > cameraBounds[1] + cameraBounds[3]){
+                this.cameraY = cameraBounds[1] + cameraBounds[3] - (app.renderer.height/2);
+            }
+        }
     }
 
     public setMoveSpeedX(moveSpeed: number){

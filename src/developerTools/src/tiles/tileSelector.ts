@@ -15,6 +15,8 @@ export class tileSelector{
     private canvasRenderer: HTMLCanvasElement = document.createElement("canvas");
     private controls: HTMLElement = document.createElement("div");
 
+    private selectedTileProperties: HTMLElement = document.createElement("div");
+
     private canvasContainer: HTMLElement | null;
     private canvasContext: CanvasRenderingContext2D | null;
 
@@ -30,6 +32,7 @@ export class tileSelector{
 
     private prevCreatedAnimTiles: HTMLElement;
 
+    private canvasScale = 1;
     private callbackSubTile: (exportedTile: tileAnimation) => void = (exportedTile: tileAnimation) => {};
 
     constructor(){
@@ -86,6 +89,20 @@ export class tileSelector{
         this.modal.style.display = "none";
         this.closeButton.addEventListener("mouseup", this.close.bind(this));
 
+
+
+        
+        this.selectedTileProperties.innerHTML = "<span>XStart</span><input id='tileStartX' type='number'>";
+        this.selectedTileProperties.innerHTML += "<span>YStart</span><input id='tileStartY' type='number'>";
+
+        this.selectedTileProperties.innerHTML += "<span>Width</span><input id='tileWidth' type='number'>";
+        this.selectedTileProperties.innerHTML += "<span>Height</span><input id='tileHeight' type='number'>";
+        this.modal.appendChild(this.selectedTileProperties);
+        let buttonUpdateTile = document.createElement("button") as HTMLButtonElement;
+        buttonUpdateTile.innerHTML = "Update";
+        buttonUpdateTile.addEventListener("mouseup", this.updateTileSize.bind(this));
+        this.selectedTileProperties.appendChild(buttonUpdateTile);
+
         this.canvasRenderer.addEventListener("mousemove", this.mouseMoveCanvas.bind(this));
         this.canvasRenderer.addEventListener("mousedown", this.clickCanvas.bind(this));
         this.canvasRenderer.addEventListener("mouseup", this.mouseUpCanvas.bind(this));
@@ -101,6 +118,20 @@ export class tileSelector{
 
 
         setInterval(this.resizeCanvas.bind(this), 3000);
+    }
+
+
+    private updateTileSize(){
+        let gridWidth = parseInt((document.getElementById("gridWidthIn") as HTMLInputElement).value);
+        let gridHeight = parseInt((document.getElementById("gridHeightIn") as HTMLInputElement).value);
+
+        this.tileCreator.tempSubTile!.startX = parseInt((document.getElementById("tileStartX")! as HTMLInputElement).value) * gridWidth;
+        this.tileCreator.tempSubTile!.startY = parseInt((document.getElementById("tileStartY")! as HTMLInputElement).value) * gridHeight;
+
+        this.tileCreator.tempSubTile!.width = parseInt((document.getElementById("tileWidth")! as HTMLInputElement).value) * gridWidth;
+        this.tileCreator.tempSubTile!.height = parseInt((document.getElementById("tileHeight")! as HTMLInputElement).value) * gridHeight;
+
+        this.renderCanvas();
     }
 
 
@@ -144,6 +175,15 @@ export class tileSelector{
 
     mouseUpCanvas(e: MouseEvent){
         this.subTileDone = true;
+        
+        let gridWidth = parseInt((document.getElementById("gridWidthIn") as HTMLInputElement).value);
+        let gridHeight = parseInt((document.getElementById("gridHeightIn") as HTMLInputElement).value);
+
+        (document.getElementById("tileStartX")! as HTMLInputElement).value = (this.tileCreator.tempSubTile!.startX/gridWidth)+"";
+        (document.getElementById("tileStartY")! as HTMLInputElement).value = (this.tileCreator.tempSubTile!.startY/gridHeight)+"";
+
+        (document.getElementById("tileWidth")! as HTMLInputElement).value = (this.tileCreator.tempSubTile!.width/gridWidth)+"";
+        (document.getElementById("tileHeight")! as HTMLInputElement).value = (this.tileCreator.tempSubTile!.height/gridHeight)+"";
     }
 
 

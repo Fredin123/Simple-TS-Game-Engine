@@ -31,4 +31,10 @@ export class calculations{
         return Math.sin(delta + calculations.PI/*We need to flip sin since our coordinate system Y goes from 0 to positive numbers when you do down*/);
     }
 
+    static getRandomInt(min: number, max: number) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
 }

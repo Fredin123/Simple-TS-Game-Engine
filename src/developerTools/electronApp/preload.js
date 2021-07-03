@@ -116,7 +116,20 @@ contextBridge.exposeInMainWorld('node', {
         }
       }
     });
-  }
+  },
+
+  promptDefaultText: (question, defaultText, callbackFunc) => {
+    vex.dialog.open({
+      message: 'Enter notes for this context',
+      input: '<textarea name="notes" rows="6", cols="80">'+defaultText+'</textarea>',
+      callback: function(data) {
+        if (data) {
+          callbackFunc(data.notes);
+        }
+      }
+    });
+  },
+
 
 
 });

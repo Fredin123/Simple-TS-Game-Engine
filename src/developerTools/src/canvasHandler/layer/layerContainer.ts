@@ -3,8 +3,10 @@ import { layer } from "../../../../shared/layer";
 import { objectMetaData } from "../../objectMetaData";
 import { canvasRenderer } from "../canvasRenderer";
 import { layerCompressor } from "./layerCompressor";
+import { roomData } from "../../../../shared/roomData";
 
 declare var LZString: any;
+declare var window : any;
 
 
 export class layerContainer{
@@ -25,20 +27,65 @@ export class layerContainer{
 
     importRoom(clickedFile: string, jsonString: string){
         this.currentRoom = clickedFile;
-        let arayOfData: layer[] = [];
+        let arayOfData: roomData = new roomData([]);
         if(jsonString != ""){
             arayOfData = JSON.parse(jsonString);
+
+            if(arayOfData.cameraBoundsX != undefined){
+                (document.getElementById("cameraBoundsX") as HTMLInputElement).value = arayOfData.cameraBoundsX!.toString();
+            }else{
+                (document.getElementById("cameraBoundsX") as HTMLInputElement).value = "";
+            }
+
+            if(arayOfData.cameraBoundsX != undefined){
+                (document.getElementById("cameraBoundsY") as HTMLInputElement).value = arayOfData.cameraBoundsY!.toString();
+            }else{
+                (document.getElementById("cameraBoundsY") as HTMLInputElement).value = "";
+            }
+
+            if(arayOfData.cameraBoundsX != undefined){
+                (document.getElementById("cameraBoundsWidth") as HTMLInputElement).value = arayOfData.cameraBoundsWidth!.toString();
+            }else{
+                (document.getElementById("cameraBoundsWidth") as HTMLInputElement).value = "";
+            }
+
+            if(arayOfData.cameraBoundsX != undefined){
+                (document.getElementById("cameraBoundsHeight") as HTMLInputElement).value = arayOfData.cameraBoundsHeight!.toString();
+            }else{
+                (document.getElementById("cameraBoundsHeight") as HTMLInputElement).value = "";
+            }
+            
+            if(arayOfData.backgroundColor != undefined){
+                (document.getElementById("backgroundColorInput") as HTMLInputElement).value = arayOfData.backgroundColor!.toString();
+            }else{
+                (document.getElementById("backgroundColorInput") as HTMLInputElement).value = "0xFFFFFF";
+            }
+
+            for(var l of arayOfData.layerData){
+                if(l.scrollSpeedX == undefined){
+                    l.scrollSpeedX = 1;
+                }
+                if(l.scrollSpeedY == undefined){
+                    l.scrollSpeedY = 1;
+                }
+            }
         }
-        if(arayOfData.length == 0){
-            arayOfData.push(new layer("Layer 1", 0));
+        if(arayOfData.layerData.length == 0){
+            arayOfData.layerData.push(new layer("Layer 1", 0));
         }
         
         this.storedLayers.length = 0;
-        for(let i=0; i<arayOfData.length; i++){
-            let dataLayer = arayOfData[i];
-            console.log("Imported layer: ",dataLayer);
+        for(let i=0; i<arayOfData.layerData.length; i++){
+            let dataLayer = arayOfData.layerData[i];
+            console.log("dataLayer: ",dataLayer);
             let newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
             newLayer.hidden = dataLayer.hidden;
+            newLayer.scrollSpeedX = dataLayer.scrollSpeedX;
+            newLayer.scrollSpeedY = dataLayer.scrollSpeedY;
+            if(dataLayer.settings == "undefined" || dataLayer.settings == "" || dataLayer.settings == undefined || dataLayer.settings == null){
+                dataLayer.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1, \"blur\": 0}";
+            }
+            newLayer.settings = dataLayer.settings;
 
             dataLayer.metaObjectsInLayer.forEach(obj => {
                 if(obj.isCombinationOfTiles == false){
@@ -48,6 +95,7 @@ export class layerContainer{
             });
             this.storedLayers.push(newLayer);
         }
+        console.log("this.storedLayers: ",this.storedLayers);
 
 
         //populate layer select element
@@ -87,10 +135,48 @@ export class layerContainer{
         hideCheck.addEventListener("change", this.clickHideLayer.bind(this));
         layerOption.appendChild(hideCheck);
 
+
+        let edit = document.createElement("button");
+        edit.innerHTML = "edit";
+        edit.addEventListener("mouseup", this.setLayerSettings.bind(this));
+        layerOption.appendChild(edit);
+
+
         this.containerElement.appendChild(layerOption);
         
 
         return layerOption;
+    }
+
+    private setLayerSettings(e: Event){
+        let target = e.target as HTMLInputElement;
+        let layerName = target.parentElement?.getElementsByTagName("span")[0].innerHTML;
+
+        var clickedLayer: layer | null = null;
+        if(layerName != null){
+            for(let layer of this.storedLayers){
+                if(layer.layerName == layerName){
+                    clickedLayer = layer;
+                    break;
+                }
+            }
+        }
+
+        if(clickedLayer != null){
+            var currentSettings = clickedLayer.settings;
+        
+            window.node.promptDefaultText("Type in the name of the layer you want to delete", currentSettings, (text: string | null) => {
+                if(text != null){
+                    clickedLayer!.settings = text;
+                    /*var parsed = JSON.parse(text) as any;
+                    let newSpeedX: number = parseFloat(parsed.scrollSpeedX);
+                    let newSpeedY: number = parseFloat(parsed.scrollSpeedY);
+    
+                    clickedLayer!.scrollSpeedX = newSpeedX;
+                    clickedLayer!.scrollSpeedY = newSpeedY;*/
+                }
+            });
+        }
     }
 
     private clickLayerOption(e: Event){

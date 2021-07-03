@@ -20,7 +20,7 @@ import { player } from "../objects/player";
 import { tileAnimation } from "./tile/tileAnimation";
 import { objectBase } from "../engine/objectHandlers/objectBase";
 import { tools } from "../engine/tools/tools";
-import { resourcesHand } from "../engine/preload sources/resources";
+import { resourcesHand } from "../engine/preload sources/resourcesHand";
 import { tileMetaObj } from "../engine/Tile/tileMeteObj";
 
 
@@ -71,7 +71,6 @@ export class objectGenerator{
                 //Create tile object
                 let newTile = new tileMetaObj(x, y);
                 newTile.setTiles(tile);
-                resourcesHand.createAnimatedSpriteFromTile(tile);
                 return newTile;
             }
             

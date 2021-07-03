@@ -1,5 +1,5 @@
-import { resourcesHand } from "../preload sources/resources";
-
+import { resourcesHand } from "../preload sources/resourcesHand";
+import * as PIXI from 'pixi.js'
 
 export class interaction{
     isInUse = false;

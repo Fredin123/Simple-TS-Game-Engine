@@ -1,11 +1,11 @@
-import { resourcesHand } from "../../engine/preload sources/resources";
+import { resourcesHand } from "../../engine/preload sources/resourcesHand";
 import { cursorData } from "./cursor/cursorData";
 import { fileSystemHandlerObjects } from "./fileSystemHandlerObjects";
 import { fileSystemHandlerResources } from "./fileSystemHandlerResources";
 import { fileSystemHandlerRooms } from "./fileSystemHandlerRooms";
 import { handleCanvas } from "./canvasHandler/handleCanvas";
 import { mouseControls } from "./mouseControls";
-
+import * as PIXI from 'pixi.js'
 
 
 (function(){
@@ -36,8 +36,8 @@ function initializeProgram(){
     //canvasHandler.setFileSystemElement(filesHandlerObjects.getFileSystemElement()!);
 
     document.getElementById("saveButton")?.addEventListener("mouseup", (e: Event) => {
-        //tools.download("room.txt", canvasHandler.exportRoom());
         filesHandlerRooms.saveRoom(canvasHandler.exportRoom());
+        alert("Complete");
     }, false);
 
 

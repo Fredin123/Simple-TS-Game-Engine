@@ -140,8 +140,13 @@ export class canvasRenderer{
         this.counter++;
         this.haveSelectedFromHover = false;
         this.ctx?.clearRect(0, 0, this.canvas.width/this.canvasScaleX, this.canvas.height/this.canvasScaleY);
+        this.ctx!.fillStyle = (document.getElementById("backgroundColorInput") as HTMLInputElement).value;
+        this.ctx?.fillRect(0, 0, this.canvas.width/this.canvasScaleX, this.canvas.height/this.canvasScaleY);
+        this.ctx?.fill();
+
         this.drawGrid();
         this.drawObjects(mouseX, mouseY);
+        this.drawCameraBounds();
         this.drawMouse(mouseX, mouseY, cursor);
     }
 
@@ -210,7 +215,8 @@ export class canvasRenderer{
 
     private drawMouseOverSelection(obj: objectMetaData, mouseX: number, mouseY: number){
         if(this.layerHandler.isMouseInsideObject(obj, mouseX, mouseY) 
-        && this.haveSelectedFromHover == false){
+        && this.haveSelectedFromHover == false
+        && obj.isCombinationOfTiles == false){
             this.haveSelectedFromHover = true;
             let width = -1;
             let height = -1;
@@ -271,6 +277,23 @@ export class canvasRenderer{
             this.ctx?.stroke();
         }
 
+    }
+
+
+    private drawCameraBounds(){
+        let startXCam = parseInt((document.getElementById("cameraBoundsX") as HTMLInputElement).value);
+        let startYCam = parseInt((document.getElementById("cameraBoundsY") as HTMLInputElement).value);
+        let widthCam = parseInt((document.getElementById("cameraBoundsWidth") as HTMLInputElement).value);
+        let heightCam = parseInt((document.getElementById("cameraBoundsHeight") as HTMLInputElement).value);
+
+        if(startXCam != null && startYCam != null && widthCam != null && heightCam != null){
+            this.ctx!.strokeStyle = "red";
+            this.ctx!.lineWidth = 16;
+            this.ctx!.rect(startXCam + this.gridXOffset, startYCam + this.gridYOffset, 
+                widthCam, heightCam);
+            this.ctx!.stroke();
+        }
+        
     }
 
 

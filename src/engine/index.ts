@@ -1,7 +1,8 @@
 import { gameSettings } from "./gameSettings";
 import { gameRunner } from "./gameRunner";
 import { logger } from "./logger";
-import { resourcesHand } from "./preload sources/resources";
+import { resourcesHand } from "./preload sources/resourcesHand";
+import * as PIXI from 'pixi.js'
 
 
 (function(){

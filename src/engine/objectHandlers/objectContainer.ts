@@ -3,13 +3,18 @@ import { tools } from "../tools/tools";
 import { objectBase } from "./objectBase";
 import { nulliObject } from "./nulliObject";
 import { iObject } from "./iObject";
+import { gameCamera } from "../gameCamera";
+import { layer } from "../../shared/layer";
+import { roomLayer } from "./roomLayer";
+import * as PIXI from 'pixi.js'
 
 
 export class objectContainer{
     private specificObjects: {[key: string]: Array<objectBase>};
-    private layers: {[key: number]: Array<iObject>};
+    private layers: {[key: number]: roomLayer};
     private layerNames: {[key: string]: number} = {};
-    private layersContainer: {[key: number]: PIXI.Container} = {};
+    //private layersContainer: {[key: number]: PIXI.Container} = {};
+
     private layerKeysOrdered: Array<number> = [];
     private objectToRemoveBuffer: Array<iObject> = [];
     private objectToAddBuffer: Array<[objectBase, number]> = [];
@@ -25,10 +30,17 @@ export class objectContainer{
         this.layerKeysOrdered.length = 0;
     }
 
-    addContainerForLayer(container: PIXI.Container, layerNumber: number, layerName: string){
-        if(this.layersContainer[layerNumber] == null){
-            this.layersContainer[layerNumber] = container;
+    addContainerForLayer(container: PIXI.Container, layerNumber: number, layerName: string, scrollSpeedX: number, scrollSpeedY: number){
+        if(this.layerNames[layerNumber] == null){
             this.layerNames[layerName] = layerNumber;
+        }
+
+        if(this.layers[layerNumber] == null){
+            this.layers[layerNumber] = new roomLayer(layerName, layerNumber, container);
+            this.layers[layerNumber].scrollSpeedX = scrollSpeedX;
+            this.layers[layerNumber].scrollSpeedY = scrollSpeedY;
+            this.layerKeysOrdered.push(layerNumber);
+            this.layerKeysOrdered.sort();
         }
     }
 
@@ -40,17 +52,10 @@ export class objectContainer{
             this.specificObjects[objName] = new Array<objectBase>();
         }
         this.specificObjects[objName].push(obj);
-
-        //Add on specific layer
-        if(this.layers[targetlayer] == null){
-            this.layers[targetlayer] = new Array<objectBase>();
-            this.layerKeysOrdered.push(targetlayer);
-            this.layerKeysOrdered.sort();
-        }
         
-        this.layers[targetlayer].push(obj);
+        this.layers[targetlayer].objects.push(obj);
         if(hidden == false){
-            this.layersContainer[targetlayer].addChild(obj.g);
+            this.layers[targetlayer].graphicsContainer.addChild(obj.g);
         }
         
     }
@@ -84,10 +89,10 @@ export class objectContainer{
 
             this.layerKeysOrdered.forEach(layerNumber => { 
                 
-                for(let target of this.layers[layerNumber]){
+                for(let target of this.layers[layerNumber].objects){
                     if(target.ID == removeThis.ID){
                         target.g.destroy();
-                        this.layers[layerNumber].splice(this.layers[layerNumber].indexOf(target), 1);
+                        this.layers[layerNumber].objects.splice(this.layers[layerNumber].objects.indexOf(target), 1);
                         break;
                     }
                 }
@@ -119,11 +124,21 @@ export class objectContainer{
     loopThrough(logicModule: roomEvent){
         for(let x = 0; x<this.layerKeysOrdered.length; x++){
             let key = this.layerKeysOrdered[x];
-            for(var i=0; i<this.layers[key].length; i++){
-                this.layers[key][i].logic(logicModule);
+            for(var i=0; i<this.layers[key].objects.length; i++){
+                this.layers[key].objects[i].logic(logicModule);
             }
         }
-
-        
     }
+
+    updateLayerOffsets(camera: gameCamera, app: PIXI.Application){
+        for(let x = 0; x<this.layerKeysOrdered.length; x++){
+            //console.log("this.layerKeysOrdered[x]: ",this.layerKeysOrdered[x]);
+            //console.log("this.layers: ",this.layers[this.layerKeysOrdered[x]]);
+            //console.log("this.layersContainer[this.layerKeysOrdered[x]].x: ",this.layersContainer[this.layerKeysOrdered[x]].x, "  camera.getX(): ",camera.getX());
+            this.layers[this.layerKeysOrdered[x]].graphicsContainer.x = (-camera.getX() * (1-this.layers[this.layerKeysOrdered[x]].scrollSpeedX))/* - app.renderer.width/2*/;
+            //this.layersContainer[this.layerKeysOrdered[x]].y = camera.getY();
+        }
+    }
+
+
 }

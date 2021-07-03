@@ -4,6 +4,7 @@ import { iObject } from "./iObject";
 import { vector } from "../dataObjects/vector/vector";
 import { resourceMeta } from "../preload sources/resourceMeta";
 import { boxCollider } from "./collision/boxCollider";
+import * as PIXI from 'pixi.js'
 
 export class nulliObject implements iObject{
     isTile = false;

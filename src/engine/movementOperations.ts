@@ -15,21 +15,17 @@ export class movementOperations{
     static moveByForce(target: iObject, force: vector, collisionNames: string[], objContainer: objectContainer, deltaTime: number){
         force.Dx = force.Dx * deltaTime;
         force.Dy = force.Dy * deltaTime;
-        if(Math.abs(force.Dx) <= 0.01){
-            force.Dx = 0;
-        }
 
-        if(Math.abs(force.Dy) <= 0.01){
-            force.Dy = 0;
-        }
+
         let xdiff = force.Dx;
         let ydiff = force.Dy;
 
-        
         this.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
         
         
         this.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
+        
+        
         
 
         force.Dx *= target.airFriction;
@@ -105,7 +101,7 @@ export class movementOperations{
                 collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
             }
             
-            if(collisionTarget != objectBase.null){
+            if(collisionTarget != objectBase.null && target._isColliding_Special == false){
                 
                 sign *= -1;
                 target.g.x += 1*sign;

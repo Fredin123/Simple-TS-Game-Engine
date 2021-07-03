@@ -47,6 +47,7 @@ export class fileSystemHandlerResources{
             returnData.forEach(room => {
                 room[0] = room[0].substr(room[0].indexOf("resources"));
             });
+            returnData = returnData.filter(x => x.indexOf(".ogg") == -1 && x.indexOf(".wav") == -1);
             this.populateFileSystem(returnData);
         });
 

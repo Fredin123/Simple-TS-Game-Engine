@@ -7,6 +7,7 @@ import { objectContainer } from "./objectContainer";
 import { movementOperations } from "../movementOperations";
 import { iVector } from "../dataObjects/vector/iVector";
 import { nulliObject } from "./nulliObject";
+import * as PIXI from 'pixi.js'
 
 
 export interface iObject{

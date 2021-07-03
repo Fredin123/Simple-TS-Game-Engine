@@ -8,6 +8,7 @@ import { objectContainer } from "./objectHandlers/objectContainer";
 import { interaction } from "./text interaction/interaction";
 import { task } from "./tools/task";
 
+//declare var Howl: any;
 
 
 export class roomEvent {
@@ -30,6 +31,8 @@ export class roomEvent {
 
     interaction: interaction = new interaction();
 
+
+
     constructor(con: HTMLElement, objContainer: objectContainer, tasker: task){
         this.objContainer = objContainer;
         this.container = con;
@@ -39,6 +42,8 @@ export class roomEvent {
         this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
         document.addEventListener("keydown", this.keyDownListener.bind(this), false);
         document.addEventListener("keyup", this.keyUpListener.bind(this), false);
+
+
     }
 
     static tick(){
@@ -183,6 +188,8 @@ export class roomEvent {
         return colliding;
     }
     
+
+
 
 
 

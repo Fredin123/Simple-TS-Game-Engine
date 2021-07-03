@@ -1,9 +1,9 @@
-
+import * as PIXI from 'pixi.js'
 
 export class gameSettings{
     stretchToWindow: boolean = false;
     fixedCanvasWidth: number = 640;
-    fixedCanvasHeight: number = 640;
+    fixedCanvasHeight: number = 380;
     app: PIXI.Application | undefined;
 
     applySettings(a: PIXI.Application){
@@ -12,16 +12,16 @@ export class gameSettings{
 
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
         
-        if(this.stretchToWindow){
+        /*if(this.stretchToWindow){
             this.windowStretchListener();
             window.addEventListener("resize", this.windowStretchListener.bind(this));
-        }
+        }*/
     }
 
-    windowStretchListener(){
+    /*windowStretchListener(){
         if(this.stretchToWindow){
             this.app!.view.width = window.innerWidth;
             this.app!.view.height = window.innerHeight;
         }
-    }
+    }*/
 }

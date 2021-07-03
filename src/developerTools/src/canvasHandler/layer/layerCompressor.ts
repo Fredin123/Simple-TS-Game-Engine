@@ -4,6 +4,7 @@ import { subTileMeta } from "../../../../shared/tile/subTileMeta";
 import { tileAnimation } from "../../../../shared/tile/tileAnimation";
 import { tileSelector } from "../../tiles/tileSelector";
 import { layer } from "../../../../shared/layer";
+import { roomData } from "../../../../shared/roomData";
 
 declare var window: any;
 
@@ -19,7 +20,15 @@ export class layerCompressor{
             compressed.push(compressedLayer);
         });
 
-        return compressed;
+        let compressedRoom = new roomData(compressed);
+
+        compressedRoom.cameraBoundsX = parseInt((document.getElementById("cameraBoundsX") as HTMLInputElement).value);
+        compressedRoom.cameraBoundsY = parseInt((document.getElementById("cameraBoundsY") as HTMLInputElement).value);
+        compressedRoom.cameraBoundsWidth = parseInt((document.getElementById("cameraBoundsWidth") as HTMLInputElement).value);
+        compressedRoom.cameraBoundsHeight = parseInt((document.getElementById("cameraBoundsHeight") as HTMLInputElement).value);
+        compressedRoom.backgroundColor = (document.getElementById("backgroundColorInput") as HTMLInputElement).value;
+
+        return compressedRoom;
     }
 
 
@@ -27,6 +36,16 @@ export class layerCompressor{
         //get each static tile from the layer
         let compressedLayer: layer = new layer(l.layerName, l.zIndex);
         compressedLayer.hidden = l.hidden;
+        compressedLayer.scrollSpeedX = l.scrollSpeedX;
+        compressedLayer.scrollSpeedY = l.scrollSpeedY;
+        compressedLayer.settings = l.settings;
+
+        for(var d of l.metaObjectsInLayer){
+            if(d.tile != null){
+                d.isPartOfCombination = false;
+            }
+        }
+
         let staticTiles = l.metaObjectsInLayer.filter(t => t.tile != null && t.tile.tiles.length == 1);
         if(staticTiles.length > 0){
             let combinedStaticTiles = layerCompressor.combineStaticTilesIntoOne(staticTiles, roomName);

@@ -1,10 +1,18 @@
 #game{
-    border:solid 1px black;
+    border:solid 5px pink;
+}
+
+#gameContainer{
+    width: 100%;
+    display:flex;
+    border:solid 5px red;
+    justify-content: center;
 }
 
 body{
     padding: 0px;
     margin: 0px;
+    height:100%;
 }
 
 canvas{
@@ -13,4 +21,9 @@ canvas{
     image-rendering: -webkit-optimize-contrast;
     -ms-interpolation-mode: nearest-neighbor;
     image-rendering: pixelated;
+}
+
+html{
+    overflow: hidden;
+    height:100%;
 }
