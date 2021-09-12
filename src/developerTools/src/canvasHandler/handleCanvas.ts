@@ -5,6 +5,7 @@ import { layerContainer } from "./layer/layerContainer";
 import { objectMetaData } from "../objectMetaData";
 import { tileSelector } from "../tiles/tileSelector";
 import { canvasRenderer } from "./canvasRenderer";
+import { objectGenerator } from "../../../shared/objectGenerator";
 declare var LZString: any;
 declare var window : any;
 
@@ -20,8 +21,8 @@ export class handleCanvas{
     private cursor: cursorData;
     private resetCtrlGridKey: ReturnType<typeof setTimeout> | undefined;
     private canvasRenderPart: canvasRenderer;
-    
-    
+    private genObj = new objectGenerator();
+    private currentRoomName: string = "";
 
     constructor(canvasName:string, cursor: cursorData){
         this.cursor = cursor;
@@ -139,7 +140,7 @@ export class handleCanvas{
             
         }else if(cursorData.cursorType == cursorType.eraser && this.canvasRenderPart.layerHandler.selectedLayer != null){
             let objTarget = this.canvasRenderPart.layerHandler.getObjectAtPos(this.mouseXPosition, this.mouseYPosition);
-            this.canvasRenderPart.layerHandler.remomveObject(objTarget);
+            this.canvasRenderPart.layerHandler.removeObject(objTarget);
         }else if(cursorData.cursorType == cursorType.grabber){
             if(this.previousMouseX != -1 && this.previousMouseY != -1){
                 let dX = this.mouseXPosition - this.previousMouseX;
@@ -149,6 +150,24 @@ export class handleCanvas{
 
             this.previousMouseX = this.mouseXPosition;
             this.previousMouseY = this.mouseYPosition;
+        }else if(cursorData.cursorType == cursorType.editor && this.canvasRenderPart.layerHandler.selectedLayer != null){
+            var objTarget = this.canvasRenderPart.layerHandler.getObjectAtPos(this.mouseXPosition, this.mouseYPosition);
+            if(objTarget != null){
+                let inputTemplate = this.genObj.generateObject(objTarget.name, 0, 0, null, "").inputTemplate;
+                let inputString = objTarget.inputString;
+                if(inputString == ""){
+                    inputString = inputTemplate;
+                }
+                
+                window.node.promptDefaultText("Input string for object:", inputString, (text: string | null) => {
+                    if(text != null){
+                        if(objTarget != null){
+                            objTarget.inputString = text;
+                        }
+                    }
+                });
+            }
+            
         }
 
         
@@ -158,10 +177,9 @@ export class handleCanvas{
 
     
 
-    
-
 
     importRoom(roomName: string, jsonString: string){
+        this.currentRoomName = roomName;
         this.canvasRenderPart.layerHandler.importRoom(roomName, jsonString);
     }
 

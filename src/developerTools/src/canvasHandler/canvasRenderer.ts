@@ -1,9 +1,10 @@
 import { layer } from "../../../shared/layer";
 import { layerContainer } from "./layer/layerContainer";
 import { objectMetaData } from "../objectMetaData";
-import { tileSelector } from "../tiles/tileSelector";
 import { cursorData } from "../cursor/cursorData";
 import { cursorType } from "../cursor/cursorType";
+import { fileSystemHandlerObjects } from "../fileSystemHandlerObjects";
+import { resourcesTiles } from "../tiles/resourcesTiles";
 
 
 
@@ -31,7 +32,7 @@ export class canvasRenderer{
 
     container: HTMLElement | null;
 
-    static classAndImage: Record<string, HTMLImageElement> = {};
+    
 
     private counter: number = 0;
     haveSelectedFromHover: boolean = false;
@@ -159,13 +160,13 @@ export class canvasRenderer{
                 layer.metaObjectsInLayer.forEach(meta => {
                     if(meta.tile == null){
                         
-                        if(canvasRenderer.classAndImage[meta.name] != null){
-                            if(canvasRenderer.classAndImage[meta.name].complete){
+                        if(fileSystemHandlerObjects.classAndImage[meta.name] != null){
+                            if(fileSystemHandlerObjects.classAndImage[meta.name].complete){
                                 if(this.layerHandler.selectedLayer!.layerName == layer.layerName){
                                     this.drawMouseOverSelection(meta, mouseX, mouseY);
                                 }
                                 
-                                    this.ctx?.drawImage(canvasRenderer.classAndImage[meta.name], 
+                                    this.ctx?.drawImage(fileSystemHandlerObjects.classAndImage[meta.name], 
                                         meta.x + this.gridXOffset, 
                                         meta.y + this.gridYOffset);
                             }
@@ -187,8 +188,8 @@ export class canvasRenderer{
                             this.drawMouseOverSelection(meta, mouseX, mouseY);
                         }
                         
-                        if(tileSelector.resourceNameAndImage[tileToDraw.resourceName] != null){
-                            this.ctx?.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], 
+                        if(resourcesTiles.resourceNameAndImage[tileToDraw.resourceName] != null){
+                            this.ctx?.drawImage(resourcesTiles.resourceNameAndImage[tileToDraw.resourceName], 
                                 tileToDraw.startX, 
                                 tileToDraw.startY, 
                                 tileToDraw.width, 
@@ -224,9 +225,9 @@ export class canvasRenderer{
                 width = obj.tile.get(this.counter).width;
                 height = obj.tile.get(this.counter).height;
             }else{
-                if(canvasRenderer.classAndImage[obj.name] != null){
-                    width = canvasRenderer.classAndImage[obj.name].width;
-                    height = canvasRenderer.classAndImage[obj.name].height;
+                if(fileSystemHandlerObjects.classAndImage[obj.name] != null){
+                    width = fileSystemHandlerObjects.classAndImage[obj.name].width;
+                    height = fileSystemHandlerObjects.classAndImage[obj.name].height;
                 }else{
                     width = 98;
                     height = 98;
@@ -332,8 +333,8 @@ export class canvasRenderer{
                 if(cursor.currentSubTile.get(0) == undefined){
                     console.log("can't get first image from tile: ", cursor.currentSubTile);
                 }
-                if(tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName] != null){
-                    let image = tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
+                if(resourcesTiles.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName] != null){
+                    let image = resourcesTiles.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
                     this.ctx?.drawImage(image, cursor.currentSubTile.get(0).startX, 
                         cursor.currentSubTile.get(0).startY, 
                         cursor.currentSubTile.get(0).width, 
@@ -343,7 +344,7 @@ export class canvasRenderer{
                         cursor.currentSubTile.get(0).height);
                 }else{
                     console.log("Can't find resource ",cursor.currentSubTile.get(0).resourceName);
-                    console.log("In resource pool: ",tileSelector.resourceNameAndImage);
+                    console.log("In resource pool: ",resourcesTiles.resourceNameAndImage);
                 }
                 
             }

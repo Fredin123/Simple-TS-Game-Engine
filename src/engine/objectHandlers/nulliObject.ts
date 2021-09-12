@@ -21,14 +21,13 @@ export class nulliObject implements iObject{
     ID: string = "";
     g: PIXI.Graphics = new PIXI.Graphics();
     _collisionBox: boxCollider = new boxCollider(0, 0, 0, 0);
-    resourcesNeeded: string[] = [];
     _objectName: string = "nulliObject";
     collisionTargets: string[] = [];
     moveCollisionTargets: Array<string> = [];
     force: vector = new vector(0, 0);
+    exportedString: string = "";
     _hasBeenMoved_Tick: number = 0;
     _isColliding_Special: boolean = false;
-    percentage: number = 0;
 
     constructor(xp: number, yp: number) {
 

@@ -1,6 +1,307 @@
 (function (PIXI) {
     'use strict';
 
+    var calculations = /** @class */ (function () {
+        function calculations() {
+        }
+        calculations.degreesToRadians = function (degrees) {
+            return degrees * (calculations.PI / 180);
+        };
+        calculations.radiansToDegrees = function (radians) {
+            return radians * (180 / calculations.PI);
+        };
+        calculations.roundToNDecimals = function (value, nDecimal) {
+            return Math.round((value) * Math.pow(10, nDecimal)) / Math.pow(10, nDecimal);
+        };
+        calculations.getShortestDeltaBetweenTwoRadians = function (rad1, rad2) {
+            rad1 *= 180 / calculations.PI;
+            rad2 *= 180 / calculations.PI;
+            var raw_diff = rad1 > rad2 ? rad1 - rad2 : rad2 - rad1;
+            var mod_diff = raw_diff % 360;
+            var dist = mod_diff > 180.0 ? 360.0 - mod_diff : mod_diff;
+            return dist;
+        };
+        calculations.flippedSin = function (delta) {
+            return Math.sin(delta + calculations.PI /*We need to flip sin since our coordinate system Y goes from 0 to positive numbers when you do down*/);
+        };
+        calculations.getRandomInt = function (min, max) {
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        };
+        calculations.PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
+        calculations.EPSILON = 8.8541878128;
+        return calculations;
+    }());
+
+    var resourcesHand = /** @class */ (function () {
+        function resourcesHand(app, onCompleteCallback, alternativePath) {
+            if (alternativePath === void 0) { alternativePath = ""; }
+            resourcesHand.app = app;
+            PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+            fetch(alternativePath + '/resources.txt', {
+                method: 'get'
+            })
+                .then(function (response) { return response.text(); })
+                .then(function (textData) { return resourcesHand.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
+                .catch(function (err) {
+                console.log("err: " + err);
+            });
+        }
+        resourcesHand.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
+            resourcesHand.resourcesToLoad = loadedResources;
+            var audioToLoad = loadedResources.filter(function (x) { return x.indexOf(".wav") != -1 || x.indexOf(".ogg") != -1; });
+            resourcesHand.loadAudio(audioToLoad);
+            loadedResources = loadedResources.filter(function (x) { return x.indexOf(".mp4") != -1 || x.indexOf(".json") != -1 || (x.indexOf(".png") != -1 && loadedResources.indexOf(x.replace(".png", ".json")) == -1); });
+            resourcesHand.resourcesToLoad.forEach(function (resourceDir) {
+                var resourceDirsSplit = resourceDir.split("/");
+                var resourceName = resourceDirsSplit[resourceDirsSplit.length - 1];
+                resourcesHand.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
+            });
+            resourcesHand.app.loader.load(function (e) {
+                resourcesHand.resourcesToLoad.forEach(function (resource) {
+                    var split = resource.split("/");
+                    var name = split[split.length - 1];
+                    if (name.indexOf(".json") != -1) {
+                        resourcesHand.storeAnimatedArray(name);
+                    }
+                    else if (split[0] == "_generated_tiles") {
+                        resourcesHand.storeStaticTile(name);
+                    }
+                    else if (split[0] == "tiles") {
+                        resourcesHand.storeStaticTile(name);
+                    }
+                    else if (name.indexOf(".png") != -1) {
+                        resourcesHand.storeStaticTile(name);
+                    }
+                    else if (name.indexOf(".mp4") != -1) {
+                        resourcesHand.storeVideoAsAnimatedTexture("resources/" + resource, name);
+                    }
+                });
+                onCompleteCallback();
+            });
+        };
+        resourcesHand.loadAudio = function (audioFiles) {
+            for (var _i = 0, audioFiles_1 = audioFiles; _i < audioFiles_1.length; _i++) {
+                var audioToLoad = audioFiles_1[_i];
+                var dirParts = audioToLoad.split("/");
+                resourcesHand.audio[dirParts[dirParts.length - 1]] = new Howl({
+                    src: ['resources/' + audioToLoad]
+                });
+            }
+        };
+        resourcesHand.playAudio = function (name) {
+            resourcesHand.audio[name].play();
+        };
+        resourcesHand.playAudioVolume = function (name, volume) {
+            resourcesHand.audio[name].volume(volume);
+            resourcesHand.audio[name].play();
+        };
+        resourcesHand.playRandomAudio = function (names) {
+            resourcesHand.audio[names[calculations.getRandomInt(0, names.length - 1)]].play();
+        };
+        resourcesHand.generateAnimatedTiles = function (animationMeta) {
+            if (resourcesHand.animatedSprite[animationMeta.name] == null) {
+                resourcesHand.animatedSprite[animationMeta.name] = [];
+            }
+            for (var _i = 0, _a = animationMeta.tiles; _i < _a.length; _i++) {
+                var tile = _a[_i];
+                var parts = tile.resourceName.split("/");
+                var newTex = new PIXI.Texture(resourcesHand.app.loader.resources[parts[parts.length - 1]].texture.baseTexture, new PIXI.Rectangle(tile.startX, tile.startY, tile.width, tile.height));
+                resourcesHand.animatedSprite[animationMeta.name].push(newTex);
+            }
+        };
+        resourcesHand.storeStaticTile = function (genName) {
+            var texturesTmp = resourcesHand.app.loader.resources[genName].texture;
+            if (texturesTmp != null) {
+                resourcesHand.staticTile[genName] = texturesTmp;
+            }
+            else {
+                throw new Error("Can't create static tile resource for: " + genName);
+            }
+        };
+        resourcesHand.storeAnimatedArray = function (resourceName) {
+            var texturesTmp = resourcesHand.app.loader.resources[resourceName].textures;
+            if (resourcesHand.app.loader.resources[resourceName].textures != null) {
+                for (var key in texturesTmp) {
+                    if (texturesTmp.hasOwnProperty(key)) {
+                        if (resourcesHand.animatedSprite[resourceName] == null) {
+                            resourcesHand.animatedSprite[resourceName] = [];
+                        }
+                        resourcesHand.animatedSprite[resourceName].push(texturesTmp[key]);
+                    }
+                }
+            }
+            //const animeFromSheet = new PIXI.AnimatedSprite(animation);
+        };
+        resourcesHand.storeVideoAsAnimatedTexture = function (resourcelocation, resourceName) {
+            /*const texture = PIXI.Texture.from(resourcelocation);
+
+            var textVid = new PIXI.AnimatedSprite(texture);
+
+
+            if(resourcesHand.animatedSprite[resourceName] == null){
+                resourcesHand.animatedSprite[resourceName] = [];
+            }
+            resourcesHand.animatedSprite[resourceName].push(textVid);*/
+            console.log("After adding video texture: ", resourcesHand.animatedSprite[resourceName]);
+        };
+        resourcesHand.getAnimatedSprite = function (name) {
+            if (name.indexOf(".mp4") == -1) {
+                if (name.indexOf(".") != -1) {
+                    name = name.split(".")[0];
+                }
+                name += ".json";
+            }
+            if (resourcesHand.animatedSprite[name] != null) {
+                return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
+            }
+            //console.log("Wanted to find this animated sprite: ",name);
+            //console.log("In this resource pool: ",resourcesHand.animatedSprite);
+            return null;
+        };
+        resourcesHand.getAnimatedTile = function (name) {
+            if (resourcesHand.animatedSprite[name] != null) {
+                return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
+            }
+            console.log("Wanted to find this animated sprite: ", name);
+            console.log("In this resource pool: ", resourcesHand.animatedSprite);
+            return null;
+        };
+        resourcesHand.getStaticTile = function (genName) {
+            return new PIXI.Sprite(resourcesHand.staticTile[genName]);
+        };
+        resourcesHand.resourcePNG = function (resourceName) {
+            for (var _i = 0, _a = resourcesHand.resourcesToLoad; _i < _a.length; _i++) {
+                var resourceDir = _a[_i];
+                var splitDirs = resourceDir.split("/");
+                var nameAndMeta = splitDirs[splitDirs.length - 1];
+                if (nameAndMeta.toLocaleLowerCase().indexOf(".png") != -1) {
+                    nameAndMeta.split(".")[0];
+                    if (nameAndMeta == resourceName + ".png") {
+                        return resourcesHand.app.loader.resources[nameAndMeta].texture;
+                    }
+                }
+            }
+            throw new Error("PNG resource does not exist: " + resourceName);
+        };
+        resourcesHand.resourcesToLoad = [];
+        resourcesHand.animatedSprite = {};
+        resourcesHand.staticTile = {};
+        resourcesHand.audio = {};
+        return resourcesHand;
+    }());
+
+    var cursorType;
+    (function (cursorType) {
+        cursorType[cursorType["pensil"] = 0] = "pensil";
+        cursorType[cursorType["eraser"] = 1] = "eraser";
+        cursorType[cursorType["grabber"] = 2] = "grabber";
+        cursorType[cursorType["editor"] = 3] = "editor";
+    })(cursorType || (cursorType = {}));
+
+    var cursorData = /** @class */ (function () {
+        function cursorData() {
+            this.objectSelected = null;
+            this.currentSubTile = null;
+            var buttonsContainer = document.getElementById("idCursorTypeContainer");
+            var enumKeys = Object.keys(cursorType);
+            for (var _i = 0, enumKeys_1 = enumKeys; _i < enumKeys_1.length; _i++) {
+                var enumKey = enumKeys_1[_i];
+                var typeButton = document.createElement("button");
+                typeButton.className = "cursorButton";
+                if (cursorType[enumKey] == cursorData.cursorType) {
+                    typeButton.className = "cursorButtonSelected";
+                }
+                typeButton.innerHTML = enumKey;
+                typeButton.addEventListener("mouseup", function (e) {
+                    var allButtons = document.getElementsByClassName("cursorButtonSelected");
+                    for (var i = 0; i < allButtons.length; i++) {
+                        allButtons[i].className = "cursorButton";
+                    }
+                    var target = e.target;
+                    var key = target.innerHTML;
+                    target.className = "cursorButtonSelected";
+                    cursorData.cursorType = cursorType[key];
+                });
+                buttonsContainer === null || buttonsContainer === void 0 ? void 0 : buttonsContainer.appendChild(typeButton);
+            }
+        }
+        cursorData.cursorType = cursorType.pensil;
+        return cursorData;
+    }());
+
+    var tools = /** @class */ (function () {
+        function tools() {
+        }
+        /*download(filename: string, text:string) {
+            var element = document.createElement('a');
+            console.log(text)
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
+            element.setAttribute('download', filename);
+          
+            element.style.display = 'none';
+            document.body.appendChild(element);
+          
+            element.click();
+          
+            document.body.removeChild(element);
+        }*/
+        tools.download = function (filename, text, type) {
+            if (type === void 0) { type = "text/plain"; }
+            // Create an invisible A element
+            var a = document.createElement("a");
+            a.style.display = "none";
+            document.body.appendChild(a);
+            // Set the HREF to a Blob representation of the data to be downloaded
+            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
+            // Use download attribute to set set desired file name
+            a.setAttribute("download", filename);
+            // Trigger the download by simulating click
+            a.click();
+            // Cleanup
+            window.URL.revokeObjectURL(a.href);
+            document.body.removeChild(a);
+        };
+        tools.upload = function (callback) {
+            var _this = this;
+            var element = document.createElement("input");
+            element.type = "file";
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.onchange = function (e) {
+                _this.uploadOnChange(e, callback);
+            };
+            element.click();
+        };
+        tools.getClassNameFromConstructorName = function (constructorName) {
+            var funcNameOnly = constructorName.replace("function ", "");
+            var paramsStartIndex = funcNameOnly.indexOf("(");
+            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
+            return funcNameOnly;
+        };
+        tools.functionName = function (func) {
+            console.log(func.toString());
+            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
+            return result ? result[1] : ''; // for an anonymous function there won't be a match
+        };
+        tools.uploadOnChange = function (e, callback) {
+            var ev = e;
+            console.log(ev.target.files);
+            var reader = new FileReader();
+            reader.readAsText(ev.target.files[0], "UTF-8");
+            reader.onload = function (evt) {
+                var _a, _b;
+                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
+                callback(LZString.decompressFromEncodedURIComponent(t));
+            };
+            reader.onerror = function (evt) {
+                alert("Could not read file");
+            };
+        };
+        return tools;
+    }());
+
     /*! *****************************************************************************
     Copyright (c) Microsoft Corporation.
 
@@ -39,38 +340,30 @@
 
       d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     }
+    /** @deprecated */
 
-    var calculations = /** @class */ (function () {
-        function calculations() {
+    function __spreadArrays() {
+      for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
+
+      for (var r = Array(s), k = 0, i = 0; i < il; i++) for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++) r[k] = a[j];
+
+      return r;
+    }
+
+    var internalFunction = /** @class */ (function () {
+        function internalFunction() {
         }
-        calculations.degreesToRadians = function (degrees) {
-            return degrees * (calculations.PI / 180);
+        internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
+            var x1 = initiator.g.x + initiadorCollisionBox.x;
+            var y1 = initiator.g.y + initiadorCollisionBox.y;
+            var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
+            var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
+            return (x1 < x2 + collisionTarget.collisionBox.width &&
+                x1 + initiadorCollisionBox.width > x2 &&
+                y1 < y2 + collisionTarget.collisionBox.height &&
+                y1 + initiadorCollisionBox.height > y2);
         };
-        calculations.radiansToDegrees = function (radians) {
-            return radians * (180 / calculations.PI);
-        };
-        calculations.roundToNDecimals = function (value, nDecimal) {
-            return Math.round((value) * Math.pow(10, nDecimal)) / Math.pow(10, nDecimal);
-        };
-        calculations.getShortestDeltaBetweenTwoRadians = function (rad1, rad2) {
-            rad1 *= 180 / calculations.PI;
-            rad2 *= 180 / calculations.PI;
-            var raw_diff = rad1 > rad2 ? rad1 - rad2 : rad2 - rad1;
-            var mod_diff = raw_diff % 360;
-            var dist = mod_diff > 180.0 ? 360.0 - mod_diff : mod_diff;
-            return dist;
-        };
-        calculations.flippedSin = function (delta) {
-            return Math.sin(delta + calculations.PI /*We need to flip sin since our coordinate system Y goes from 0 to positive numbers when you do down*/);
-        };
-        calculations.getRandomInt = function (min, max) {
-            min = Math.ceil(min);
-            max = Math.floor(max);
-            return Math.floor(Math.random() * (max - min + 1)) + min;
-        };
-        calculations.PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
-        calculations.EPSILON = 8.8541878128;
-        return calculations;
+        return internalFunction;
     }());
 
     var nullVector = /** @class */ (function () {
@@ -215,544 +508,6 @@
         return uidGen;
     }());
 
-    var internalFunction = /** @class */ (function () {
-        function internalFunction() {
-        }
-        internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
-            var x1 = initiator.g.x + initiadorCollisionBox.x;
-            var y1 = initiator.g.y + initiadorCollisionBox.y;
-            var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
-            var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
-            return (x1 < x2 + collisionTarget.collisionBox.width &&
-                x1 + initiadorCollisionBox.width > x2 &&
-                y1 < y2 + collisionTarget.collisionBox.height &&
-                y1 + initiadorCollisionBox.height > y2);
-        };
-        return internalFunction;
-    }());
-
-    var brain = /** @class */ (function () {
-        function brain() {
-        }
-        brain.angleBetweenPoints = function (dx, dy) {
-            return Math.atan2(dy, dx) + Math.PI;
-        };
-        brain.distanceBetweenPoints = function (x1, y1, x2, y2) {
-            return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
-        };
-        return brain;
-    }());
-
-    var gameCamera = /** @class */ (function () {
-        function gameCamera() {
-            this.isInUse = true;
-            this.cameraX = 0;
-            this.cameraY = 0;
-            this.camMovementSpeedX = 0.08;
-            this.camMovementSpeedY = 0.08;
-            this.targetX = 0;
-            this.targetY = 0;
-            this.cameraOffsetX = 0;
-            this.cameraOffsetY = 0;
-        }
-        gameCamera.prototype.getIsInUse = function () {
-            return this.isInUse;
-        };
-        gameCamera.prototype.getX = function () {
-            return this.cameraX;
-        };
-        gameCamera.prototype.getY = function () {
-            return this.cameraY;
-        };
-        gameCamera.prototype.moveCamera = function (app, cameraBounds) {
-            var angle = brain.angleBetweenPoints((this.cameraX - this.targetX), (this.cameraY - this.targetY));
-            var distance = brain.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
-            this.cameraX += Math.cos(angle) * distance * this.camMovementSpeedX;
-            this.cameraY += Math.sin(angle) * distance * this.camMovementSpeedY;
-            this.cameraX = Math.floor(this.cameraX);
-            this.cameraY = Math.floor(this.cameraY);
-            if (cameraBounds[0] + cameraBounds[1] + cameraBounds[2] + cameraBounds[3] != 0) {
-                if (this.cameraX - (app.renderer.width / 2) < cameraBounds[0]) {
-                    this.cameraX = cameraBounds[0] + (app.renderer.width / 2);
-                }
-                if (this.cameraX + (app.renderer.width / 2) > cameraBounds[0] + cameraBounds[2]) {
-                    this.cameraX = cameraBounds[0] + cameraBounds[2] - (app.renderer.width / 2);
-                }
-                if (this.cameraY - (app.renderer.height / 2) < cameraBounds[1]) {
-                    this.cameraY = cameraBounds[1] + (app.renderer.height / 2);
-                }
-                if (this.cameraY + (app.renderer.height / 2) > cameraBounds[1] + cameraBounds[3]) {
-                    this.cameraY = cameraBounds[1] + cameraBounds[3] - (app.renderer.height / 2);
-                }
-            }
-        };
-        gameCamera.prototype.setMoveSpeedX = function (moveSpeed) {
-            this.camMovementSpeedX = moveSpeed;
-        };
-        gameCamera.prototype.setMoveSpeedY = function (moveSpeed) {
-            this.camMovementSpeedY = moveSpeed;
-        };
-        gameCamera.prototype.setTarget = function (tx, ty) {
-            this.targetX = tx;
-            this.targetY = ty;
-        };
-        return gameCamera;
-    }());
-
-    var interaction = /** @class */ (function () {
-        function interaction() {
-            this.isInUse = false;
-            this.inputContainer = new PIXI.Container();
-        }
-        interaction.prototype.openText = function (text) {
-            this.isInUse = true;
-            var newAnimation = resourcesHand.getStaticTile("panel_1");
-            if (newAnimation != null) {
-                this.inputContainer.addChild(newAnimation);
-            }
-        };
-        return interaction;
-    }());
-
-    //declare var Howl: any;
-    var roomEvent = /** @class */ (function () {
-        function roomEvent(con, objContainer, tasker) {
-            this.mouseXPosition = 0;
-            this.mouseYPosition = 0;
-            this.keysDown = {};
-            this.gameKeysPressed = {};
-            this.gameKeysReleased = {};
-            this.gameKeysHeld = {};
-            this.deltaTime = 1;
-            this.camera = new gameCamera();
-            this.interaction = new interaction();
-            this.objContainer = objContainer;
-            this.container = con;
-            this.tasker = tasker;
-            this.keysDown = {};
-            this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
-            document.addEventListener("keydown", this.keyDownListener.bind(this), false);
-            document.addEventListener("keyup", this.keyUpListener.bind(this), false);
-        }
-        roomEvent.tick = function () {
-            if (roomEvent.ticks >= Number.MAX_VALUE) {
-                roomEvent.ticks = 0;
-            }
-            roomEvent.ticks++;
-        };
-        roomEvent.getTicks = function () {
-            return this.ticks;
-        };
-        roomEvent.prototype.queryKey = function () {
-            //Reset pressed keys
-            for (var key in this.gameKeysPressed) {
-                if (this.gameKeysPressed.hasOwnProperty(key)) {
-                    this.gameKeysPressed[key] = false;
-                }
-            }
-            for (var key in this.gameKeysReleased) {
-                if (this.gameKeysReleased.hasOwnProperty(key)) {
-                    this.gameKeysReleased[key] = false;
-                }
-            }
-            for (var key in this.keysDown) {
-                if (this.keysDown.hasOwnProperty(key)) {
-                    if (this.keysDown[key] && (this.gameKeysPressed[key] == undefined || this.gameKeysPressed[key] == false) && (this.gameKeysHeld[key] == undefined || this.gameKeysHeld[key] == false)) {
-                        this.gameKeysPressed[key] = true;
-                        this.gameKeysHeld[key] = true;
-                    }
-                    else if (this.keysDown[key] == false && this.gameKeysHeld[key] == true) {
-                        this.gameKeysPressed[key] = false;
-                        this.gameKeysHeld[key] = false;
-                        this.gameKeysReleased[key] = true;
-                    }
-                }
-            }
-        };
-        roomEvent.prototype.mouseMoveListener = function (e) {
-            var x = e.clientX; //x position within the element.
-            var y = e.clientY; //y position within the element.
-            if (e.target instanceof Element) {
-                var rect = e.target.getBoundingClientRect();
-                x -= rect.left;
-                y -= rect.top;
-            }
-            this.mouseXPosition = x;
-            this.mouseYPosition = y;
-        };
-        roomEvent.prototype.keyDownListener = function (e) {
-            this.keysDown[e.key] = true;
-        };
-        roomEvent.prototype.keyUpListener = function (e) {
-            this.keysDown[e.key] = false;
-        };
-        roomEvent.prototype.resetKeyPressedStates = function () {
-            this.keysDown = {};
-        };
-        //Get keys--------------------
-        roomEvent.prototype.checkKeyPressed = function (keyCheck) {
-            return this.gameKeysPressed[keyCheck];
-        };
-        roomEvent.prototype.checkKeyReleased = function (keyCheck) {
-            return this.gameKeysReleased[keyCheck];
-        };
-        roomEvent.prototype.checkKeyHeld = function (keyCheck) {
-            return this.gameKeysHeld[keyCheck];
-        };
-        roomEvent.prototype.mouseX = function () {
-            return this.mouseXPosition;
-        };
-        roomEvent.prototype.mouseY = function () {
-            return this.mouseYPosition;
-        };
-        roomEvent.prototype.foreachObjectTypeBoolean = function (type, func) {
-            var specificObjects = this.objContainer.getSpecificObjects(type);
-            specificObjects.forEach(function (element) {
-                if (element.objectName == type) {
-                    if (func(element)) {
-                        return true;
-                    }
-                }
-            });
-            return false;
-        };
-        roomEvent.prototype.foreachObjectType = function (type, func) {
-            var returnResult = new Array();
-            var specificObjects = this.objContainer.getSpecificObjects(type);
-            if (specificObjects != null) {
-                specificObjects.forEach(function (element) {
-                    if (element.objectName == type) {
-                        if (func(element)) {
-                            returnResult.push(element);
-                        }
-                    }
-                });
-            }
-            return returnResult;
-        };
-        roomEvent.prototype.isCollidingWith = function (colSource, colSourceCollisionBox, colTargetType) {
-            var colliding = null;
-            this.objContainer.foreachObjectType(colTargetType, function (obj) {
-                if (internalFunction.intersecting(colSource, colSourceCollisionBox, obj)) {
-                    colliding = obj;
-                    return true;
-                }
-                return false;
-            });
-            return colliding;
-        };
-        roomEvent.prototype.isCollidingWithMultiple = function (colSource, colSourceCollisionBox, colTargetType) {
-            var colliding = [];
-            this.objContainer.foreachObjectType(colTargetType, function (obj) {
-                if (internalFunction.intersecting(colSource, colSourceCollisionBox, obj)) {
-                    colliding.push(obj);
-                }
-                return false;
-            });
-            return colliding;
-        };
-        roomEvent.ticks = 0;
-        return roomEvent;
-    }());
-
-    var movementOperations = /** @class */ (function () {
-        function movementOperations() {
-        }
-        movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
-            force.Dx = force.Dx * deltaTime;
-            force.Dy = force.Dy * deltaTime;
-            var xdiff = force.Dx;
-            var ydiff = force.Dy;
-            this.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
-            this.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
-            force.Dx *= target.airFriction;
-            force.Dy *= target.airFriction;
-            if (target.gravity != vector.null) {
-                force.Dx += target.gravity.Dx;
-                force.Dy += target.gravity.Dy;
-                target.gravity.increaseMagnitude(target.weight);
-            }
-        };
-        movementOperations.moveForceHorizontal = function (magnitude, target, collisionNames, objContainer) {
-            var _this = this;
-            if (magnitude == 0)
-                return;
-            var sign = magnitude > 0 ? 1 : -1;
-            var objectsThatWereCollidingThisObjectWhileMoving = new Array();
-            var collisionTarget = objectBase.null;
-            var _loop_1 = function (i) {
-                objectsThatWereCollidingThisObjectWhileMoving.length = 0;
-                target.g.x += sign;
-                if (objectBase.objectsThatCollideWith[target.objectName] != null) {
-                    //Push object
-                    objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                        if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                            collisionTarget = _this.pushObjectHorizontal(target, testCollisionWith, sign, objContainer);
-                            if (collisionTarget == objectBase.null) {
-                                target.force.Dx *= 1 - testCollisionWith.weight;
-                            }
-                        }
-                        return false;
-                    });
-                    //Sticky draging
-                    var stickyCheck_1 = boxCollider.copy(target.collisionBox);
-                    var checkDistance_1 = Math.abs(magnitude) + 2;
-                    if (target.stickyTop) {
-                        stickyCheck_1.expandTop(checkDistance_1);
-                    }
-                    if (target.stickyBottom) {
-                        stickyCheck_1.expandBottom(checkDistance_1);
-                    }
-                    if (target.stickyTop || target.stickyBottom) {
-                        //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
-                        objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                            if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
-                                if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.x += sign;
-                                    if (i >= Math.abs(magnitude) - 1) {
-                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                    }
-                                }
-                            }
-                            return false;
-                        });
-                    }
-                }
-                if (collisionTarget == objectBase.null) {
-                    collisionTarget = this_1.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
-                }
-                if (collisionTarget != objectBase.null && target._isColliding_Special == false) {
-                    sign *= -1;
-                    target.g.x += 1 * sign;
-                    objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.x += 1 * sign;
-                    });
-                    target.force.Dx = 0;
-                    var distance = 0;
-                    if (sign <= 0) {
-                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, 0);
-                    }
-                    else {
-                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI);
-                    }
-                    if (distance < 90) {
-                        target.gravity.Dy *= distance / 90;
-                        target.gravity.Dx *= 1 - (distance / 90);
-                    }
-                    target.force.Dy *= collisionTarget.friction;
-                    return "break";
-                }
-            };
-            var this_1 = this;
-            for (var i = 0; i < Math.abs(magnitude); i += 1) {
-                var state_1 = _loop_1(i);
-                if (state_1 === "break")
-                    break;
-            }
-            //Sticky draging
-            var stickyCheck = boxCollider.copy(target.collisionBox);
-            var checkDistance = Math.abs(magnitude) + 2;
-            if (target.stickyLeftSide) {
-                stickyCheck.expandLeftSide(checkDistance);
-            }
-            if (target.stickyRightSide) {
-                stickyCheck.expandRightSide(checkDistance);
-            }
-            if (target.stickyLeftSide || target.stickyRightSide) {
-                objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                    if (sign > 0) {
-                        //Moving right
-                        if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
-                            testCollisionWith.g.x = target.g.x - testCollisionWith.collisionBox.x - testCollisionWith.collisionBox.width;
-                        }
-                    }
-                    else {
-                        //Moving left
-                        if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
-                            testCollisionWith.g.x = target.g.x + target.collisionBox.x + target.collisionBox.width - testCollisionWith.collisionBox.x;
-                        }
-                    }
-                    return false;
-                });
-            }
-        };
-        movementOperations.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
-            var _this = this;
-            if (magnitude == 0)
-                return;
-            var sign = magnitude > 0 ? 1 : -1;
-            var objectsThatWereCollidingThisObjectWhileMoving = new Array();
-            var collisionTarget = objectBase.null;
-            var _loop_2 = function (i) {
-                target.g.y += sign;
-                if (objectBase.objectsThatCollideWith[target.objectName] != null) {
-                    //Moving objects
-                    objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                        if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                            collisionTarget = _this.pushObjectVertical(target, testCollisionWith, sign, objContainer);
-                            if (collisionTarget == objectBase.null) {
-                                target.force.Dy *= 1 - testCollisionWith.weight;
-                            }
-                        }
-                        return false;
-                    });
-                    //Sticky draging
-                    var stickyCheck_2 = boxCollider.copy(target.collisionBox);
-                    var checkDistance_2 = Math.abs(magnitude) + 2;
-                    if (target.stickyLeftSide) {
-                        stickyCheck_2.expandLeftSide(checkDistance_2);
-                    }
-                    if (target.stickyRightSide) {
-                        stickyCheck_2.expandRightSide(checkDistance_2);
-                    }
-                    if (target.stickyLeftSide || target.stickyRightSide) {
-                        //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
-                        objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                            if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
-                                if (testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()) {
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.y += sign;
-                                    if (i >= Math.abs(magnitude) - 1) {
-                                        testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
-                                    }
-                                }
-                            }
-                            return false;
-                        });
-                    }
-                }
-                //This has to be more optimized
-                if (collisionTarget == objectBase.null) {
-                    collisionTarget = this_2.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
-                }
-                if (collisionTarget != objectBase.null) {
-                    sign *= -1;
-                    target.g.y += sign;
-                    objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.y += sign;
-                    });
-                    target.force.Dy = 0;
-                    var distance = 0;
-                    if (sign >= 0) {
-                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI / 2);
-                    }
-                    else {
-                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI + (calculations.PI / 2));
-                    }
-                    if (distance < 90) {
-                        target.gravity.Dy *= distance / 90;
-                        target.gravity.Dx *= 1 - (distance / 90);
-                    }
-                    target.force.Dx *= collisionTarget.friction * target.friction;
-                    return "break";
-                }
-            };
-            var this_2 = this;
-            for (var i = 0; i < Math.abs(magnitude); i += 1) {
-                var state_2 = _loop_2(i);
-                if (state_2 === "break")
-                    break;
-            }
-            var stickyCheck = boxCollider.copy(target.collisionBox);
-            var checkDistance = Math.abs(magnitude) + 2;
-            if (target.stickyTop) {
-                stickyCheck.expandTop(checkDistance);
-            }
-            if (target.stickyBottom) {
-                stickyCheck.expandBottom(checkDistance);
-            }
-            //Sticky draging
-            if (target.stickyTop || target.stickyBottom) {
-                objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                    if (sign > 0) {
-                        //Moving down
-                        if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
-                            testCollisionWith.g.y = target.g.y - testCollisionWith.collisionBox.y - testCollisionWith.collisionBox.height;
-                        }
-                    }
-                    else {
-                        //Moving up
-                        if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
-                            testCollisionWith.g.y = target.g.y + target.collisionBox.y + target.collisionBox.height - testCollisionWith.collisionBox.y;
-                        }
-                    }
-                    return false;
-                });
-            }
-        };
-        movementOperations.pushObjectHorizontal = function (pusher, objectBeingPushed, sign, objContainer) {
-            var _this = this;
-            var collided = false;
-            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
-                if (objectBeingPushed.collisionTargets.length == 0) {
-                    return pusher;
-                }
-                objectBeingPushed.g.x += sign;
-                objContainer.foreachObjectType(objectBeingPushed.collisionTargets, function (testCollision) {
-                    if (testCollision.objectName != pusher.objectName &&
-                        internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
-                        && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null) {
-                        objectBeingPushed.g.x += sign * -1;
-                        collided = true;
-                    }
-                    return false;
-                });
-            }
-            if (collided) {
-                return objectBeingPushed;
-            }
-            return objectBase.null;
-        };
-        movementOperations.pushObjectVertical = function (pusher, objectBeingPushed, sign, objContainer) {
-            var _this = this;
-            var collided = false;
-            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
-                if (objectBeingPushed.collisionTargets.length == 0) {
-                    return pusher;
-                }
-                objectBeingPushed.g.y += sign;
-                if (objectBeingPushed._isColliding_Special) {
-                    objectBeingPushed.g.y += sign * -1;
-                    collided = true;
-                }
-                else {
-                    objContainer.foreachObjectType(objectBeingPushed.collisionTargets, function (testCollision) {
-                        if (testCollision.objectName != pusher.objectName &&
-                            internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
-                            && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null) {
-                            objectBeingPushed.g.y += sign * -1;
-                            collided = true;
-                        }
-                        return false;
-                    });
-                }
-            }
-            if (collided) {
-                return objectBeingPushed;
-            }
-            return objectBase.null;
-        };
-        movementOperations.boxIntersectionSpecific = function (initiator, boxData, targetObjects, objContainer) {
-            return this.boxIntersectionSpecificClass(initiator, boxData, targetObjects, "", objContainer);
-        };
-        //Collision
-        movementOperations.boxIntersectionSpecificClass = (new /** @class */ (function () {
-            function class_1() {
-                this.inc = function (initiator, boxData, targetObjects, excludeObject, objContainer) {
-                    return objContainer.foreachObjectType(targetObjects, function (testCollisionWith) {
-                        if (testCollisionWith.objectName != excludeObject && internalFunction.intersecting(initiator, boxData, testCollisionWith)) {
-                            return true;
-                        }
-                        return false;
-                    });
-                };
-            }
-            return class_1;
-        }())).inc;
-        return movementOperations;
-    }());
-
     var nulliObject = /** @class */ (function () {
         function nulliObject(xp, yp) {
             this.isTile = false;
@@ -768,14 +523,13 @@
             this.ID = "";
             this.g = new PIXI.Graphics();
             this._collisionBox = new boxCollider(0, 0, 0, 0);
-            this.resourcesNeeded = [];
             this._objectName = "nulliObject";
             this.collisionTargets = [];
             this.moveCollisionTargets = [];
             this.force = new vector(0, 0);
+            this.exportedString = "";
             this._hasBeenMoved_Tick = 0;
             this._isColliding_Special = false;
-            this.percentage = 0;
             this.objectName = "";
             this.collisionBox = new boxCollider(0, 0, 0, 0);
             this.x = 0;
@@ -826,6 +580,329 @@
         return nulliObject;
     }());
 
+    var objectGlobalData = /** @class */ (function () {
+        function objectGlobalData() {
+        }
+        objectGlobalData.null = new nulliObject(0, 0);
+        objectGlobalData.objectsThatCollideWith = {};
+        objectGlobalData.objectsThatMoveWith = {};
+        return objectGlobalData;
+    }());
+
+    var ticker = /** @class */ (function () {
+        function ticker() {
+        }
+        ticker.tick = function () {
+            if (this.ticks >= Number.MAX_VALUE) {
+                this.ticks = 0;
+            }
+            this.ticks++;
+        };
+        ticker.getTicks = function () {
+            return this.ticks;
+        };
+        ticker.ticks = 0;
+        return ticker;
+    }());
+
+    var movementOperations = /** @class */ (function () {
+        function movementOperations() {
+        }
+        movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
+            force.Dx = force.Dx * deltaTime;
+            force.Dy = force.Dy * deltaTime;
+            var xdiff = force.Dx;
+            var ydiff = force.Dy;
+            this.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
+            this.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
+            force.Dx *= target.airFriction;
+            force.Dy *= target.airFriction;
+            if (target.gravity != vector.null) {
+                force.Dx += target.gravity.Dx;
+                force.Dy += target.gravity.Dy;
+                target.gravity.increaseMagnitude(target.weight);
+            }
+        };
+        movementOperations.moveForceHorizontal = function (magnitude, target, collisionNames, objContainer) {
+            var _this = this;
+            if (magnitude == 0)
+                return;
+            var sign = magnitude > 0 ? 1 : -1;
+            var objectsThatWereCollidingThisObjectWhileMoving = new Array();
+            var collisionTarget = objectGlobalData.null;
+            var _loop_1 = function (i) {
+                objectsThatWereCollidingThisObjectWhileMoving.length = 0;
+                target.g.x += sign;
+                if (objectGlobalData.objectsThatCollideWith[target.objectName] != null) {
+                    //Push object
+                    objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                        if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                            collisionTarget = _this.pushObjectHorizontal(target, testCollisionWith, sign, objContainer);
+                            if (collisionTarget == objectGlobalData.null) {
+                                target.force.Dx *= 1 - testCollisionWith.weight;
+                            }
+                        }
+                        return false;
+                    });
+                    //Sticky draging
+                    var stickyCheck_1 = boxCollider.copy(target.collisionBox);
+                    var checkDistance_1 = Math.abs(magnitude) + 2;
+                    if (target.stickyTop) {
+                        stickyCheck_1.expandTop(checkDistance_1);
+                    }
+                    if (target.stickyBottom) {
+                        stickyCheck_1.expandBottom(checkDistance_1);
+                    }
+                    if (target.stickyTop || target.stickyBottom) {
+                        //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
+                        objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                            if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                                if (testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()) {
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.x += sign;
+                                    if (i >= Math.abs(magnitude) - 1) {
+                                        testCollisionWith._hasBeenMoved_Tick = ticker.getTicks();
+                                    }
+                                }
+                            }
+                            return false;
+                        });
+                    }
+                }
+                if (collisionTarget == objectGlobalData.null) {
+                    collisionTarget = this_1.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                }
+                if (collisionTarget != objectGlobalData.null && target._isColliding_Special == false) {
+                    sign *= -1;
+                    target.g.x += 1 * sign;
+                    objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
+                        updaterObject.g.x += 1 * sign;
+                    });
+                    target.force.Dx = 0;
+                    var distance = 0;
+                    if (sign <= 0) {
+                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, 0);
+                    }
+                    else {
+                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI);
+                    }
+                    if (distance < 90) {
+                        target.gravity.Dy *= distance / 90;
+                        target.gravity.Dx *= 1 - (distance / 90);
+                    }
+                    target.force.Dy *= collisionTarget.friction;
+                    return "break";
+                }
+            };
+            var this_1 = this;
+            for (var i = 0; i < Math.abs(magnitude); i += 1) {
+                var state_1 = _loop_1(i);
+                if (state_1 === "break")
+                    break;
+            }
+            //Sticky draging
+            var stickyCheck = boxCollider.copy(target.collisionBox);
+            var checkDistance = Math.abs(magnitude) + 2;
+            if (target.stickyLeftSide) {
+                stickyCheck.expandLeftSide(checkDistance);
+            }
+            if (target.stickyRightSide) {
+                stickyCheck.expandRightSide(checkDistance);
+            }
+            if (target.stickyLeftSide || target.stickyRightSide) {
+                objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                    if (sign > 0) {
+                        //Moving right
+                        if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
+                            testCollisionWith.g.x = target.g.x - testCollisionWith.collisionBox.x - testCollisionWith.collisionBox.width;
+                        }
+                    }
+                    else {
+                        //Moving left
+                        if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
+                            testCollisionWith.g.x = target.g.x + target.collisionBox.x + target.collisionBox.width - testCollisionWith.collisionBox.x;
+                        }
+                    }
+                    return false;
+                });
+            }
+        };
+        movementOperations.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
+            var _this = this;
+            if (magnitude == 0)
+                return;
+            var sign = magnitude > 0 ? 1 : -1;
+            var objectsThatWereCollidingThisObjectWhileMoving = new Array();
+            var collisionTarget = objectGlobalData.null;
+            var _loop_2 = function (i) {
+                target.g.y += sign;
+                if (objectGlobalData.objectsThatCollideWith[target.objectName] != null) {
+                    //Moving objects
+                    objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                        if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                            collisionTarget = _this.pushObjectVertical(target, testCollisionWith, sign, objContainer);
+                            if (collisionTarget == objectGlobalData.null) {
+                                target.force.Dy *= 1 - testCollisionWith.weight;
+                            }
+                        }
+                        return false;
+                    });
+                    //Sticky draging
+                    var stickyCheck_2 = boxCollider.copy(target.collisionBox);
+                    var checkDistance_2 = Math.abs(magnitude) + 2;
+                    if (target.stickyLeftSide) {
+                        stickyCheck_2.expandLeftSide(checkDistance_2);
+                    }
+                    if (target.stickyRightSide) {
+                        stickyCheck_2.expandRightSide(checkDistance_2);
+                    }
+                    if (target.stickyLeftSide || target.stickyRightSide) {
+                        //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
+                        objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                            if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                                if (testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()) {
+                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.y += sign;
+                                    if (i >= Math.abs(magnitude) - 1) {
+                                        testCollisionWith._hasBeenMoved_Tick = ticker.getTicks();
+                                    }
+                                }
+                            }
+                            return false;
+                        });
+                    }
+                }
+                //This has to be more optimized
+                if (collisionTarget == objectGlobalData.null) {
+                    collisionTarget = this_2.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                }
+                if (collisionTarget != objectGlobalData.null) {
+                    sign *= -1;
+                    target.g.y += sign;
+                    objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
+                        updaterObject.g.y += sign;
+                    });
+                    target.force.Dy = 0;
+                    var distance = 0;
+                    if (sign >= 0) {
+                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI / 2);
+                    }
+                    else {
+                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI + (calculations.PI / 2));
+                    }
+                    if (distance < 90) {
+                        target.gravity.Dy *= distance / 90;
+                        target.gravity.Dx *= 1 - (distance / 90);
+                    }
+                    target.force.Dx *= collisionTarget.friction * target.friction;
+                    return "break";
+                }
+            };
+            var this_2 = this;
+            for (var i = 0; i < Math.abs(magnitude); i += 1) {
+                var state_2 = _loop_2(i);
+                if (state_2 === "break")
+                    break;
+            }
+            var stickyCheck = boxCollider.copy(target.collisionBox);
+            var checkDistance = Math.abs(magnitude) + 2;
+            if (target.stickyTop) {
+                stickyCheck.expandTop(checkDistance);
+            }
+            if (target.stickyBottom) {
+                stickyCheck.expandBottom(checkDistance);
+            }
+            //Sticky draging
+            if (target.stickyTop || target.stickyBottom) {
+                objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                    if (sign > 0) {
+                        //Moving down
+                        if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
+                            testCollisionWith.g.y = target.g.y - testCollisionWith.collisionBox.y - testCollisionWith.collisionBox.height;
+                        }
+                    }
+                    else {
+                        //Moving up
+                        if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
+                            testCollisionWith.g.y = target.g.y + target.collisionBox.y + target.collisionBox.height - testCollisionWith.collisionBox.y;
+                        }
+                    }
+                    return false;
+                });
+            }
+        };
+        movementOperations.pushObjectHorizontal = function (pusher, objectBeingPushed, sign, objContainer) {
+            var _this = this;
+            var collided = false;
+            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
+                if (objectBeingPushed.collisionTargets.length == 0) {
+                    return pusher;
+                }
+                objectBeingPushed.g.x += sign;
+                objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, function (testCollision) {
+                    if (testCollision.objectName != pusher.objectName &&
+                        internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
+                        && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
+                        objectBeingPushed.g.x += sign * -1;
+                        collided = true;
+                    }
+                    return false;
+                });
+            }
+            if (collided) {
+                return objectBeingPushed;
+            }
+            return objectGlobalData.null;
+        };
+        movementOperations.pushObjectVertical = function (pusher, objectBeingPushed, sign, objContainer) {
+            var _this = this;
+            var collided = false;
+            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
+                if (objectBeingPushed.collisionTargets.length == 0) {
+                    return pusher;
+                }
+                objectBeingPushed.g.y += sign;
+                if (objectBeingPushed._isColliding_Special) {
+                    objectBeingPushed.g.y += sign * -1;
+                    collided = true;
+                }
+                else {
+                    objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, function (testCollision) {
+                        if (testCollision.objectName != pusher.objectName &&
+                            internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
+                            && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
+                            objectBeingPushed.g.y += sign * -1;
+                            collided = true;
+                        }
+                        return false;
+                    });
+                }
+            }
+            if (collided) {
+                return objectBeingPushed;
+            }
+            return objectGlobalData.null;
+        };
+        movementOperations.boxIntersectionSpecific = function (initiator, boxData, targetObjects, objContainer) {
+            return this.boxIntersectionSpecificClass(initiator, boxData, targetObjects, "", objContainer);
+        };
+        //Collision
+        movementOperations.boxIntersectionSpecificClass = (new /** @class */ (function () {
+            function class_1() {
+                this.inc = function (initiator, boxData, targetObjects, excludeObject, objContainer) {
+                    return objContainer.loopThroughObjectsUntilCondition(targetObjects, function (testCollisionWith) {
+                        if (testCollisionWith.objectName != excludeObject && internalFunction.intersecting(initiator, boxData, testCollisionWith)) {
+                            return true;
+                        }
+                        return false;
+                    });
+                };
+            }
+            return class_1;
+        }())).inc;
+        return movementOperations;
+    }());
+
     var objectBase = /** @class */ (function () {
         function objectBase(x, y, childObjectName) {
             this.isTile = false;
@@ -835,8 +912,6 @@
             this.gSprites = {};
             this.friction = 0.98;
             this.airFriction = 0.9;
-            this.percentage = 0;
-            this.resourcesNeeded = [];
             this.stickyBottom = false;
             this.stickyTop = false;
             this.stickyLeftSide = false;
@@ -845,6 +920,8 @@
             this.weight = 0.4;
             this._hasBeenMoved_Tick = 0;
             this._isColliding_Special = false;
+            this.inputTemplate = "";
+            this.outputString = "";
             this.onLayer = 0;
             this._collisionBox = new boxCollider(0, 0, 0, 0);
             this._objectName = "iObject";
@@ -890,6 +967,8 @@
             enumerable: false,
             configurable: true
         });
+        objectBase.prototype.init = function (roomEvents) {
+        };
         objectBase.prototype.addMoveCollisionTarget = function () {
             var collNames = [];
             for (var _i = 0; _i < arguments.length; _i++) {
@@ -918,11 +997,11 @@
             }
             for (var i = 0; i < collNames.length; i++) {
                 if (this._collisionTargets.indexOf(collNames[i]) == -1) {
-                    if (objectBase.objectsThatCollideWith[collNames[i]] == null) {
-                        objectBase.objectsThatCollideWith[collNames[i]] = new Array();
+                    if (objectGlobalData.objectsThatCollideWith[collNames[i]] == null) {
+                        objectGlobalData.objectsThatCollideWith[collNames[i]] = new Array();
                     }
-                    if (objectBase.objectsThatCollideWith[collNames[i]].indexOf(this.objectName) == -1) {
-                        objectBase.objectsThatCollideWith[collNames[i]].push(this.objectName);
+                    if (objectGlobalData.objectsThatCollideWith[collNames[i]].indexOf(this.objectName) == -1) {
+                        objectGlobalData.objectsThatCollideWith[collNames[i]].push(this.objectName);
                     }
                     if (this._collisionTargets.indexOf(collNames[i]) == -1) {
                         this._collisionTargets.push(collNames[i]);
@@ -1079,114 +1158,8 @@
             this._force.Dx += Math.cos(angle) * magnitude;
             this._force.Dy += calculations.flippedSin(angle) * magnitude;
         };
-        objectBase.null = new nulliObject(0, 0);
-        objectBase.objectsThatCollideWith = {};
-        objectBase.objectsThatMoveWith = {};
         return objectBase;
     }());
-
-    var block = /** @class */ (function (_super) {
-        __extends(block, _super);
-        function block(xp, yp) {
-            var _this = _super.call(this, xp, yp, block.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.986;
-            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 128, 128);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-            /*setInterval(()=>{
-                this.switch = !this.switch;
-            }, 700);*/
-        }
-        block.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            /*if(this.switch){
-                super.setNewForce(l.degreesToRadians(0), 3);
-            }else{
-                super.setNewForce(l.degreesToRadians(180), 3);
-            }*/
-        };
-        block.objectName = "block";
-        return block;
-    }(objectBase));
-
-    var movingBlockHori = /** @class */ (function (_super) {
-        __extends(movingBlockHori, _super);
-        function movingBlockHori(xp, yp) {
-            var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.873;
-            _this.stickyTop = true;
-            _this.stickyRightSide = true;
-            _this.stickyLeftSide = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 256);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-        }
-        movingBlockHori.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
-            if (this.switch) {
-                _super.prototype.setNewForce.call(this, 2, 0);
-            }
-            else {
-                _super.prototype.setNewForce.call(this, -2, 0);
-            }
-            if (roomEvent.getTicks() % 20 == 0) {
-                this.switch = !this.switch;
-            }
-        };
-        movingBlockHori.objectName = "movingBlockHori";
-        return movingBlockHori;
-    }(objectBase));
-
-    var movingBlockVert = /** @class */ (function (_super) {
-        __extends(movingBlockVert, _super);
-        function movingBlockVert(xp, yp) {
-            var _this = _super.call(this, xp, yp, movingBlockVert.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.873;
-            _this.stickyTop = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 256);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-        }
-        movingBlockVert.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            if (this.switch) {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 1);
-            }
-            else {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
-            }
-            if (roomEvent.getTicks() % 55 == 0) {
-                this.switch = !this.switch;
-            }
-        };
-        movingBlockVert.objectName = "movingBlockVert";
-        return movingBlockVert;
-    }(objectBase));
 
     var vectorFixedDelta = /** @class */ (function () {
         function vectorFixedDelta(delta, inputMagnitude) {
@@ -1247,9 +1220,115 @@
         return animConfig;
     }());
 
+    var block = /** @class */ (function (_super) {
+        __extends(block, _super);
+        function block(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, block.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 32, 32);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        block.prototype.setCollision = function (x, y, width, height) {
+            _super.prototype.setCollision.call(this, x, y, width, height);
+            _super.prototype.style.call(this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(x, y, width, height);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+        };
+        block.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        block.objectName = "block";
+        return block;
+    }(objectBase));
+
+    var movingBlockHori = /** @class */ (function (_super) {
+        __extends(movingBlockHori, _super);
+        function movingBlockHori(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.873;
+            _this.stickyTop = true;
+            _this.stickyRightSide = true;
+            _this.stickyLeftSide = true;
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        movingBlockHori.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
+            if (this.switch) {
+                _super.prototype.setNewForce.call(this, 2, 0);
+            }
+            else {
+                _super.prototype.setNewForce.call(this, -2, 0);
+            }
+            if (ticker.getTicks() % 20 == 0) {
+                this.switch = !this.switch;
+            }
+        };
+        movingBlockHori.objectName = "movingBlockHori";
+        return movingBlockHori;
+    }(objectBase));
+
+    var movingBlockVert = /** @class */ (function (_super) {
+        __extends(movingBlockVert, _super);
+        function movingBlockVert(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, movingBlockVert.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.873;
+            _this.stickyTop = true;
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        movingBlockVert.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            if (this.switch) {
+                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 1);
+            }
+            else {
+                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
+            }
+            if (ticker.getTicks() % 55 == 0) {
+                this.switch = !this.switch;
+            }
+        };
+        movingBlockVert.objectName = "movingBlockVert";
+        return movingBlockVert;
+    }(objectBase));
+
     var tinyBlock32 = /** @class */ (function (_super) {
         __extends(tinyBlock32, _super);
-        function tinyBlock32(xp, yp) {
+        function tinyBlock32(xp, yp, input) {
             var _this = _super.call(this, xp, yp, tinyBlock32.objectName) || this;
             _this.switch = false;
             _this.friction = 0.986;
@@ -1281,7 +1360,7 @@
 
     var wideBlock = /** @class */ (function (_super) {
         __extends(wideBlock, _super);
-        function wideBlock(xp, yp) {
+        function wideBlock(xp, yp, input) {
             var _this = _super.call(this, xp, yp, wideBlock.objectName) || this;
             _this.switch = false;
             _this.friction = 0.986;
@@ -1311,13 +1390,53 @@
         return wideBlock;
     }(objectBase));
 
+    var dummySandbag = /** @class */ (function (_super) {
+        __extends(dummySandbag, _super);
+        function dummySandbag(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
+            _this.switch = false;
+            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0);
+            _this.friction = 0.90;
+            _this.airFriction = 0.96;
+            _this.weight = 0.06;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x0000FF);
+                newGraphics.drawRect(0, 0, 64, 128);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                _super.prototype.addSprite.call(_this, new animConfig({
+                    animationName: "godrayPreview.mp4",
+                    scaleX: 3,
+                    scaleY: 3,
+                    speed: 0.3,
+                    x: 64,
+                    y: 77,
+                    anchorX: 0.5,
+                    anchorY: 0.34,
+                }));
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, tinyBlock32.objectName, wideBlock.objectName);
+            return _this;
+        }
+        dummySandbag.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        dummySandbag.objectName = "dummySandbag";
+        return dummySandbag;
+    }(objectBase));
+
     var hitbox = /** @class */ (function (_super) {
         __extends(hitbox, _super);
-        function hitbox(xp, yp) {
+        function hitbox(xp, yp, input) {
             var _this = _super.call(this, xp, yp, hitbox.objectName) || this;
             _this.switch = false;
             _this.friction = 0.0;
             _this.haveHitThese = [];
+            _this.startupTime = 0;
             _this.life = 10;
             _this.targets = [dummySandbag.objectName];
             _this.creator = null;
@@ -1328,6 +1447,22 @@
             _this.type = "";
             return _this;
         }
+        hitbox.initialize = function (_a) {
+            var startupTime = _a.startupTime, x = _a.x, y = _a.y, creator = _a.creator, life = _a.life, size = _a.size, offset = _a.offset, hitboxDirection = _a.hitboxDirection, aerial = _a.aerial, type = _a.type;
+            var newHitbox = new hitbox(x, y, "");
+            newHitbox.startupTime = startupTime;
+            newHitbox.type = type;
+            newHitbox.creator = creator;
+            newHitbox.life = life;
+            newHitbox.setSize(size[0], size[1]);
+            newHitbox.setOffset(offset[0], offset[1]);
+            newHitbox.hitboxDirection = hitboxDirection;
+            newHitbox.aerial = aerial;
+            return newHitbox;
+        };
+        hitbox.prototype.getStartupTime = function () {
+            return this.startupTime;
+        };
         hitbox.prototype.setOffset = function (offX, offY) {
             this.offsetX = offX;
             this.offsetY = offY;
@@ -1349,7 +1484,7 @@
             if (this.creator != null) {
                 this.moveWithCreator();
                 if (this.life <= 0) {
-                    l.objContainer.deleteObject(this);
+                    l.deleteObject(this);
                 }
                 else {
                     for (var _i = 0, _a = this.targets; _i < _a.length; _i++) {
@@ -1360,9 +1495,9 @@
                                 && internalFunction.intersecting(_this, _this.collisionBox, obj)) {
                                 _this.haveHitThese.push(obj.ID);
                                 if (_this.hitboxDirection != null) {
-                                    if (_this.type == "sword") {
+                                    /*if(this.type == "sword"){
                                         resourcesHand.playAudioVolume("WeaponImpact1.ogg", 0.25);
-                                    }
+                                    }*/
                                     if (_this.creator.facingRight) {
                                         obj.addForceAngleMagnitude((_a = _this.hitboxDirection) === null || _a === void 0 ? void 0 : _a.delta, (_b = _this.hitboxDirection) === null || _b === void 0 ? void 0 : _b.magnitude);
                                     }
@@ -1377,7 +1512,7 @@
                 }
             }
             else {
-                l.objContainer.deleteObject(this);
+                l.deleteObject(this);
             }
         };
         hitbox.prototype.moveWithCreator = function () {
@@ -1398,95 +1533,89 @@
         return hitbox;
     }(objectBase));
 
-    var tools = /** @class */ (function () {
-        function tools() {
+    var baseAttack = /** @class */ (function (_super) {
+        __extends(baseAttack, _super);
+        function baseAttack(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, hitbox.objectName) || this;
+            _this.attackSeries = [];
+            _this.attackSeriesIndex = 0;
+            _this.startupTime = -1;
+            return _this;
         }
-        /*download(filename: string, text:string) {
-            var element = document.createElement('a');
-            console.log(text)
-            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + text);
-            element.setAttribute('download', filename);
-          
-            element.style.display = 'none';
-            document.body.appendChild(element);
-          
-            element.click();
-          
-            document.body.removeChild(element);
-        }*/
-        tools.download = function (filename, text, type) {
-            if (type === void 0) { type = "text/plain"; }
-            // Create an invisible A element
-            var a = document.createElement("a");
-            a.style.display = "none";
-            document.body.appendChild(a);
-            // Set the HREF to a Blob representation of the data to be downloaded
-            a.href = window.URL.createObjectURL(new Blob([text], { type: type }));
-            // Use download attribute to set set desired file name
-            a.setAttribute("download", filename);
-            // Trigger the download by simulating click
-            a.click();
-            // Cleanup
-            window.URL.revokeObjectURL(a.href);
-            document.body.removeChild(a);
+        baseAttack.prototype.startAttack = function (creator) {
+            this.attackSeriesIndex = 0;
+            this.startupTime = -1;
         };
-        tools.upload = function (callback) {
-            var _this = this;
-            var element = document.createElement("input");
-            element.type = "file";
-            element.style.display = "none";
-            document.body.appendChild(element);
-            element.onchange = function (e) {
-                _this.uploadOnChange(e, callback);
-            };
-            element.click();
+        baseAttack.prototype.tickAttack = function (l, caller) {
+            if (this.attackSeries[this.attackSeriesIndex] != null) {
+                if (this.startupTime == -1) {
+                    this.startupTime = this.attackSeries[this.attackSeriesIndex].getStartupTime();
+                }
+                if (this.startupTime > 0) {
+                    this.startupTime--;
+                    if (this.startupTime == 0) {
+                        this.startupTime = -1;
+                        this.attackSeriesIndex++;
+                        l.addObject(this.attackSeries[this.attackSeriesIndex], caller.onLayer);
+                    }
+                }
+            }
         };
-        tools.getClassNameFromConstructorName = function (constructorName) {
-            var funcNameOnly = constructorName.replace("function ", "");
-            var paramsStartIndex = funcNameOnly.indexOf("(");
-            funcNameOnly = funcNameOnly.substring(0, paramsStartIndex);
-            return funcNameOnly;
+        return baseAttack;
+    }(objectBase));
+
+    var threeHitNormal = /** @class */ (function (_super) {
+        __extends(threeHitNormal, _super);
+        function threeHitNormal(xp, yp, input) {
+            return _super.call(this, xp, yp, hitbox.objectName) || this;
+        }
+        threeHitNormal.prototype.startAttack = function (creator) {
+            _super.prototype.startAttack.call(this, creator);
+            /*tools.createHitbox({
+                startupTime: 18,
+                x: creator.g.x,
+                y: creator.g.y,
+                creator: creator,
+                life: 16,
+                size: [32, 16],
+                offset: [24, -8],
+                hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(80), 8),
+                aerial: true,
+                type: "sword"
+            }),
+            tools.createHitbox({
+                startupTime:32,
+                x: creator.g.x,
+                y: creator.g.y,
+                creator: creator,
+                life: 16,
+                size: [50, 64],
+                offset: [48, -26],
+                hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 10),
+                aerial: true,
+                type: "sword"
+            })] */
+            this.attackSeries = [
+                hitbox.initialize({
+                    startupTime: 18,
+                    x: creator.g.x,
+                    y: creator.g.y,
+                    creator: creator,
+                    life: 16,
+                    size: [32, 16],
+                    offset: [24, -8],
+                    hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(80), 8),
+                    aerial: true,
+                    type: "sword"
+                })
+            ];
         };
-        tools.functionName = function (func) {
-            console.log(func.toString());
-            var result = /^function\s+([\w\$]+)\s*\(/.exec(func.toString());
-            return result ? result[1] : ''; // for an anonymous function there won't be a match
-        };
-        tools.uploadOnChange = function (e, callback) {
-            var ev = e;
-            console.log(ev.target.files);
-            var reader = new FileReader();
-            reader.readAsText(ev.target.files[0], "UTF-8");
-            reader.onload = function (evt) {
-                var _a, _b;
-                var t = (_b = (_a = evt.target) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.toString();
-                callback(LZString.decompressFromEncodedURIComponent(t));
-            };
-            reader.onerror = function (evt) {
-                alert("Could not read file");
-            };
-        };
-        tools.createHitbox = function (_a) {
-            var startupTime = _a.startupTime, x = _a.x, y = _a.y, creator = _a.creator, life = _a.life, size = _a.size, offset = _a.offset, hitboxDirection = _a.hitboxDirection, aerial = _a.aerial, type = _a.type;
-            var newHitbox = new hitbox(x, y);
-            newHitbox.type = type;
-            newHitbox.creator = creator;
-            newHitbox.life = life;
-            newHitbox.setSize(size[0], size[1]);
-            newHitbox.setOffset(offset[0], offset[1]);
-            newHitbox.hitboxDirection = hitboxDirection;
-            newHitbox.aerial = aerial;
-            console.log("Passed life: ", life);
-            console.log("new hitbox: ", newHitbox);
-            var hitboxData = [startupTime, newHitbox];
-            return hitboxData;
-        };
-        return tools;
-    }());
+        return threeHitNormal;
+    }(baseAttack));
 
     var ladder = /** @class */ (function (_super) {
         __extends(ladder, _super);
-        function ladder(xp, yp) {
+        function ladder(xp, yp, input) {
             var _this = _super.call(this, xp, yp, ladder.objectName) || this;
             _this.switch = false;
             _this.friction = 0.0;
@@ -1521,7 +1650,7 @@
 
     var textPrompt = /** @class */ (function (_super) {
         __extends(textPrompt, _super);
-        function textPrompt(xp, yp) {
+        function textPrompt(xp, yp, input) {
             var _this = _super.call(this, xp, yp, textPrompt.objectName) || this;
             _this.switch = false;
             _this.friction = 0.0;
@@ -1541,62 +1670,76 @@
             return _this;
         }
         textPrompt.prototype.logic = function (l) {
-            l.interaction.openText(this.text);
+            l.getInteractionObject().openText(this.text);
         };
         textPrompt.objectName = "textPrompt";
         return textPrompt;
     }(objectBase));
 
+    var spriteContainer = /** @class */ (function () {
+        function spriteContainer() {
+            this.currentSpriteObj = null;
+        }
+        spriteContainer.prototype.set = function (newSprite) {
+            this.currentSpriteObj = newSprite;
+        };
+        spriteContainer.prototype.update = function (updateFunc) {
+            if (this.currentSpriteObj != null) {
+                updateFunc(this.currentSpriteObj);
+            }
+        };
+        return spriteContainer;
+    }());
+
+    var block32x64 = /** @class */ (function (_super) {
+        __extends(block32x64, _super);
+        function block32x64(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, input) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _this.setCollision(0, 0, 32, 64);
+            return _this;
+        }
+        block32x64.objectName = "block32x64";
+        return block32x64;
+    }(block));
+
+    var block64x32 = /** @class */ (function (_super) {
+        __extends(block64x32, _super);
+        function block64x32(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, block64x32.objectName) || this;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 32);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 64, 32);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        block64x32.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        block64x32.objectName = "block64x32";
+        return block64x32;
+    }(objectBase));
+
     var player = /** @class */ (function (_super) {
         __extends(player, _super);
-        /*private myShaderFrag = `
-        varying vec2 vTextureCoord;
-        uniform sampler2D uSampler;
-        void main(void)
-        {
-            float width = 256.0;
-            float height = 256.0;
-
-            
-
-            vec4 t = texture2D(uSampler, vTextureCoord);
-
-            float averageColorStrength = (t.x + t.y + t.z)/3.0;
-
-            float density = 256.0 * (1.0 - averageColorStrength);
-
-            float positionY = float(floor(vTextureCoord.y * density));
-            int everyOtherRow = int(positionY - (2.0 * floor(positionY/2.0)));
-
-
-            float position = float(floor(vTextureCoord.x * density));
-            int black = 0;
-            int r = int(position - (2.0 * floor(position/2.0)));
-            if(everyOtherRow == 0 || r == 0){
-                black = 1;
-            }
-            
-            t.a = 1.0;
-            if(black == 1){
-                gl_FragColor = vec4(0.0 * t.a, 0.0 * t.a, 0.0 * t.a, t.a); //* t;
-            }else{
-                gl_FragColor = vec4(1.0 * t.a, 1.0 * t.a, 1.0 * t.a, 1.0 * t.a); // * t;
-            }
-
-            
-        }
-        `;*/
-        function player(xp, yp) {
+        function player(xp, yp, input) {
             var _this = _super.call(this, xp, yp, player.objectName) || this;
             _this.airFriction = 0.98;
             _this.friction = 0.8;
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
             _this.weight = 0.06;
-            _this.maxRunSpeed = 9;
-            _this.normalRunSpeed = 9;
-            _this.superRunSpeed = 14;
+            _this.maxRunSpeed = 4;
+            _this.normalRunSpeed = 4;
+            _this.superRunSpeed = 7;
             _this.currentSprite = "warriorIdle";
-            _this.currentSpriteObj = null;
+            _this.currentSpriteObj = new spriteContainer();
             _this.shakeCameraForce = 0;
             _this.airbornTimer = 0;
             _this.facingRight = true;
@@ -1609,42 +1752,54 @@
             _this.constantForce = 0;
             _this.attacking = false;
             _this.actionWait = 0;
-            _this.hitboxToCreate = null;
+            _this.attack = null;
             _this.playFootstepTimer = 0;
-            _this.myShaderVert = "";
-            _this.myShaderFrag = "\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n\n\n    float rand(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n\n    void main(void)\n    {\n        float width = 256.0;\n        float height = 175.0;\n\n        int rings = int(width/16.0);\n\n        vec4 t = texture2D(uSampler, vTextureCoord);\n\n        int color = 1;\n        int spot = 0;\n        int render = 0;\n\n        float distanceFromCenterX = vTextureCoord.x - 0.5;\n        float distanceFromCenterY = vTextureCoord.y - (1.0 - 0.68/*height/width*/);\n        float hyputenuse = sqrt((distanceFromCenterX*distanceFromCenterX) + (distanceFromCenterY*distanceFromCenterY));\n\n        /*if(floor(hyputenuse*100.0) == 15.0){\n            color = 1;\n        }*/\n\n        float floatPerPixel = 1.0/width;\n\n        float random = rand(vTextureCoord);\n\n        float averageColorStrength = (t.x + t.y + t.z)/3.0;\n        \n\n        for(int i=0; i<128; i++){\n\n            //circles\n            int drawlines = int(float(i) - (3.0 * floor(float(i)/3.0)));\n            if(drawlines == 1 && i > 5){\n\n                float thicknes = float(i)-8.0*averageColorStrength;\n\n                if(hyputenuse < float(i)*floatPerPixel && hyputenuse > thicknes*(floatPerPixel)){\n                    render = 1;\n                }\n            }\n            \n        }\n\n\n\n        if(averageColorStrength > 0.8){ //face and part of sword\n            color = -1;\n        }\n\n        if(averageColorStrength < 0.8\n            && averageColorStrength > 0.4){//armor\n                color = 2;\n        }\n\n        if(averageColorStrength < 0.3\n            && averageColorStrength > 0.2){//hair and part of wrists\n                color = 3;\n        }\n\n\n\n        for(int i=0; i<128; i++){\n\n            int draw = int(float(i) - (2.0 * floor(float(i)/2.0)));\n            if(draw == 1 && i > 3 + int((128.0*random)) ){\n                if(hyputenuse < float(i)*floatPerPixel && hyputenuse > float(i-int(32.0*averageColorStrength))*(floatPerPixel)){\n                    spot = 1;\n                }\n            }\n            \n        }\n\n        if(render == 0 && color == 1){\n            t.a = t.a* 0.9;\n        }\n\n        vec4 colorOut = vec4(1.0 * t.a, 1.0 * t.a, 1.0 * t.a, t.a);\n\n        if(color == -1){//white\n            colorOut = vec4(0.9 * t.a, 0.9 * t.a, 0.9 * t.a, t.a);\n        }else if(color == 0){//black\n            colorOut = vec4(0.0 * t.a, 0.0 * t.a, 0.0 * t.a, t.a);\n        }else if(color == 1){//blue\n            colorOut = vec4(0.0 * t.a, 0.0 * t.a, vTextureCoord.y * t.a, t.a);\n        }else if(color == 2){//silver\n            colorOut = vec4(0.4 * t.a, 0.4 * t.a, 0.4 * t.a, t.a);\n        }else if(color == 3){//yellow\n            colorOut = vec4(0.7 * t.a, 0.7 * t.a, 0.09 * t.a, t.a);\n        }else{\n            colorOut = vec4(0.0 * t.a, 0.0 * t.a, 0.0 * t.a, t.a);\n        }\n\n        if(spot == 1){\n            colorOut = colorOut*colorOut;\n        }\n\n        gl_FragColor = colorOut * t;\n\n        \n    }\n    ";
-            _super.prototype.setCollision.call(_this, 0, 0, 64, 125);
+            _super.prototype.setCollision.call(_this, 0, 0, 24, 32);
+            //console.log(input);
             _super.prototype.style.call(_this, function (g) {
-                /*let newGraphics = new PIXI.Graphics();
-
+                var newGraphics = new PIXI.Graphics();
                 newGraphics.beginFill(0xFF3e50);
-                newGraphics.drawRect(0, 0, 64, 125);
+                newGraphics.drawRect(0, 0, 24, 32);
                 newGraphics.endFill();
-                g.addChild(newGraphics);*/
+                g.addChild(newGraphics);
                 g.calculateBounds();
                 return g;
             });
             _this.g.filters = [];
-            try {
-                /*this.g.filters.push(new GlowFilter({
-                    color: 0x000000,
-                    outerStrength: 16
-                }));*/
-                var filtertest = new PIXI.Filter(undefined, _this.myShaderFrag);
-                _this.g.filters.push(filtertest);
-                //this.g.filters.push(new PIXI.filters.BlurFilter());
-            }
-            catch (e) {
-            }
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName, tinyBlock32.objectName, wideBlock.objectName);
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName, tinyBlock32.objectName, wideBlock.objectName);
             _this.updateCurrentSprite();
-            console.log("width: ", _this.g.width);
-            console.log("height: ", _this.g.height);
             return _this;
+            //console.log("width: ",this.g.width);
+            //console.log("height: ",this.g.height);
         }
+        player.prototype.init = function (roomEvents) {
+            var _this = this;
+            if (roomEvents.getRoomStartString() != "") {
+                var roomStartObj = JSON.parse(roomEvents.getRoomStartString());
+                if (roomStartObj.from != null) {
+                    var from_1 = roomStartObj.from;
+                    var roomChangers = roomEvents.objContainer.getSpecificObjects("roomChanger");
+                    roomChangers.forEach(function (roomChanger) {
+                        var roomChangerJson = JSON.parse(roomChanger.outputString);
+                        var facing = roomChangerJson.facing;
+                        if (roomChangerJson.to == from_1) {
+                            _this.g.y = roomChanger.g.y;
+                            _this.g.x = roomChanger.g.x + _this.collisionBox.x + _this.collisionBox.width / 2;
+                            if (facing == "right") {
+                                _this.g.x += 50;
+                            }
+                            else if (facing == "left") {
+                                _this.g.x -= 50;
+                            }
+                        }
+                    });
+                }
+            }
+        };
         player.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
-            if (Math.floor(this.force.Dy) == 0 && Math.floor(this.gravity.magnitude) == 0) {
+            console.log(Math.round(this.gravity.magnitude));
+            if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
                 this.hasJumped = false;
             }
             if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
@@ -1682,7 +1837,7 @@
                     }
                     if (l.checkKeyHeld("w") && this.atLadderTop == true && this.releasedJumpKeyAtLadderTop) {
                         this.g.y -= 1;
-                        _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 11);
+                        _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 6);
                     }
                     if (l.checkKeyReleased("w") && this.atLadderTop == true) {
                         this.releasedJumpKeyAtLadderTop = true;
@@ -1750,7 +1905,7 @@
                 this.climbindLadder = false;
                 this.releasedJumpKeyAtLadderTop = false;
                 if (this.falling == false && this.hasJumped == false && l.checkKeyHeld("w") && Math.floor(this.gravity.magnitude) == 0 && this.actionWait == 0) {
-                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 11);
+                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 6);
                     this.hasJumped = true;
                 }
             }
@@ -1785,16 +1940,14 @@
             if (_super.prototype.hasSprite.call(this, this.currentSprite) == false) {
                 this.updateCurrentSprite();
             }
-            if (this.currentSpriteObj != null) {
-                if (this.currentSprite == "warriorRun") {
-                    var animWithSpeed = 0.3 * Math.abs(this.force.Dx) / this.superRunSpeed;
-                    if (animWithSpeed < 0.01)
-                        animWithSpeed = 0.01;
-                    this.currentSpriteObj.animationSpeed = animWithSpeed;
-                }
-                else if (this.currentSprite == "warriorIdle") {
-                    this.currentSpriteObj.animationSpeed = 0.155;
-                }
+            if (this.currentSprite == "warriorRun") {
+                var animWithSpeed_1 = 0.3 * Math.abs(this.force.Dx) / this.superRunSpeed;
+                if (animWithSpeed_1 < 0.01)
+                    animWithSpeed_1 = 0.01;
+                this.currentSpriteObj.update(function (x) { return x.animationSpeed = animWithSpeed_1; });
+            }
+            else if (this.currentSprite == "warriorIdle") {
+                this.currentSpriteObj.update(function (x) { return x.animationSpeed = 0.155; });
             }
             if (Math.abs(Math.floor(this.force.Dx)) != 0) {
                 if (this.force.Dx > 0) {
@@ -1806,10 +1959,10 @@
                     this.facingRight = false;
                 }
                 if (this.facingRight == true) {
-                    this.currentSpriteObj.pivot.set(3, 15);
+                    this.currentSpriteObj.update(function (x) { return x.pivot.set(3, 15); });
                 }
                 else {
-                    this.currentSpriteObj.pivot.set(-12, 15);
+                    this.currentSpriteObj.update(function (x) { return x.pivot.set(-12, 15); });
                 }
             }
             if (Math.round(this.gravity.magnitude) == 0 && Math.round(this.force.Dy) == 0 && Math.abs(this.force.Dx) > 2 &&
@@ -1817,21 +1970,21 @@
                 (l.checkKeyHeld("a") || l.checkKeyHeld("d"))) {
                 if (this.playFootstepTimer <= 0) {
                     this.playFootstepSounds();
-                    console.log((this.maxRunSpeed / Math.abs(this.force.Dx)));
+                    //console.log((this.maxRunSpeed/Math.abs(this.force.Dx)));
                     this.playFootstepTimer = 17 * (this.normalRunSpeed / this.maxRunSpeed);
                 }
                 else {
                     this.playFootstepTimer--;
                 }
             }
-            if (this.climbindLadder) {
-                this.currentSpriteObj.pivot.set(3, 15);
+            if (this.climbindLadder && this.currentSpriteObj != null) {
+                this.currentSpriteObj.update(function (x) { return x.pivot.set(3, 15); });
             }
             if (Math.abs(Math.floor(this.force.Dx)) >= 5) {
-                l.camera.setMoveSpeedX(0.07);
+                l.setCameraMoveSpeedX(0.07);
             }
             else {
-                l.camera.setMoveSpeedX(0.04);
+                l.setCameraMoveSpeedX(0.04);
             }
             if (this.climbindLadder == false) {
                 if (this.force.Dy >= 1) {
@@ -1855,16 +2008,16 @@
                 collisionInteraction.logic(l);
             }
             else {
-                this.hangleAttacks(l);
+                this.handleAttacks(l);
             }
             if (this.shakeCameraForce > 0) {
-                l.camera.cameraOffsetX = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
-                l.camera.cameraOffsetY = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                l.setCameraOffsetX(-this.shakeCameraForce + Math.random() * this.shakeCameraForce);
+                l.setCameraOffsetY(-this.shakeCameraForce + Math.random() * this.shakeCameraForce);
                 this.shakeCameraForce--;
             }
             else {
-                l.camera.cameraOffsetX = 0;
-                l.camera.cameraOffsetY = 0;
+                l.setCameraOffsetX(0);
+                l.setCameraOffsetY(0);
             }
             var spaceToAdd = 128;
             if (Math.abs(this.force.Dx) > 2) {
@@ -1878,198 +2031,97 @@
             if (Math.floor(this.force.Dy) > 30) {
                 addCamSpaceY = 600;
             }
-            l.camera.setTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
-            if (this.hitboxToCreate != null) {
-                for (var _i = 0, _a = this.hitboxToCreate; _i < _a.length; _i++) {
-                    var hitbox_1 = _a[_i];
-                    if (hitbox_1[0] > 0) {
-                        hitbox_1[0]--;
-                        if (hitbox_1[0] == 0) {
-                            l.objContainer.addObject(hitbox_1[1], this.onLayer);
-                        }
-                    }
-                    /*if(hitbox != null && hitbox[1].aerial && (Math.round(this.gravity.Dy) == 0)){
-                        hitbox[1].life *= 0.8;
-                    }*/
-                }
-            }
-            if (l.checkKeyReleased("p") && this.attacking == false) {
-                l.objContainer.deleteObject(this);
-                l.objContainer.addObject(new mio(this.g.x, this.g.y - 32), this.onLayer);
-            }
+            l.setCameraTarget(this.g.x + addCamSpace + 24, this.g.y + addCamSpaceY);
+            /*if(l.checkKeyReleased("p") && this.attacking == false){
+                l.deleteObject(this);
+                l.addObject(new mio(this.g.x, this.g.y-32, ""), this.onLayer);
+            }*/
         };
         player.prototype.playFootstepSounds = function () {
             resourcesHand.playRandomAudio(["footstepDirt1.wav", "footstepDirt2.wav", "footstepDirt3.wav", "footstepDirt4.wav"]);
         };
-        player.prototype.hangleAttacks = function (l) {
+        player.prototype.handleAttacks = function (l) {
+            if (this.attack != null) {
+                this.attack.tickAttack(l, this);
+            }
             if (l.checkKeyPressed(" ") && this.actionWait == 0 && this.climbindLadder == false) {
                 if (Math.floor(this.gravity.magnitude) != 0) {
-                    resourcesHand.playAudioVolume("bladeDraw.ogg", 0.2);
+                    //resourcesHand.playAudioVolume("bladeDraw.ogg", 0.2);
                     //Air attack
-                    this.currentSprite = "warriorAttack";
-                    this.currentSpriteObj.animationSpeed = 0.4;
-                    this.attacking = true;
-                    this.constantForce = 7;
-                    this.actionWait = 45;
-                    this.airbornTimer += 5;
-                    this.hitboxToCreate = [tools.createHitbox({
-                            startupTime: 18,
-                            x: this.g.x,
-                            y: this.g.y,
-                            creator: this,
-                            life: 16,
-                            size: [98, 64],
-                            offset: [48, -16],
-                            hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(80), 8),
-                            aerial: true,
-                            type: "sword"
-                        }),
-                        tools.createHitbox({
-                            startupTime: 32,
-                            x: this.g.x,
-                            y: this.g.y,
-                            creator: this,
-                            life: 16,
-                            size: [100, 128],
-                            offset: [98, -52],
-                            hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 10),
-                            aerial: true,
-                            type: "sword"
-                        })];
+                    //this.currentSprite = "warriorAttack";
+                    //this.currentSpriteObj.update(x => x.animationSpeed = 0.4);
+                    this.attack = new threeHitNormal(-1, -1, "");
                 }
                 else {
                     //ground attack
                     this.currentSprite = "warriorDashAttack";
-                    this.currentSpriteObj.animationSpeed = 0.21;
+                    this.currentSpriteObj.update(function (x) { return x.animationSpeed = 0.21; });
                     this.attacking = true;
                     this.constantForce = 3;
                     this.actionWait = 35;
                     this.force.Dy = 0;
-                    this.hitboxToCreate = [tools.createHitbox({
-                            startupTime: 16,
-                            x: this.g.x,
-                            y: this.g.y,
-                            creator: this,
-                            life: 7,
-                            size: [98, 48],
-                            offset: [64, -5],
-                            hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(32), 4),
-                            aerial: false,
-                            type: "sword"
-                        })];
+                    /*this.hitboxToCreate = [tools.createHitbox({
+                        startupTime: 16,
+                        x: this.g.x,
+                        y: this.g.y,
+                        creator: this,
+                        life: 7,
+                        size: [48, 24],
+                        offset: [32, -2],
+                        hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(32), 4),
+                        aerial: false,
+                        type: "sword"
+                    })];*/
                 }
             }
-            if (this.facingRight) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(350), this.constantForce);
+            /*if(this.facingRight){
+                super.addForceAngleMagnitude(calculations.degreesToRadians(350), this.constantForce);
+            }else{
+                super.addForceAngleMagnitude(calculations.degreesToRadians(190), this.constantForce);
             }
-            else {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(190), this.constantForce);
-            }
-            if (this.constantForce > 0) {
+            
+            if(this.constantForce > 0){
                 this.constantForce -= 1;
             }
-            if (this.actionWait > 0) {
-                this.actionWait--;
-            }
-            else {
+
+            if(this.actionWait > 0){
+                this.actionWait --;
+            }else{
                 this.attacking = false;
-            }
+            }*/
         };
         player.prototype.updateCurrentSprite = function () {
             _super.prototype.removeAllSprites.call(this);
-            this.currentSpriteObj = _super.prototype.addSprite.call(this, new animConfig({
-                animationName: this.currentSprite,
-                scaleX: 4,
-                scaleY: 4,
-                speed: 0.3,
-                x: 64,
-                y: 77,
-                anchorX: 0.5,
-                anchorY: 0.34,
-            }));
-            if (this.currentSpriteObj != null) {
-                this.currentSpriteObj.filters = [];
-                //new PIXI.filters.AsciiFilter();
-                //var t = (PIXI.Filter)(new filters.AdvancedBloomFilter());
-                //this.currentSpriteObj.filters.push(new externalFilters.BlurFilter());  
-                //GlowFilter
-                //this.currentSpriteObj.filters.push(new GlowFilter());
-                /*this.currentSpriteObj.filters.push(new DropShadowFilter({
-                    blur: 5,
-                    alpha: 1
-                }));*/
+            if (this.currentSprite != null) {
+                this.currentSpriteObj.set(_super.prototype.addSprite.call(this, new animConfig({
+                    animationName: this.currentSprite,
+                    scaleX: 4,
+                    scaleY: 4,
+                    speed: 0.3,
+                    x: 64,
+                    y: 77,
+                    anchorX: 0.5,
+                    anchorY: 0.34,
+                })));
+                if (this.currentSpriteObj != null) {
+                    this.currentSpriteObj.update(function (x) { return x.filters = []; });
+                    if (this.facingRight == true) {
+                        this.currentSpriteObj.update(function (x) { return x.pivot.set(0, 15); });
+                    }
+                    else {
+                        this.currentSpriteObj.update(function (x) { return x.pivot.set(-15, 15); });
+                    }
+                }
             }
-            if (this.facingRight == true) {
-                this.currentSpriteObj.pivot.set(0, 15);
-            }
-            else {
-                this.currentSpriteObj.pivot.set(-15, 15);
-            }
-            /*console.log(this.fragmentSrc.join('\n'));
-            var colorValue = parseInt("ff0000".substr(1), 16);
-            var r = ((colorValue & 0xFF0000) >> 16) / 255,
-            g = ((colorValue & 0x00FF00) >> 8) / 255,
-            b = (colorValue & 0x0000FF) / 255;
-
-            this.g.filters = [new PIXI.Filter(undefined,
-                this.fragmentSrc.join('\n'),
-            {
-                distance: 15.0,
-                outerStrength: 2.4,
-                innerStrength: 2.4,
-                glowColor: {x: r, y: g, z: b, w: 1},
-                pixelWidth: {type: '1f', value: 1 / 128},
-                pixelHeight: {type: '1f', value: 1 / 128},
-            })];*/
             this.g.calculateBounds();
         };
         player.objectName = "player";
         return player;
     }(objectBase));
 
-    var dummySandbag = /** @class */ (function (_super) {
-        __extends(dummySandbag, _super);
-        function dummySandbag(xp, yp) {
-            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
-            _this.switch = false;
-            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0);
-            _this.friction = 0.90;
-            _this.airFriction = 0.96;
-            _this.weight = 0.06;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x0000FF);
-                newGraphics.drawRect(0, 0, 64, 128);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                _super.prototype.addSprite.call(_this, new animConfig({
-                    animationName: "godrayPreview.mp4",
-                    scaleX: 3,
-                    scaleY: 3,
-                    speed: 0.3,
-                    x: 64,
-                    y: 77,
-                    anchorX: 0.5,
-                    anchorY: 0.34,
-                }));
-                return g;
-            });
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, tinyBlock32.objectName, wideBlock.objectName, mio.objectName, player.objectName);
-            return _this;
-            //super.addMoveCollisionTarget(mio.objectName);
-        }
-        dummySandbag.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-        };
-        dummySandbag.objectName = "dummySandbag";
-        return dummySandbag;
-    }(objectBase));
-
     var mio = /** @class */ (function (_super) {
         __extends(mio, _super);
-        function mio(xp, yp) {
+        function mio(xp, yp, input) {
             var _this = _super.call(this, xp, yp, mio.objectName) || this;
             _this.airFriction = 0.93;
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
@@ -2078,7 +2130,7 @@
             _this.normalRunSpeed = 13;
             _this.superRunSpeed = 19;
             _this.currentSprite = "catReady";
-            _this.currentSpriteObj = null;
+            _this.currentSpriteObj = new spriteContainer();
             _this.jumpAngle = 0;
             _this.shakeCameraForce = 0;
             _this.airbornTimer = 0;
@@ -2105,13 +2157,12 @@
                 g.calculateBounds();
                 return g;
             });
-            var filtertest = new PIXI.Filter(undefined, _this.myShaderFrag);
-            _this.g.filters = [filtertest];
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName, tinyBlock32.objectName, wideBlock.objectName);
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName, tinyBlock32.objectName, wideBlock.objectName);
             _this.updateCurrentSprite();
             return _this;
         }
         mio.prototype.logic = function (l) {
+            var _this = this;
             _super.prototype.logic.call(this, l);
             if (Math.floor(this.force.Dy) == 0 && Math.floor(this.gravity.magnitude) == 0) {
                 this.hasJumped = false;
@@ -2200,22 +2251,20 @@
                 _super.prototype.removeAllSprites.call(this);
                 this.updateCurrentSprite();
             }
-            if (this.currentSpriteObj != null) {
-                this.currentSpriteObj.rotation = this.jumpAngle;
-                if (this.climbing) {
-                    if (l.checkKeyHeld("a")) {
-                        this.currentSpriteObj.rotation = calculations.degreesToRadians(90);
-                    }
-                    else if (l.checkKeyHeld("d")) {
-                        this.currentSpriteObj.rotation = calculations.degreesToRadians(270);
-                    }
+            this.currentSpriteObj.update(function (x) { return x.rotation = _this.jumpAngle; });
+            if (this.climbing) {
+                if (l.checkKeyHeld("a")) {
+                    this.currentSpriteObj.update(function (x) { return x.rotation = calculations.degreesToRadians(90); });
                 }
-                if (this.currentSprite == "catRun") {
-                    var animWithSpeed = 0.5 * Math.abs(this.force.Dx) / this.superRunSpeed;
-                    if (animWithSpeed < 0.1)
-                        animWithSpeed = 0.1;
-                    this.currentSpriteObj.animationSpeed = animWithSpeed;
+                else if (l.checkKeyHeld("d")) {
+                    this.currentSpriteObj.update(function (x) { return x.rotation = calculations.degreesToRadians(270); });
                 }
+            }
+            if (this.currentSprite == "catRun") {
+                var animWithSpeed_1 = 0.5 * Math.abs(this.force.Dx) / this.superRunSpeed;
+                if (animWithSpeed_1 < 0.1)
+                    animWithSpeed_1 = 0.1;
+                this.currentSpriteObj.update(function (x) { return x.animationSpeed = animWithSpeed_1; });
             }
             if (Math.abs(Math.floor(this.force.Dx)) != 0) {
                 if (this.force.Dx > 0) {
@@ -2234,10 +2283,10 @@
                 }
             }
             if (Math.abs(Math.floor(this.force.Dx)) >= 5) {
-                l.camera.setMoveSpeedX(0.07);
+                l.setCameraMoveSpeedX(0.07);
             }
             else {
-                l.camera.setMoveSpeedX(0.04);
+                l.setCameraMoveSpeedX(0.04);
             }
             if (this.force.Dy >= 1) {
                 this.airbornTimer++;
@@ -2253,13 +2302,13 @@
             }
             this.hangleAttacks(l);
             if (this.shakeCameraForce > 0) {
-                l.camera.cameraOffsetX = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
-                l.camera.cameraOffsetY = -this.shakeCameraForce + Math.random() * this.shakeCameraForce;
+                l.setCameraOffsetX(-this.shakeCameraForce + Math.random() * this.shakeCameraForce);
+                l.setCameraOffsetY(-this.shakeCameraForce + Math.random() * this.shakeCameraForce);
                 this.shakeCameraForce--;
             }
             else {
-                l.camera.cameraOffsetX = 0;
-                l.camera.cameraOffsetY = 0;
+                l.setCameraOffsetX(0);
+                l.setCameraOffsetY(0);
             }
             var spaceToAdd = 128;
             if (Math.abs(this.force.Dx) > 2) {
@@ -2273,12 +2322,12 @@
             if (Math.floor(this.force.Dy) > 30) {
                 addCamSpaceY = 600;
             }
-            l.camera.setTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
+            l.setCameraTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
             if (this.hitboxToCreate != null) {
                 if (this.hitboxToCreate[0] > 0) {
                     this.hitboxToCreate[0]--;
                     if (this.hitboxToCreate[0] == 0) {
-                        l.objContainer.addObject(this.hitboxToCreate[1], this.onLayer);
+                        l.addObject(this.hitboxToCreate[1], this.onLayer);
                     }
                 }
                 if (this.hitboxToCreate != null && this.hitboxToCreate[1].aerial && (this.climbing || Math.round(this.gravity.Dy) == 0)) {
@@ -2286,8 +2335,8 @@
                 }
             }
             if (l.checkKeyReleased("p") && this.attacking == false) {
-                l.objContainer.deleteObject(this);
-                l.objContainer.addObject(new player(this.g.x, this.g.y - 32), this.onLayer);
+                l.deleteObject(this);
+                l.addObject(new player(this.g.x, this.g.y - 32, ""), this.onLayer);
             }
         };
         mio.prototype.hangleAttacks = function (l) {
@@ -2297,7 +2346,7 @@
                     this.constantForce = 15;
                     this.actionWait = 33;
                     this.airbornTimer += 5;
-                    resourcesHand.playAudioVolume("playerBeastAttack1.ogg", 0.2);
+                    /*resourcesHand.playAudioVolume("playerBeastAttack1.ogg", 0.2);
                     this.hitboxToCreate = tools.createHitbox({
                         startupTime: 4,
                         x: this.g.x,
@@ -2309,13 +2358,13 @@
                         hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 16),
                         aerial: true,
                         type: "playerBeastForm"
-                    });
+                    });*/
                 }
                 else {
                     this.attacking = true;
                     this.constantForce = 10;
                     this.actionWait = 25;
-                    this.hitboxToCreate = tools.createHitbox({
+                    /*this.hitboxToCreate = tools.createHitbox({
                         startupTime: 4,
                         x: this.g.x,
                         y: this.g.y,
@@ -2326,7 +2375,7 @@
                         hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 12),
                         aerial: false,
                         type: "playerBeastForm"
-                    });
+                    });*/
                 }
             }
             if (this.facingRight) {
@@ -2347,85 +2396,106 @@
         };
         mio.prototype.updateCurrentSprite = function () {
             _super.prototype.removeAllSprites.call(this);
-            this.currentSpriteObj = _super.prototype.addSprite.call(this, new animConfig({
-                animationName: this.currentSprite,
-                scaleX: 3,
-                scaleY: 3,
-                speed: 0.3,
-                x: 64,
-                y: 77,
-                anchorX: 0.5,
-                anchorY: 0.34,
-            }));
-            if (this.currentSprite == "catReady") {
-                this.currentSpriteObj.animationSpeed = 0.155;
+            if (this.currentSprite != null) {
+                this.currentSpriteObj.set(_super.prototype.addSprite.call(this, new animConfig({
+                    animationName: this.currentSprite,
+                    scaleX: 3,
+                    scaleY: 3,
+                    speed: 0.3,
+                    x: 64,
+                    y: 77,
+                    anchorX: 0.5,
+                    anchorY: 0.34,
+                })));
+                if (this.currentSpriteObj != null) {
+                    if (this.currentSprite == "catReady") {
+                        this.currentSpriteObj.update(function (x) { return x.animationSpeed = 0.155; });
+                    }
+                    this.currentSpriteObj.update(function (x) { return x.pivot.set(0, 25); });
+                }
             }
-            this.currentSpriteObj.pivot.set(0, 25);
         };
         mio.objectName = "mio";
         return mio;
     }(objectBase));
 
-    var collisionSlopeLeft = /** @class */ (function (_super) {
-        __extends(collisionSlopeLeft, _super);
-        function collisionSlopeLeft(xp, yp) {
-            var _this = _super.call(this, xp, yp, collisionSlopeLeft.objectName) || this;
+    var collisionPolygon = /** @class */ (function (_super) {
+        __extends(collisionPolygon, _super);
+        function collisionPolygon(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, collisionPolygon.objectName) || this;
             _this.switch = false;
             _this.friction = 0.986;
             _this.previousTargets = [];
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 192);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 192);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
+            _this.line = [0, 32, 16, 32, 48, 16, 64, 16];
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 64);
+            return _this;
+        }
+        collisionPolygon.prototype.setPolygon = function (polygon) {
+            var _this = this;
+            this.line = polygon;
+            _super.prototype.style.call(this, function (g) {
                 var myGraph = new PIXI.Graphics();
                 // Move it to the beginning of the line
-                myGraph.position.set(64, 128);
-                // Draw the line (endPoint should be relative to myGraph's position)
-                myGraph.lineStyle(5, 0xffffff)
-                    .moveTo(0, 0)
-                    .lineTo(128, -64);
+                //myGraph.position.set(0, 12);
+                var linesWithEnding = __spreadArrays(_this.line);
+                linesWithEnding.push(64, 64, 0, 64);
+                //console.log(linesWithEnding);
+                myGraph.beginFill(0xff0000);
+                myGraph.drawPolygon(linesWithEnding);
+                myGraph.endFill();
                 g.addChild(myGraph);
                 return g;
             });
-            return _this;
-        }
-        collisionSlopeLeft.prototype.logic = function (l) {
+        };
+        collisionPolygon.prototype.getYFromLine = function (xIndex) {
+            for (var i = 0; i < this.line.length; i += 2) {
+                var xFirst = this.line[i];
+                var yFirst = this.line[i + 1];
+                var xLast = this.line[i + 2];
+                var yLast = this.line[i + 2 + 1];
+                if (xIndex >= xFirst && xIndex <= xLast) {
+                    if (yFirst == yLast) {
+                        return yFirst;
+                    }
+                    else {
+                        var steps = xLast - xFirst;
+                        var stepSize = (yFirst - yLast) / steps;
+                        return yFirst + (stepSize * (xFirst - xIndex));
+                    }
+                }
+            }
+            if (xIndex <= 0) {
+                return this.line[1];
+            }
+            else if (xIndex >= this.line[this.line.length - 1 - 1]) {
+                return this.line[this.line.length - 1];
+            }
+            return 0;
+        };
+        collisionPolygon.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
+            for (var _i = 0, _a = this.previousTargets; _i < _a.length; _i++) {
+                var prevTarget = _a[_i];
+                prevTarget._isColliding_Special = false;
+            }
             var newTargets = l.isCollidingWithMultiple(this, this.collisionBox, [player.objectName, mio.objectName, dummySandbag.objectName]);
-            for (var _i = 0, newTargets_1 = newTargets; _i < newTargets_1.length; _i++) {
-                var target = newTargets_1[_i];
-                for (var _a = 0, _b = this.previousTargets; _a < _b.length; _a++) {
-                    var prevTarget = _b[_a];
+            for (var _b = 0, newTargets_1 = newTargets; _b < newTargets_1.length; _b++) {
+                var target = newTargets_1[_b];
+                for (var _c = 0, _d = this.previousTargets; _c < _d.length; _c++) {
+                    var prevTarget = _d[_c];
                     if (target.ID == prevTarget.ID) {
                         this.previousTargets.splice(this.previousTargets.indexOf(prevTarget), 1);
                     }
                 }
                 if (target.force.Dy > 0) {
                     var index = (target.g.x + target.collisionBox.x + (target.collisionBox.width / 2)) - this.g.x;
-                    if (index < 64) {
-                        index = 64;
-                    }
-                    else if (index > 192) {
-                        index = 192;
-                    }
-                    var ratio = (index - 64) / 128;
-                    var extraCheckTop = 0;
-                    if (target.force.Dx < -1) {
-                        extraCheckTop = 32;
-                    }
-                    if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + 64 + 64 * (1 - ratio) - extraCheckTop) {
+                    if (target.force.Dx < -1) ;
+                    var spaceFromTop = this.getYFromLine(index);
+                    if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + (spaceFromTop / 2)) {
                         target.gravity.magnitude = 0;
                         target.force.Dy = 0;
                         target.force.Dx *= 0.916;
-                        target.g.y = this.g.y - target.collisionBox.y - (target.collisionBox.height) + 64 + (64 * (1 - ratio));
-                        target._isColliding_Special = true;
-                    }
-                    else if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + 64 + 64 * (1 - ratio) - 1) {
-                        target.force.Dy = 0;
-                        target.gravity.magnitude = 0;
+                        target.g.y = this.g.y - target.collisionBox.y - target.collisionBox.height + spaceFromTop; // - target.collisionBox.y - (target.collisionBox.height) + 6 + (6*(1-ratio));
                         target._isColliding_Special = true;
                     }
                     else {
@@ -2435,101 +2505,43 @@
                 else if (target.force.Dy <= 0) {
                     target._isColliding_Special = false;
                 }
-                for (var _c = 0, _d = this.previousTargets; _c < _d.length; _c++) {
-                    var prevTarget = _d[_c];
-                    prevTarget._isColliding_Special = false;
-                }
                 this.previousTargets = newTargets;
             }
         };
+        collisionPolygon.objectName = "collisionPolygon";
+        return collisionPolygon;
+    }(objectBase));
+
+    var collisionSlopeLeft = /** @class */ (function (_super) {
+        __extends(collisionSlopeLeft, _super);
+        function collisionSlopeLeft(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, input) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _this.setPolygon([0, 32, 16, 32, 48, 16, 64, 16]);
+            return _this;
+        }
         collisionSlopeLeft.objectName = "collisionSlopeLeft";
         return collisionSlopeLeft;
-    }(objectBase));
+    }(collisionPolygon));
 
     var collisionSlopeRight = /** @class */ (function (_super) {
         __extends(collisionSlopeRight, _super);
-        function collisionSlopeRight(xp, yp) {
-            var _this = _super.call(this, xp, yp, collisionSlopeRight.objectName) || this;
+        function collisionSlopeRight(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, input) || this;
             _this.switch = false;
             _this.friction = 0.986;
-            _this.previousTargets = [];
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 192);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 192);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                var myGraph = new PIXI.Graphics();
-                // Move it to the beginning of the line
-                myGraph.position.set(64, 64);
-                // Draw the line (endPoint should be relative to myGraph's position)
-                myGraph.lineStyle(5, 0xffffff)
-                    .moveTo(0, 0)
-                    .lineTo(128, 64);
-                g.addChild(myGraph);
-                return g;
-            });
+            _this.setPolygon([0, 16, 16, 16, 48, 32, 64, 32]);
             return _this;
         }
-        collisionSlopeRight.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            var newTargets = l.isCollidingWithMultiple(this, this.collisionBox, [player.objectName, mio.objectName, dummySandbag.objectName]);
-            for (var _i = 0, newTargets_1 = newTargets; _i < newTargets_1.length; _i++) {
-                var target = newTargets_1[_i];
-                for (var _a = 0, _b = this.previousTargets; _a < _b.length; _a++) {
-                    var prevTarget = _b[_a];
-                    if (target.ID == prevTarget.ID) {
-                        this.previousTargets.splice(this.previousTargets.indexOf(prevTarget), 1);
-                    }
-                }
-                if (target.force.Dy > 0) {
-                    var index = (target.g.x + target.collisionBox.x + (target.collisionBox.width / 2)) - this.g.x;
-                    if (index < 64) {
-                        index = 64;
-                    }
-                    else if (index > 192) {
-                        index = 192;
-                    }
-                    var ratio = (index - 64) / 128;
-                    var extraCheckTop = 0;
-                    if (target.force.Dx > 1) {
-                        extraCheckTop = 32;
-                    }
-                    if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + 64 + 64 * (ratio) - extraCheckTop) {
-                        target.gravity.magnitude = 0;
-                        target.force.Dy = 0;
-                        target.force.Dx *= 0.916;
-                        target.g.y = this.g.y - target.collisionBox.y - (target.collisionBox.height) + 64 + (64 * (ratio));
-                        target._isColliding_Special = true;
-                    }
-                    else if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + 64 + 64 * (ratio) - 1) {
-                        target.force.Dy = 0;
-                        target.gravity.magnitude = 0;
-                        target._isColliding_Special = true;
-                    }
-                    else {
-                        target._isColliding_Special = false;
-                    }
-                }
-                else if (target.force.Dy < -0.5) {
-                    target._isColliding_Special = false;
-                }
-                for (var _c = 0, _d = this.previousTargets; _c < _d.length; _c++) {
-                    var prevTarget = _d[_c];
-                    prevTarget._isColliding_Special = false;
-                }
-                this.previousTargets = newTargets;
-            }
-        };
         collisionSlopeRight.objectName = "collisionSlopeRight";
         return collisionSlopeRight;
-    }(objectBase));
+    }(collisionPolygon));
 
     //import anime from 'animejs';
     var grass = /** @class */ (function (_super) {
         __extends(grass, _super);
-        function grass(xp, yp) {
+        function grass(xp, yp, input) {
             var _this = _super.call(this, xp, yp, grass.objectName) || this;
             _this.switch = false;
             _this.friction = 0.0;
@@ -2598,44 +2610,47 @@
         return grass;
     }(objectBase));
 
-    var marker = /** @class */ (function (_super) {
-        __extends(marker, _super);
-        function marker(xp, yp) {
-            var _this = _super.call(this, xp, yp, marker.objectName) || this;
+    var scene_home_Forest1 = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALnVQBsSAacaeJNLbATUOLMslgRQxwHUBLTABcAFs1IUqHWt2wAJGHwDmwwWNYgARhDABrRXDqYAwshLI4hEAGIYADjt2QlEhACe8ACIRBEQgG1QWB8AeQ0AKxgwQWwASXQAGTd4f1A+dAAHVEEAZUE4NMVLJxBBPhIYNQk+bBMoDTTvPmR0YIAzABUymGxCVogSbBhKATbcxrBO8tr69EbmouHsAAUIOEE26YbS+YI+gaGQAA9CAEYTgCZKV0IAZlsAFkpZ2EsNM10ANnvDm-OQAF9yKkMllcvl0IUCCBiqVypVFptZtsWh0uj1dv1BsNMKMfKUJl1EXN0AsQNUVmsNsg6lsmiSMftKMcCCcAOwfK63B5Paivd46L4-P6A4GZHJ5Aqk2EVIjiBHUmbEtqTbq9TEHEatMb4lVE5Gk8mrdatPV0tWMo6Ec73AAMnIId0eIGeMs0-MFvwBQLJIPF4Mh0Mo0vhZJqCtpzWVaPNWLJOK1eL4BKm4aRZqhxUNlJNqeJMYOzJuNqd1wd3OdvKhb2Qn2+npFPrFYMlGaDXRD1VNkdR5XRe1jmu1Sd1uf1rdDFONXfp-YLhHutntjp5Lyr7rrwu9aSbEohUvbsvUndHdKjvfz2Nx4xHNLTO0DE6NVNveYZseZAFoThyQKXlxXVzdGsBQ3L1RVBXcAxhA8WCqMMX2RM9VTfDV4yHZMYGnA1lifHMEPTWcmUID9bDtX8uSdF0+WAj1N3Av0WwfYNDzg6ckL7dVLwTa9CRPe9Mxw7MsJQoiCC-C4lxuH8qLXYDfkOL4wMbCD-X3OEWPlfDuxVDiLUHRMMOEh8synPiZ04y0xLOS5yIIc4AFZpMrIDdHkxSG23FTGOg9TYM0xVEJ7ZDCLjK8dV4rT6WMwTTMii9LPEmzS3OVkbJklydDc+4lM8hi93HZi-NDNigt0gc0IMm8AvTaLJ2faqdhCz9rPtFK0uc6tXPOBTso831m3ypiYLlYqzPY+L9J4lM4vHEz6ojcyLWaiTbLaldXU6zLuvcrd+sgtSZSK49IvGkTQu48LpoaqKBLqvDrvi5akqtVL1uorqepyvbVIK4aj3g67TpCybLswszsLu4SmuIlrVtegCNv5LKvp3H6ht8kbjsB0qJoqqawZm2rcKhiynta+H0s25G+tR7y2wx-6Sp03GwuHCKHtmmL5rvRb3xhlbkopjqke23rdtpwafMOzGAYWoGLJBtmroWiHifBs6ybh9rAKp0WUa8yX6elxmxpxs7FcM9WiaE9XoasgWXu1xG5L1mmDago2O1lnn5b0vHQaM261Zmu3EvJp33q2z63byj2Sj+1jTeZ83-aVgmOet2KOdD2HBYj2SPp2+iBrjwqZaZ6MU9Zy3CaDm2Q9J-nnrsoWdZF6Pxfdg6vYr88q4utPA8WSHbcb+3m7WhHI+pzvY+7jTRpOs3gdTmuM7rrOVY1pvw7eguo6L5S59+hnE6X5OV+rqqt8z7nXxzh2WQATnzjKZ+L-aT+Ns-sYvhXV+vjzVW9ds5jzDrZC4i4p773fkfEu88jreyVMvf+V92Y3w3nfMcdspJQL-OWSm64hT62Pujb+-k5YoL9mg5WQDOYjwbktecvxJJOTbi7DuH80ZSx7knSul8B5rwwcPYOoCmEEHuCwrWe836u1nvAr+vDz78NQYIwBr5b73S3nbSRE9W7O0LmLLhdN46nwoT7Kh5UaHp2EY+EB2ix66NajaKBhCOGH1ygoshSjf4qOoWo9BdDNEk3EU41aLiZG604XAz+3iF5Y0oX-fx6F1FjmCaPUJUjSwnHuJRYW7ijExO4Z7eJSDApJKsQE2hGjMFaLoTorJhBSKRPbh476Jiy4m2UX3ARKTAk1JEfY+pYDc6ECfmwgxIFiExy8Tw0pvdgqqL6dUtJtSQl83HvacZLSaKgRmbEuZiCFllVQtYoedjN7DPER+BcWyJmR1oiQ2ZJSjl8J6Usyq-TVmDMuffMe347k7NrNM+RByXnlzeYs5JnyVk1TWRkjZzTbLbOgRlR5+zimmPIYvXx7zoX43OXNOpfzxFItLCitxwL6ygsxZ0n+iS-GVOWTYoJ8LGEbJySWMZ9z97oppR0hO5jkEVNOVUllAyLlYIIv83JgLUWbT5cYw2WKfEMrxUymF4rvmSuJdgmVXKCAUvyVSuiRSBVmJxWqqFGqCVWzZWIjlsrkU8rRXs-lyq6VCvKYy0VzLCVc11dK8RnK5WUqmdSpVpdBWWosSKrifq7U-KlY1fVobjXhtNZ4sFKr5mQpOfGzV-qGEOrnCyD4ZFyUuoVW6yNCCIXdOtb6wtiadXrNLd+Ct3KgUZqedmz1MbhU+oLba2uSbA0puDeWtN7CTW9tpdGhJsah3nQTaO1tCL21Tudd2xVZqPULrKaeSxTaR3rzHW20SHbp2TN3Vm+dFrF2DvVSegOLaiUXssmyH8lad01r3VGh9h7tLLotqkuF56N2XvZNeh5f673muxY+71z7h2vrXe+yDn7oPbvlUQiN-661dNxY21Dg830Bo-cyE4L8YO8rg+0-dgHjkszFUW0RDjg00Zw2G29DGAOIaAyiONK7m3oYo5hqjXGf24d2SC2tijc0NvzSJ09tiMPsvbVJrtMnZ0YoQ6qpdKGVNobPeujTolzgRO4+m3jEt+MGafSR4zZGxPFo4xsyzeDtM8fo3Zwj9LDNOdA188DZmS0Was9JnzcmCMKdeUpljq7TPqfC5ZTztHXUxfg4xgTzH+5JbU+J8zaXIveZs75rucX63EeU8F2F-EIPFeZOca0GXq1Zb4-5r1R7hN1a1aFlL7nS0tYNUamdPa9M5Yc8hoLACQsNbC0NizrXrPjds5VuJ8WauJdE8lorqXmsrai+VjrfmqtEatbVub9WbqNYO1aI7ZW1sVdIYc6rl2duqdZXdpbaXbRtbw5mzr52AuOau2c8jbmrkef+6tm9L3nk5q2x9-Lu3CtQ5JTDzthqq2A7nfpxT23UdfYlYN6Hw3YfHee6djbb2LuBfB6xyH7HycWcp09+HNPXvgvp2Dz7Jn0cs8xxT7HY3Of4ey-ZwnKPelo++4t1naXHIA9kxL4Hm33sM-5y5vbGO9XiIct+jnsGueI-7UhnrIHrv9YW2T4XFnldw5N2rs7GveczcZwV+Xdv9cecd1T8XQPXd09Bx77XQjvf7d+81-3xu6Om77QevLsuSfap90Gv3Ruce-oT-e3Lebw9gdt1HxXzX4YB+d0H2nPPQ+W6M31tjQz7dpfL3HzLLvq9I813z4nAvI964z8N1v2edMTfdVL5HWve868F0333Q-m5i8r-jqb0up8p776Tkvzey+L9x6rqv3Ou-u7r7NiHrmhfz4s8Ppf8eO9H-N4J32NrN9p+31ftLtgvMj+i-fs3SeC9p8I8t8B8J0PMv8VddNx8usB0w8gCi9bsFcd8rQICnc79D9-8mNACN8Z9+9L9B8LNUCK90CV8J9u84CcDgC39QDeZhsiC292s-9E8sCEt4D5tED08wC6Dv9b928MDmD89WDKCEDgFfkP9mt6Cf8TsmC89ptT9Pc5cQD8CuDCCeD98oD5M3da9gN69rdG8xCCDP81Cc8ZCCdJ8e9hD2DRDk1aDVDICx9NCQ9usdCz8mcL859DCJDjDR91sH8AChCPlU8Bt39PDbhix7DfDMDBCidLCbtrDx1bDLIixRt1CHDYstDnChMrdz9ddlDEjCxwi0C+DSCYCLcXCFCgji8aDHowiUiTD+DZC18LDAjX9gjqjt4HRCjiDijJsyCT9yjC8rD6E8iajOi6ifCEcBC5CBi2C4jhiPCVCkiuiGC8dejSin9j1SMqC2iRiOjkiIjJjGjzCKCWjcClCFj8jaiDjc8zDyD5DBi5j0kmsriijGCGjbj+isjdCcjZ8DDFiCjxjf93jV9jj7jZibcOCQj-iXjui3iSiQdMjn8X0zjqDdicFlipDqdTCQS7iZjYiIT4jKMYSViD94SMjYCwT8T9CbDRj9jXjVjoCESKS8TTjtiqi0Sx46TYSGTHCa9ETNjnM2TIT2j0TATpDgS+jtCvjXCvdzi-jLixjrjsTJT+Tes9DmcLjaSMTeC4S1imSyjpSKjWj2TNS9jtTUjIipimiTj8VjThSOTxEuSSSND0inDmTDSHiCT5j5StSxSsSJT1jk9WSRDvSaS9iPhvCgSyS3SDSkStiQynj7sy1scbh7JX50gXB3ALA9SQBgAAAdEoZAAsggAAAgLOwDABgHQBgAAH1hBqQYACzyAyyQBWgDAoBiyWyKyqzaz6zYAayAAxcwboQQE4JslsvoMAAoTsgs8oVoQQAs-4GMjYtUn4vA00nRG0FMtMmRAwakIwYQCACEZIf4AAXUoGEAEEwCrPikGEEFKAhHRFzPLLAAMDIGyHSBgBgEwFwE7JOGbJfLfJIA-K-MwAYD-KXOcCSDgAADlnJEgsySyThigAAvOIa85kG0M8-4IAA";
+
+    var scene_home = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALnVQBsSAacaeJNLbATUOLMslgRQxwHUBLTABcAFs1IUqHWt2wAJGHwDmwwWNYgARhDABrRXDqYAwshLI4hEAGIYADjt2QlEhACe8ACIRBEQgG1QWB8AeQ0AKxgwQWwASXQAGTd4f1A+dAAHVEEAZUE4NMVLJxBBPhIYNQk+bBMoDTTvPmR0YIAzABUymGxCVogSbBhKATbcxrBO8tr69EbmouHsAAUIOEE26YbS+YI+gaGQAA9CAGYTgDZKV1Pz20pZ2Et0l3cLAF9yVIys3Pz0QoIIGKpXKlUWm1m2xaHS6PV2-UGw0wox8pQmXQhc3QCxA1RWaw2yDqWya2Ph+0oxwIACYAKyXEDXAgAFgADKz7tRLBozLpzszDidqSAPl9Mjk8gUcSCKkRxOCiTMsW1Jt1egiDiNWmM0arMVCcXjVutWvrSeqKUdTtSOYzCGzbQ9ZZpeTp+YLhaLcd8JX8AUDKDKwbiaoqSc0VbCLYjccjtai+OipmHIebAcUjQTTSmsdGDlSTrZmVd7ezOY9ATzkHyBUKRZ9veLflL04GusHqmaIzDynC9jGtTrE3qcwbWyH8Sau2T+-n7cy7naWWWQE7ua73XWvWkm5L-tL23L1J3R6TI7280iUeMR8TUzsAxPjYS77nyTGqQBGACc1JLy8dLlKw3WtPQbHcfj3f1gUPFgqlDV8oXPNV301OMhyTGBp0NZZn2zRC01nSlCE-alFyZB1y2dKsaw9esxUgv0D1BI94OnZC+w1K94xvDFTwfDNcKzbDUOIghaVI-9KNXICXWrN1QPoxtGJbR8g1YhUCO7VVOMtQcE0wkTH0zKd+JnLirXEgB2BkmQuRc10BMBTBIapSWyMx0hgeIYFaVRtx9Zt93HdS4M0pUkJ7FCiNja9dT4rSyWMoTTMSy9LP5W07KLKj13kzcwIY31VJgliwpDdiot0gd0IM28IrTZLJxfBqdhiqkrNZYsl0LbrHLk2it3AwKoOY2VypPRKOPS-TeOTNLxxMlrw3My0Oq6-9ety4D8sUgLdyYkLYPlCqzOm0TYp4+L5tapLBOa-DbvSjrbk2nKZIrAaFLo-aVOCtTjuPBDbvOmLZuurCzJwh6RPawhbCFTbXo+51nLINzmg85AvIAJSUFQlIg4r-tK8aTsmkGqpm2q5shhamrw2GLKpWxv1s0tAM+mjvqGoqgugtsyvJ4GVtBizweHBKnsWlLlvvVaP0INmso57avoKwmRsOgGhaByqdOpuLJZulbocZqGLq-VlqW6iiV367mNd+4mBZKQG2LOqmLolwyLYZ4SLbhghP1ZWxyNVlG8sGwrlJdsaOxF+Wxb0mmIaM+7zYWoPP0-Wk-yXaSHZAn7hoOkrBbJvXPYN73U+Nunpf91Lpez6lP3ZgC1cdvbS7+13QuF-Wo1ro3ffpjOA6z5nCH5KT7dk7uS750ajt1j2pq9sG67HxuJ+b03LcIFXO8jnbo81suSYrhOh4vEervr9PFhhwPp4IABaWeC-nrni952P+bxw0qdDeNct6j3qgfJucs3xB3fmzTaecu6uiFIcfkF8+5AImonZUm9xbb0gfLM2k8W5v3gR3MiDkF4oOpGg5kGC46r0ruvSmYD8EQKllAveMCxxwIQUuakNtkHyVQeg52gCmE32rsPcBD8d5cOfpnUha1CDkP-O3Tm1EaF0IYRInWzDwqizwSnDhJsiEyxflPFRwcyLHxOEg0+X1RH0PESvfRUjQEyPYXIwhb5oGPQPq3Wwx9KHCN0M43RbjSYeNYV4kxPjOHmP8UzaxpFgn-kEX1ahIjaFiN7ow9xwCKZGLYfEjCvixzJNfqk2xGShGOO5hE1x2tolFJwZFUpNVTENwUU+EhgS35pOPhosJOgmn5L0a07Bt9orePKYkvx3CAnmKCcffhRcck6OaeXN2a9DFJ2MV0hJZjFmKP6SswZtSer5w2eE3JLiJlROvm0mZ1U0LdKfn0-eFyant02jc7J59tlX12QYkBsS76yPmScypSyUmK2DrnfOdkAW-12kvABTzQUxJKXEo50KelJLhdUhFIcw7-NGU7R5LTnnTOkZCuZdUFmwrOd82BZD+FMnWYCsZ9zIk0uxS8+lsyylMphY1YlViEVqOuaM8Zy8BUDyrp4hloraafKWss9l1jP622tJSnuCqdlKpYbi1V+KxWEtOV8nhhEyFfxRQajFRNJm0sHsKt53ECUatllq3hb87Goq0ei-+LqsUmv2bgzp7zjlWpZTav1drrEOv1Q0v+Mcw2KvdpGjpeKY3er9pK5RCKhTH2ZAuUZ-LjXZvBWakVFr1WFtZbatqb97HIvnFQtFugq3-WAAAHRKMgQdBAAAEg7sBgBgOgGAAB9YQRI50ADFzDdEEJ+Qd5Bx0gFaAYKAI7t2TunXOhdsBN3br6GAAoB7B35GUIIQdbwpnupVfW-NlqfWWOLXOD+KaCD2TVgYIkRhhAQH+MkN4ABdSgwgBCYGnelQYghSj-DhCAAdIBJ0GDINkLyMBMC4APZ+LdE6wDYZILhmA+GGBEafc4JIcAAByslEivFHZ+YoAAvOI8GqSsig28IAA";
+
+    var roomIndex = {
+        "scene_home_Forest1": scene_home_Forest1, "scene_home": scene_home,
+    };
+
+    var roomChanger = /** @class */ (function (_super) {
+        __extends(roomChanger, _super);
+        function roomChanger(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, roomChanger.objectName) || this;
             _this.switch = false;
             _this.friction = 0.0;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
+            _this.inputTemplate = '{"to": "", "from": "", "facing": ""}';
+            _this.targetRoom = "";
+            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
+            _this.targetRoom = input;
+            _this.outputString = _this.targetRoom;
             _super.prototype.style.call(_this, function (g) {
-                var line = new PIXI.Graphics();
-                line.lineStyle(25, 0xBB0000, 1, 1);
-                line.x = 32;
-                line.y = 0;
-                line.moveTo(0, 0);
-                line.lineTo(0, 100);
-                line.endFill();
-                g.addChild(line);
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x003eff);
+                newGraphics.drawRect(0, 0, 32, 32);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.calculateBounds();
                 return g;
             });
             return _this;
-            /*setInterval(()=>{
-                this.switch = !this.switch;
-            }, 700);*/
         }
-        marker.prototype.logic = function (l) {
-            this.life--;
-            if (this.life <= 0) {
-                l.objContainer.deleteObject(this);
+        roomChanger.prototype.logic = function (l) {
+            var collisionTarget = l.isCollidingWith(this, this.collisionBox, [player.objectName]);
+            if (collisionTarget != null) {
+                var inputJson = JSON.parse(this.targetRoom);
+                //console.log(inputJson);
+                //console.log("Load room: ",roomIndex[inputJson.to]);
+                l.loadRoom(roomIndex[inputJson.to], this.targetRoom);
             }
-            //super.logic(l);
-            /*if(this.switch){
-                super.setNewForce(l.degreesToRadians(0), 3);
-            }else{
-                super.setNewForce(l.degreesToRadians(180), 3);
-            }*/
         };
-        marker.objectName = "marker";
-        return marker;
+        roomChanger.objectName = "roomChanger";
+        return roomChanger;
     }(objectBase));
 
     var tileMetaObj = /** @class */ (function (_super) {
@@ -2690,33 +2705,37 @@
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
-                //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
-                function (xp, yp) { return new block(xp, yp); },
-                function (xp, yp) { return new collisionSlopeLeft(xp, yp); },
-                function (xp, yp) { return new collisionSlopeRight(xp, yp); },
-                function (xp, yp) { return new movingBlockHori(xp, yp); },
-                function (xp, yp) { return new movingBlockVert(xp, yp); },
-                function (xp, yp) { return new tinyBlock32(xp, yp); },
-                function (xp, yp) { return new wideBlock(xp, yp); },
-                function (xp, yp) { return new grass(xp, yp); },
-                function (xp, yp) { return new dummySandbag(xp, yp); },
-                function (xp, yp) { return new ladder(xp, yp); },
-                function (xp, yp) { return new textPrompt(xp, yp); },
-                function (xp, yp) { return new hitbox(xp, yp); },
-                function (xp, yp) { return new marker(xp, yp); },
-                function (xp, yp) { return new mio(xp, yp); },
-                function (xp, yp) { return new player(xp, yp); },
+                //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
+                function (xp, yp, input) { return new baseAttack(xp, yp, input); },
+                function (xp, yp, input) { return new threeHitNormal(xp, yp, input); },
+                function (xp, yp, input) { return new movingBlockHori(xp, yp, input); },
+                function (xp, yp, input) { return new movingBlockVert(xp, yp, input); },
+                function (xp, yp, input) { return new collisionPolygon(xp, yp, input); },
+                function (xp, yp, input) { return new collisionSlopeLeft(xp, yp, input); },
+                function (xp, yp, input) { return new collisionSlopeRight(xp, yp, input); },
+                function (xp, yp, input) { return new block(xp, yp, input); },
+                function (xp, yp, input) { return new block32x64(xp, yp, input); },
+                function (xp, yp, input) { return new block64x32(xp, yp, input); },
+                function (xp, yp, input) { return new tinyBlock32(xp, yp, input); },
+                function (xp, yp, input) { return new wideBlock(xp, yp, input); },
+                function (xp, yp, input) { return new grass(xp, yp, input); },
+                function (xp, yp, input) { return new dummySandbag(xp, yp, input); },
+                function (xp, yp, input) { return new ladder(xp, yp, input); },
+                function (xp, yp, input) { return new textPrompt(xp, yp, input); },
+                function (xp, yp, input) { return new roomChanger(xp, yp, input); },
+                function (xp, yp, input) { return new mio(xp, yp, input); },
+                function (xp, yp, input) { return new player(xp, yp, input); },
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
             return this.availibleObjects;
         };
-        objectGenerator.prototype.generateObject = function (objectName, x, y, tile) {
+        objectGenerator.prototype.generateObject = function (objectName, x, y, tile, inputString) {
             for (var i = 0; i < this.availibleObjects.length; i++) {
                 if (tile == null) {
                     //Create normal object
                     var avObj = this.availibleObjects[i];
-                    var temp = avObj(x, y);
+                    var temp = avObj(x, y, inputString);
                     var className = tools.getClassNameFromConstructorName(temp.constructor.toString());
                     if (className == objectName) {
                         return temp;
@@ -2733,203 +2752,6 @@
             throw new Error("Can't generate object for: " + objectName);
         };
         return objectGenerator;
-    }());
-
-    var resourcesHand = /** @class */ (function () {
-        function resourcesHand(app, onCompleteCallback, alternativePath) {
-            if (alternativePath === void 0) { alternativePath = ""; }
-            this.objectGen = new objectGenerator();
-            resourcesHand.app = app;
-            PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
-            fetch(alternativePath + '/resources.txt', {
-                method: 'get'
-            })
-                .then(function (response) { return response.text(); })
-                .then(function (textData) { return resourcesHand.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
-                .catch(function (err) {
-                console.log("err: " + err);
-            });
-        }
-        resourcesHand.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
-            resourcesHand.resourcesToLoad = loadedResources;
-            var audioToLoad = loadedResources.filter(function (x) { return x.indexOf(".wav") != -1 || x.indexOf(".ogg") != -1; });
-            resourcesHand.loadAudio(audioToLoad);
-            loadedResources = loadedResources.filter(function (x) { return x.indexOf(".mp4") != -1 || x.indexOf(".json") != -1 || (x.indexOf(".png") != -1 && loadedResources.indexOf(x.replace(".png", ".json")) == -1); });
-            resourcesHand.resourcesToLoad.forEach(function (resourceDir) {
-                var resourceDirsSplit = resourceDir.split("/");
-                var resourceName = resourceDirsSplit[resourceDirsSplit.length - 1];
-                resourcesHand.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
-            });
-            resourcesHand.app.loader.load(function (e) {
-                resourcesHand.resourcesToLoad.forEach(function (resource) {
-                    var split = resource.split("/");
-                    var name = split[split.length - 1];
-                    if (name.indexOf(".json") != -1) {
-                        resourcesHand.storeAnimatedArray(name);
-                    }
-                    else if (split[0] == "_generated_tiles") {
-                        resourcesHand.storeStaticTile(name);
-                    }
-                    else if (split[0] == "tiles") {
-                        resourcesHand.storeStaticTile(name);
-                    }
-                    else if (name.indexOf(".png") != -1) {
-                        resourcesHand.storeStaticTile(name);
-                    }
-                    else if (name.indexOf(".mp4") != -1) {
-                        resourcesHand.storeVideoAsAnimatedTexture("resources/" + resource, name);
-                    }
-                });
-                onCompleteCallback();
-            });
-        };
-        resourcesHand.loadAudio = function (audioFiles) {
-            for (var _i = 0, audioFiles_1 = audioFiles; _i < audioFiles_1.length; _i++) {
-                var audioToLoad = audioFiles_1[_i];
-                var dirParts = audioToLoad.split("/");
-                resourcesHand.audio[dirParts[dirParts.length - 1]] = new Howl({
-                    src: ['resources/' + audioToLoad]
-                });
-            }
-        };
-        resourcesHand.playAudio = function (name) {
-            resourcesHand.audio[name].play();
-        };
-        resourcesHand.playAudioVolume = function (name, volume) {
-            resourcesHand.audio[name].volume(volume);
-            resourcesHand.audio[name].play();
-        };
-        resourcesHand.playRandomAudio = function (names) {
-            resourcesHand.audio[names[calculations.getRandomInt(0, names.length - 1)]].play();
-        };
-        resourcesHand.generateAnimatedTiles = function (animationMeta) {
-            if (resourcesHand.animatedSprite[animationMeta.name] == null) {
-                resourcesHand.animatedSprite[animationMeta.name] = [];
-            }
-            for (var _i = 0, _a = animationMeta.tiles; _i < _a.length; _i++) {
-                var tile = _a[_i];
-                var parts = tile.resourceName.split("/");
-                var newTex = new PIXI.Texture(resourcesHand.app.loader.resources[parts[parts.length - 1]].texture.baseTexture, new PIXI.Rectangle(tile.startX, tile.startY, tile.width, tile.height));
-                resourcesHand.animatedSprite[animationMeta.name].push(newTex);
-            }
-        };
-        resourcesHand.storeStaticTile = function (genName) {
-            var texturesTmp = resourcesHand.app.loader.resources[genName].texture;
-            if (texturesTmp != null) {
-                resourcesHand.staticTile[genName] = texturesTmp;
-            }
-            else {
-                throw new Error("Can't create static tile resource for: " + genName);
-            }
-        };
-        resourcesHand.storeAnimatedArray = function (resourceName) {
-            var texturesTmp = resourcesHand.app.loader.resources[resourceName].textures;
-            if (resourcesHand.app.loader.resources[resourceName].textures != null) {
-                for (var key in texturesTmp) {
-                    if (texturesTmp.hasOwnProperty(key)) {
-                        if (resourcesHand.animatedSprite[resourceName] == null) {
-                            resourcesHand.animatedSprite[resourceName] = [];
-                        }
-                        resourcesHand.animatedSprite[resourceName].push(texturesTmp[key]);
-                    }
-                }
-            }
-            //const animeFromSheet = new PIXI.AnimatedSprite(animation);
-        };
-        resourcesHand.storeVideoAsAnimatedTexture = function (resourcelocation, resourceName) {
-            /*const texture = PIXI.Texture.from(resourcelocation);
-
-            var textVid = new PIXI.AnimatedSprite(texture);
-
-
-            if(resourcesHand.animatedSprite[resourceName] == null){
-                resourcesHand.animatedSprite[resourceName] = [];
-            }
-            resourcesHand.animatedSprite[resourceName].push(textVid);*/
-            console.log("After adding video texture: ", resourcesHand.animatedSprite[resourceName]);
-        };
-        resourcesHand.getAnimatedSprite = function (name) {
-            if (name.indexOf(".mp4") == -1) {
-                if (name.indexOf(".") != -1) {
-                    name = name.split(".")[0];
-                }
-                name += ".json";
-            }
-            if (resourcesHand.animatedSprite[name] != null) {
-                return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
-            }
-            console.log("Wanted to find this animated sprite: ", name);
-            console.log("In this resource pool: ", resourcesHand.animatedSprite);
-            return null;
-        };
-        resourcesHand.getAnimatedTile = function (name) {
-            if (resourcesHand.animatedSprite[name] != null) {
-                return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
-            }
-            console.log("Wanted to find this animated sprite: ", name);
-            console.log("In this resource pool: ", resourcesHand.animatedSprite);
-            return null;
-        };
-        resourcesHand.getStaticTile = function (genName) {
-            return new PIXI.Sprite(resourcesHand.staticTile[genName]);
-        };
-        resourcesHand.resourcePNG = function (resourceName) {
-            for (var _i = 0, _a = resourcesHand.resourcesToLoad; _i < _a.length; _i++) {
-                var resourceDir = _a[_i];
-                var splitDirs = resourceDir.split("/");
-                var nameAndMeta = splitDirs[splitDirs.length - 1];
-                if (nameAndMeta.toLocaleLowerCase().indexOf(".png") != -1) {
-                    nameAndMeta.split(".")[0];
-                    if (nameAndMeta == resourceName + ".png") {
-                        return resourcesHand.app.loader.resources[nameAndMeta].texture;
-                    }
-                }
-            }
-            throw new Error("PNG resource does not exist: " + resourceName);
-        };
-        resourcesHand.resourcesToLoad = [];
-        resourcesHand.animatedSprite = {};
-        resourcesHand.staticTile = {};
-        resourcesHand.audio = {};
-        return resourcesHand;
-    }());
-
-    var cursorType;
-    (function (cursorType) {
-        cursorType[cursorType["pensil"] = 0] = "pensil";
-        cursorType[cursorType["eraser"] = 1] = "eraser";
-        cursorType[cursorType["grabber"] = 2] = "grabber";
-    })(cursorType || (cursorType = {}));
-
-    var cursorData = /** @class */ (function () {
-        function cursorData() {
-            this.objectSelected = null;
-            this.currentSubTile = null;
-            var buttonsContainer = document.getElementById("idCursorTypeContainer");
-            var enumKeys = Object.keys(cursorType);
-            for (var _i = 0, enumKeys_1 = enumKeys; _i < enumKeys_1.length; _i++) {
-                var enumKey = enumKeys_1[_i];
-                var typeButton = document.createElement("button");
-                typeButton.className = "cursorButton";
-                if (cursorType[enumKey] == cursorData.cursorType) {
-                    typeButton.className = "cursorButtonSelected";
-                }
-                typeButton.innerHTML = enumKey;
-                typeButton.addEventListener("mouseup", function (e) {
-                    var allButtons = document.getElementsByClassName("cursorButtonSelected");
-                    for (var i = 0; i < allButtons.length; i++) {
-                        allButtons[i].className = "cursorButton";
-                    }
-                    var target = e.target;
-                    var key = target.innerHTML;
-                    target.className = "cursorButtonSelected";
-                    cursorData.cursorType = cursorType[key];
-                });
-                buttonsContainer === null || buttonsContainer === void 0 ? void 0 : buttonsContainer.appendChild(typeButton);
-            }
-        }
-        cursorData.cursorType = cursorType.pensil;
-        return cursorData;
     }());
 
     var fileSystemEntry = /** @class */ (function () {
@@ -2963,17 +2785,158 @@
         return objectSelectedData;
     }());
 
-    var layer = /** @class */ (function () {
-        function layer(layerName, zIndex) {
-            this.metaObjectsInLayer = [];
-            this.hidden = false;
-            this.scrollSpeedX = 1;
-            this.scrollSpeedY = 1;
-            this.settings = "{scrollSpeedX: 1, scrollSpeedY: 1}";
-            this.layerName = layerName;
-            this.zIndex = zIndex;
+    var fileSystemHandlerObjects = /** @class */ (function () {
+        function fileSystemHandlerObjects(canvasHandler, cursor) {
+            var _this = this;
+            this.generateObjects = new objectGenerator();
+            this.parameters = {
+                itemName: "File",
+                disableInteraction: true,
+                onlyUniqueNames: true,
+                createItemButtonOn: true,
+                canResize: false
+            };
+            this.preLoadedImage = false;
+            this.savedImageDataUrls = {};
+            this.cursor = cursor;
+            this.canvasHandler = canvasHandler;
+            this.system = new prettyFiles.init().getInit("fileSystemObjects", this.parameters);
+            this.system.onCreateNewFile = this.onCreateNewFile.bind(this);
+            this.system.onClickFile = this.onClickFile.bind(this);
+            window.node.getFolderContent("../../objects", function (returnData) {
+                returnData.forEach(function (room) {
+                    room[0] = room[0].substr(room[0].indexOf("objects"));
+                });
+                _this.populateFileSystem(returnData);
+            });
+            this.generateObjects.getAvailibleObjects().forEach(function (obj) {
+                var tempObj = obj(0, 0, "");
+                var appRenderObject = new PIXI.Application({
+                    width: tempObj.g.width,
+                    height: tempObj.g.height,
+                    transparent: true
+                });
+                appRenderObject.stage.addChild(tempObj.g);
+                appRenderObject.render();
+                _this.preLoadedImage = true;
+                _this.system.sticker = appRenderObject.view.toDataURL();
+                var functionAsString = tempObj.constructor.toString();
+                var tempNewImage = new Image();
+                tempNewImage.src = _this.system.sticker;
+                var funcNameOnly = tools.getClassNameFromConstructorName(functionAsString);
+                fileSystemHandlerObjects.classAndImage[funcNameOnly] = tempNewImage;
+                _this.savedImageDataUrls[funcNameOnly] = _this.system.sticker;
+            });
         }
-        return layer;
+        fileSystemHandlerObjects.prototype.populateFileSystem = function (roomData) {
+            var _this = this;
+            var dataToInsertIntoFileSystem = [];
+            var idCounter = 0;
+            roomData.forEach(function (roomMeta) {
+                var roomSrc = roomMeta[0];
+                var roomData = roomMeta[1];
+                var roomDirParts = roomSrc.split("/");
+                var currentFolder = null;
+                roomDirParts.forEach(function (item) {
+                    if (item != "..") {
+                        var newEntry = void 0;
+                        if (item.indexOf(".ts") != -1) {
+                            //It's a file
+                            var nameOnly = item.split(".")[0];
+                            newEntry = new fileSystemEntry("file", nameOnly, [], idCounter, [nameOnly, roomData]);
+                            newEntry.image = _this.savedImageDataUrls[nameOnly];
+                            if (currentFolder == null) {
+                                dataToInsertIntoFileSystem.push(newEntry);
+                            }
+                            else {
+                                currentFolder.contains.push(newEntry);
+                            }
+                        }
+                        else {
+                            //It's a folder
+                            //Check if folder already exists
+                            var foundFolder = false;
+                            if (currentFolder == null) {
+                                for (var _i = 0, dataToInsertIntoFileSystem_1 = dataToInsertIntoFileSystem; _i < dataToInsertIntoFileSystem_1.length; _i++) {
+                                    var elem = dataToInsertIntoFileSystem_1[_i];
+                                    if (elem.type == "folder" && elem.name == item) {
+                                        currentFolder = elem;
+                                        foundFolder = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            else {
+                                for (var _a = 0, _b = currentFolder.contains; _a < _b.length; _a++) {
+                                    var elem = _b[_a];
+                                    if (elem.type == "folder" && elem.name == item) {
+                                        currentFolder = elem;
+                                        foundFolder = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (foundFolder == false) {
+                                newEntry = new fileSystemEntry("folder", item, [], idCounter, undefined);
+                                if (currentFolder == null) {
+                                    dataToInsertIntoFileSystem.push(newEntry);
+                                }
+                                else {
+                                    currentFolder.contains.push(newEntry);
+                                }
+                                currentFolder = newEntry;
+                            }
+                        }
+                        //let newFolderId = this.system.createFolder(item);
+                        //console.log(newFolderId);
+                        idCounter++;
+                    }
+                });
+            });
+            this.system.insertData(JSON.stringify(dataToInsertIntoFileSystem));
+        };
+        fileSystemHandlerObjects.prototype.getFileSystemElement = function () {
+            return document.getElementById("fileSystemObjects");
+        };
+        fileSystemHandlerObjects.prototype.onClickFile = function (fileClicked, id, image, customData) {
+            this.cursor.currentSubTile = null;
+            this.cursor.objectSelected = new objectSelectedData(customData[0], customData.width, customData.height, image);
+        };
+        fileSystemHandlerObjects.prototype.onCreateNewFile = function (name, id, proceed) {
+            var _this = this;
+            if (this.preLoadedImage == false) {
+                this.system.prompt("Image", "Include an image source", "", function (input) {
+                    if (input != null && input.replace(/ /g, '') != '') {
+                        _this.system.sticker = input;
+                        if (proceed()) {
+                            _this.system.sticker = input;
+                        }
+                    }
+                });
+            }
+            else {
+                if (proceed()) {
+                    this.system.sticker = new Image();
+                }
+            }
+        };
+        fileSystemHandlerObjects.classAndImage = {};
+        return fileSystemHandlerObjects;
+    }());
+
+    var subTileMeta = /** @class */ (function () {
+        function subTileMeta(resourceName, startX, startY, width, height) {
+            this.tileName = "";
+            this.resourceName = resourceName;
+            this.startX = startX;
+            this.startY = startY;
+            this.width = width;
+            this.height = height;
+        }
+        subTileMeta.prototype.clone = function () {
+            return new subTileMeta(this.resourceName, this.startX, this.startY, this.width, this.height);
+        };
+        return subTileMeta;
     }());
 
     var tileAnimation = /** @class */ (function () {
@@ -3005,34 +2968,11 @@
         return tileAnimation;
     }());
 
-    var objectMetaData = /** @class */ (function () {
-        function objectMetaData(x, y, name, tile) {
-            this.tile = null;
-            this.isCombinationOfTiles = false;
-            this.isPartOfCombination = false;
-            this.x = x;
-            this.y = y;
-            this.name = name;
-            if (tile != null) {
-                this.tile = tileAnimation.initFromJsonGeneratedObj(tile);
-            }
+    var resourcesTiles = /** @class */ (function () {
+        function resourcesTiles() {
         }
-        return objectMetaData;
-    }());
-
-    var subTileMeta = /** @class */ (function () {
-        function subTileMeta(resourceName, startX, startY, width, height) {
-            this.tileName = "";
-            this.resourceName = resourceName;
-            this.startX = startX;
-            this.startY = startY;
-            this.width = width;
-            this.height = height;
-        }
-        subTileMeta.prototype.clone = function () {
-            return new subTileMeta(this.resourceName, this.startX, this.startY, this.width, this.height);
-        };
-        return subTileMeta;
+        resourcesTiles.resourceNameAndImage = {};
+        return resourcesTiles;
     }());
 
     var animatedTypeCreator = /** @class */ (function () {
@@ -3184,7 +3124,7 @@
             }
             var previewCtx = this.tilePreview.getContext("2d");
             previewCtx === null || previewCtx === void 0 ? void 0 : previewCtx.clearRect(0, 0, this.tilePreview.width, this.tilePreview.height);
-            previewCtx === null || previewCtx === void 0 ? void 0 : previewCtx.drawImage(tileSelector.resourceNameAndImage[targetTile.resourceName], targetTile.startX, targetTile.startY, targetTile.width, targetTile.height, 0, 0, drawWidth, drawHeight);
+            previewCtx === null || previewCtx === void 0 ? void 0 : previewCtx.drawImage(resourcesTiles.resourceNameAndImage[targetTile.resourceName], targetTile.startX, targetTile.startY, targetTile.width, targetTile.height, 0, 0, drawWidth, drawHeight);
         };
         return animatedTypeCreator;
     }());
@@ -3361,7 +3301,7 @@
             this.tileCreator.setTileSet(new tileAnimation());
             this.callbackSubTile = tileDoneCallback;
             this.resourceName = resourceName;
-            if (tileSelector.resourceNameAndImage[resourceName] == null) {
+            if (resourcesTiles.resourceNameAndImage[resourceName] == null) {
                 this.loadResource(imageSource, resourceName);
             }
             else {
@@ -3374,24 +3314,24 @@
             this.modal.style.display = "flex";
         };
         tileSelector.prototype.resizeCanvas = function () {
-            if (this.resourceName != null && tileSelector.resourceNameAndImage[this.resourceName] != undefined && tileSelector.resourceNameAndImage[this.resourceName].complete) {
-                this.canvasRenderer.width = tileSelector.resourceNameAndImage[this.resourceName].width + 640;
-                this.canvasRenderer.height = tileSelector.resourceNameAndImage[this.resourceName].height + 640;
-                this.canvasRenderer.style.width = (tileSelector.resourceNameAndImage[this.resourceName].width + 640) + "px";
-                this.canvasRenderer.style.height = (tileSelector.resourceNameAndImage[this.resourceName].height + 640) + "px";
+            if (this.resourceName != null && resourcesTiles.resourceNameAndImage[this.resourceName] != undefined && resourcesTiles.resourceNameAndImage[this.resourceName].complete) {
+                this.canvasRenderer.width = resourcesTiles.resourceNameAndImage[this.resourceName].width + 640;
+                this.canvasRenderer.height = resourcesTiles.resourceNameAndImage[this.resourceName].height + 640;
+                this.canvasRenderer.style.width = (resourcesTiles.resourceNameAndImage[this.resourceName].width + 640) + "px";
+                this.canvasRenderer.style.height = (resourcesTiles.resourceNameAndImage[this.resourceName].height + 640) + "px";
             }
             this.renderCanvas();
         };
         tileSelector.prototype.loadResource = function (imageSource, resourceName) {
             var _this = this;
-            tileSelector.resourceNameAndImage[resourceName] = new Image();
-            tileSelector.resourceNameAndImage[resourceName].onload = function () {
+            resourcesTiles.resourceNameAndImage[resourceName] = new Image();
+            resourcesTiles.resourceNameAndImage[resourceName].onload = function () {
                 var _a;
                 _this.resizeCanvas();
-                (_a = _this.canvasContext) === null || _a === void 0 ? void 0 : _a.drawImage(tileSelector.resourceNameAndImage[resourceName], 0, 0);
+                (_a = _this.canvasContext) === null || _a === void 0 ? void 0 : _a.drawImage(resourcesTiles.resourceNameAndImage[resourceName], 0, 0);
                 _this.renderCanvas();
             };
-            tileSelector.resourceNameAndImage[resourceName].src = imageSource;
+            resourcesTiles.resourceNameAndImage[resourceName].src = imageSource;
         };
         tileSelector.prototype.populateStoredTileAnimations = function (resourceName) {
             var _this = this;
@@ -3413,6 +3353,9 @@
                     deleteButton.addEventListener("mouseup", function () {
                         var pos = tileSelector.resourceCreatedTileAnimations[resourceName].indexOf(tileSet);
                         tileSelector.resourceCreatedTileAnimations[resourceName].splice(pos, 1);
+                        if (tileSelector.resourceCreatedTileAnimations[resourceName].length == 0) {
+                            delete tileSelector.resourceCreatedTileAnimations[resourceName];
+                        }
                         _this.populateStoredTileAnimations(resourceName);
                         if (_this.tileCreator.animation.name == tileSet.name) {
                             _this.tileCreator.animation = new tileAnimation();
@@ -3481,885 +3424,13 @@
             var _a, _b;
             (_a = this.canvasContext) === null || _a === void 0 ? void 0 : _a.clearRect(0, 0, this.canvasRenderer.width, this.canvasRenderer.height);
             if (this.resourceName != "") {
-                (_b = this.canvasContext) === null || _b === void 0 ? void 0 : _b.drawImage(tileSelector.resourceNameAndImage[this.resourceName], 0, 0);
+                (_b = this.canvasContext) === null || _b === void 0 ? void 0 : _b.drawImage(resourcesTiles.resourceNameAndImage[this.resourceName], 0, 0);
             }
             //Render lines
             this.renderGrid();
         };
-        tileSelector.resourceNameAndImage = {};
         tileSelector.resourceCreatedTileAnimations = {};
         return tileSelector;
-    }());
-
-    var roomData = /** @class */ (function () {
-        function roomData(layerData) {
-            this.cameraBoundsX = null;
-            this.cameraBoundsY = null;
-            this.cameraBoundsWidth = null;
-            this.cameraBoundsHeight = null;
-            this.backgroundColor = "#FFFFFF";
-            this.layerData = layerData;
-        }
-        return roomData;
-    }());
-
-    var layerCompressor = /** @class */ (function () {
-        function layerCompressor() {
-        }
-        layerCompressor.compressRoom = function (roomName, layerData) {
-            window.node.clearPreviouslyGeneratedImages(roomName);
-            var compressed = [];
-            //Loop through each layer and compress
-            layerData.forEach(function (l) {
-                var compressedLayer = layerCompressor.compressLayer(l, roomName);
-                compressed.push(compressedLayer);
-            });
-            var compressedRoom = new roomData(compressed);
-            compressedRoom.cameraBoundsX = parseInt(document.getElementById("cameraBoundsX").value);
-            compressedRoom.cameraBoundsY = parseInt(document.getElementById("cameraBoundsY").value);
-            compressedRoom.cameraBoundsWidth = parseInt(document.getElementById("cameraBoundsWidth").value);
-            compressedRoom.cameraBoundsHeight = parseInt(document.getElementById("cameraBoundsHeight").value);
-            compressedRoom.backgroundColor = document.getElementById("backgroundColorInput").value;
-            return compressedRoom;
-        };
-        layerCompressor.compressLayer = function (l, roomName) {
-            //get each static tile from the layer
-            var compressedLayer = new layer(l.layerName, l.zIndex);
-            compressedLayer.hidden = l.hidden;
-            compressedLayer.scrollSpeedX = l.scrollSpeedX;
-            compressedLayer.scrollSpeedY = l.scrollSpeedY;
-            compressedLayer.settings = l.settings;
-            for (var _i = 0, _a = l.metaObjectsInLayer; _i < _a.length; _i++) {
-                var d = _a[_i];
-                if (d.tile != null) {
-                    d.isPartOfCombination = false;
-                }
-            }
-            var staticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length == 1; });
-            if (staticTiles.length > 0) {
-                var combinedStaticTiles = layerCompressor.combineStaticTilesIntoOne(staticTiles, roomName);
-                compressedLayer.metaObjectsInLayer.push(combinedStaticTiles);
-                //Mark static tiles that were combined
-                for (var _b = 0, staticTiles_1 = staticTiles; _b < staticTiles_1.length; _b++) {
-                    var t = staticTiles_1[_b];
-                    t.isPartOfCombination = true;
-                }
-                staticTiles.forEach(function (tile) {
-                    compressedLayer.metaObjectsInLayer.push(tile);
-                });
-            }
-            var nonStaticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length > 1; });
-            for (var _c = 0, nonStaticTiles_1 = nonStaticTiles; _c < nonStaticTiles_1.length; _c++) {
-                var t = nonStaticTiles_1[_c];
-                compressedLayer.metaObjectsInLayer.push(t);
-            }
-            //add rest of the objects to the layer
-            l.metaObjectsInLayer.forEach(function (obj) {
-                if (obj.tile == null) {
-                    compressedLayer.metaObjectsInLayer.push(obj);
-                }
-            });
-            return compressedLayer;
-        };
-        layerCompressor.combineStaticTilesIntoOne = function (staticTiles, roomName) {
-            var canvas = document.createElement("canvas");
-            var ctx = canvas.getContext("2d");
-            var width = 0;
-            var height = 0;
-            var xStart = null;
-            var yStart = null;
-            //Resize the canvas to fit all tiles
-            staticTiles.forEach(function (obj) {
-                if (xStart == null || obj.x < xStart) {
-                    xStart = obj.x;
-                }
-                if (yStart == null || obj.y < yStart) {
-                    yStart = obj.y;
-                }
-            });
-            staticTiles.forEach(function (obj) {
-                if ((obj.x + obj.tile.tiles[0].width) - xStart > width) {
-                    width = (obj.x + obj.tile.tiles[0].width) - xStart;
-                }
-                if ((obj.y + obj.tile.tiles[0].height) - yStart > height) {
-                    height = (obj.y + obj.tile.tiles[0].height) - yStart;
-                }
-            });
-            canvas.width = width;
-            canvas.height = height;
-            canvas.style.width = width + "px";
-            canvas.style.height = height + "px";
-            //Render tiles
-            staticTiles.forEach(function (tile) {
-                var tileDraw = tile.tile.tiles[0];
-                var image = tileSelector.resourceNameAndImage[tileDraw.resourceName];
-                console.log(image.src);
-                if (image == null) {
-                    console.log("tile: ", tile);
-                    console.log("Image is null ", image);
-                }
-                ctx === null || ctx === void 0 ? void 0 : ctx.drawImage(image, tileDraw.startX, tileDraw.startY, tileDraw.width, tileDraw.height, tile.x - xStart, tile.y - yStart, tileDraw.width, tileDraw.height);
-            });
-            var generatedName = uidGen.new() + ".png";
-            canvas.toBlob(function (blob) {
-                if (blob != null) {
-                    console.log(blob);
-                    blob.arrayBuffer().then(function (buffer) {
-                        return window.node.saveCompiledTiles(roomName, generatedName, buffer);
-                    });
-                }
-                else {
-                    console.log("Blob is null, staticTiles: ", staticTiles);
-                }
-            });
-            var newTile = new subTileMeta(generatedName, xStart, yStart, width, height);
-            var combinedTiles = new tileAnimation([newTile]);
-            var compressetMeta = new objectMetaData(xStart, yStart, generatedName, combinedTiles);
-            compressetMeta.isCombinationOfTiles = true;
-            return compressetMeta;
-        };
-        return layerCompressor;
-    }());
-
-    var layerContainer = /** @class */ (function () {
-        function layerContainer(canvasContext) {
-            this.storedLayers = [];
-            this.currentRoom = "";
-            this.selectedLayer = null;
-            this.gridXOffset = 0;
-            this.gridYOffset = 0;
-            this.ctx = canvasContext;
-            this.containerElement = document.getElementById("layerContainer");
-        }
-        layerContainer.prototype.importRoom = function (clickedFile, jsonString) {
-            this.currentRoom = clickedFile;
-            var arayOfData = new roomData([]);
-            if (jsonString != "") {
-                arayOfData = JSON.parse(jsonString);
-                if (arayOfData.cameraBoundsX != undefined) {
-                    document.getElementById("cameraBoundsX").value = arayOfData.cameraBoundsX.toString();
-                }
-                else {
-                    document.getElementById("cameraBoundsX").value = "";
-                }
-                if (arayOfData.cameraBoundsX != undefined) {
-                    document.getElementById("cameraBoundsY").value = arayOfData.cameraBoundsY.toString();
-                }
-                else {
-                    document.getElementById("cameraBoundsY").value = "";
-                }
-                if (arayOfData.cameraBoundsX != undefined) {
-                    document.getElementById("cameraBoundsWidth").value = arayOfData.cameraBoundsWidth.toString();
-                }
-                else {
-                    document.getElementById("cameraBoundsWidth").value = "";
-                }
-                if (arayOfData.cameraBoundsX != undefined) {
-                    document.getElementById("cameraBoundsHeight").value = arayOfData.cameraBoundsHeight.toString();
-                }
-                else {
-                    document.getElementById("cameraBoundsHeight").value = "";
-                }
-                if (arayOfData.backgroundColor != undefined) {
-                    document.getElementById("backgroundColorInput").value = arayOfData.backgroundColor.toString();
-                }
-                else {
-                    document.getElementById("backgroundColorInput").value = "0xFFFFFF";
-                }
-                for (var _i = 0, _a = arayOfData.layerData; _i < _a.length; _i++) {
-                    var l = _a[_i];
-                    if (l.scrollSpeedX == undefined) {
-                        l.scrollSpeedX = 1;
-                    }
-                    if (l.scrollSpeedY == undefined) {
-                        l.scrollSpeedY = 1;
-                    }
-                }
-            }
-            if (arayOfData.layerData.length == 0) {
-                arayOfData.layerData.push(new layer("Layer 1", 0));
-            }
-            this.storedLayers.length = 0;
-            var _loop_1 = function (i) {
-                var dataLayer = arayOfData.layerData[i];
-                console.log("dataLayer: ", dataLayer);
-                var newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
-                newLayer.hidden = dataLayer.hidden;
-                newLayer.scrollSpeedX = dataLayer.scrollSpeedX;
-                newLayer.scrollSpeedY = dataLayer.scrollSpeedY;
-                if (dataLayer.settings == "undefined" || dataLayer.settings == "" || dataLayer.settings == undefined || dataLayer.settings == null) {
-                    dataLayer.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1, \"blur\": 0}";
-                }
-                newLayer.settings = dataLayer.settings;
-                dataLayer.metaObjectsInLayer.forEach(function (obj) {
-                    if (obj.isCombinationOfTiles == false) {
-                        var newObj = new objectMetaData(obj.x, obj.y, obj.name, obj.tile);
-                        newLayer.metaObjectsInLayer.push(newObj);
-                    }
-                });
-                this_1.storedLayers.push(newLayer);
-            };
-            var this_1 = this;
-            for (var i = 0; i < arayOfData.layerData.length; i++) {
-                _loop_1(i);
-            }
-            console.log("this.storedLayers: ", this.storedLayers);
-            //populate layer select element
-            this.initializeLayerModule(this.storedLayers);
-            this.selectFirstLayer();
-        };
-        layerContainer.prototype.exportRoom = function () {
-            return LZString.compressToEncodedURIComponent(JSON.stringify(layerCompressor.compressRoom(this.currentRoom, this.storedLayers)));
-        };
-        layerContainer.prototype.createLayerOption = function (layerName, hidden) {
-            var layerOption = document.createElement("div");
-            layerOption.className = "layerOptionContainer";
-            layerOption.addEventListener("mouseup", this.clickLayerOption.bind(this));
-            var textSpan = document.createElement("span");
-            textSpan.innerHTML = layerName;
-            layerOption.appendChild(textSpan);
-            var moveUpButton = document.createElement("button");
-            moveUpButton.innerHTML = "up";
-            moveUpButton.addEventListener("mouseup", this.moveLayerUp.bind(this));
-            layerOption.appendChild(moveUpButton);
-            var moveDownButton = document.createElement("button");
-            moveDownButton.innerHTML = "down";
-            moveDownButton.addEventListener("mouseup", this.moveLayerDown.bind(this));
-            layerOption.appendChild(moveDownButton);
-            var hideCheck = document.createElement("input");
-            hideCheck.type = "checkbox";
-            hideCheck.checked = hidden;
-            hideCheck.addEventListener("change", this.clickHideLayer.bind(this));
-            layerOption.appendChild(hideCheck);
-            var edit = document.createElement("button");
-            edit.innerHTML = "edit";
-            edit.addEventListener("mouseup", this.setLayerSettings.bind(this));
-            layerOption.appendChild(edit);
-            this.containerElement.appendChild(layerOption);
-            return layerOption;
-        };
-        layerContainer.prototype.setLayerSettings = function (e) {
-            var _a;
-            var target = e.target;
-            var layerName = (_a = target.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
-            var clickedLayer = null;
-            if (layerName != null) {
-                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
-                    var layer_1 = _b[_i];
-                    if (layer_1.layerName == layerName) {
-                        clickedLayer = layer_1;
-                        break;
-                    }
-                }
-            }
-            if (clickedLayer != null) {
-                var currentSettings = clickedLayer.settings;
-                window.node.promptDefaultText("Type in the name of the layer you want to delete", currentSettings, function (text) {
-                    if (text != null) {
-                        clickedLayer.settings = text;
-                        /*var parsed = JSON.parse(text) as any;
-                        let newSpeedX: number = parseFloat(parsed.scrollSpeedX);
-                        let newSpeedY: number = parseFloat(parsed.scrollSpeedY);
-        
-                        clickedLayer!.scrollSpeedX = newSpeedX;
-                        clickedLayer!.scrollSpeedY = newSpeedY;*/
-                    }
-                });
-            }
-        };
-        layerContainer.prototype.clickLayerOption = function (e) {
-            var _a;
-            var target = e.target;
-            var layerName = (_a = target.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
-            if (layerName != null) {
-                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
-                    var layer_2 = _b[_i];
-                    if (layer_2.layerName == layerName) {
-                        this.selectLayer(layer_2);
-                        break;
-                    }
-                }
-            }
-        };
-        layerContainer.prototype.selectLayer = function (selectThisLayer) {
-            if (selectThisLayer === void 0) { selectThisLayer = null; }
-            var layerOptions = document.getElementsByClassName("layerOptionContainer");
-            for (var i = 0; i < layerOptions.length; i++) {
-                var element = layerOptions[i];
-                var elementLayerName = element.getElementsByTagName("span")[0].innerHTML;
-                if (selectThisLayer == null && i == 0) {
-                    element.className = "layerOptionContainer selectedLayer";
-                    this.selectedLayer = selectThisLayer;
-                }
-                else if (selectThisLayer != null && elementLayerName == selectThisLayer.layerName) {
-                    element.className = "layerOptionContainer selectedLayer";
-                    this.selectedLayer = selectThisLayer;
-                }
-                else {
-                    element.className = "layerOptionContainer";
-                }
-            }
-        };
-        layerContainer.prototype.clickHideLayer = function (e) {
-            var _a;
-            var target = e.target;
-            var layerName = (_a = target.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
-            if (target.checked && layerName != null) {
-                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
-                    var l = _b[_i];
-                    if (l.layerName == layerName) {
-                        l.hidden = true;
-                        break;
-                    }
-                }
-            }
-            else if (target.checked == false && layerName != null) {
-                for (var _c = 0, _d = this.storedLayers; _c < _d.length; _c++) {
-                    var l = _d[_c];
-                    if (l.layerName == layerName) {
-                        l.hidden = false;
-                        break;
-                    }
-                }
-            }
-        };
-        layerContainer.prototype.isLayerHidden = function (layerName) {
-            for (var _i = 0, _a = this.storedLayers; _i < _a.length; _i++) {
-                var layer_3 = _a[_i];
-                if (layer_3.layerName == layerName) {
-                    return layer_3.hidden;
-                }
-            }
-            return false;
-        };
-        layerContainer.prototype.addToLayer = function (newObj) {
-            if (this.selectedLayer != null) {
-                this.selectedLayer.metaObjectsInLayer.push(newObj);
-            }
-        };
-        layerContainer.prototype.hasObjectPos = function (x, y) {
-            var _a;
-            if (this.selectedLayer != null) {
-                for (var _i = 0, _b = (_a = this.selectedLayer) === null || _a === void 0 ? void 0 : _a.metaObjectsInLayer; _i < _b.length; _i++) {
-                    var obj = _b[_i];
-                    if (obj.x == x && obj.y == y) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        };
-        layerContainer.prototype.getObjectAtPos = function (mouseTestX, mouseTestY) {
-            var _a;
-            if (this.selectedLayer != null) {
-                for (var _i = 0, _b = (_a = this.selectedLayer) === null || _a === void 0 ? void 0 : _a.metaObjectsInLayer; _i < _b.length; _i++) {
-                    var obj = _b[_i];
-                    if (this.isMouseInsideObject(obj, mouseTestX, mouseTestY)) {
-                        return obj;
-                    }
-                }
-            }
-            return null;
-        };
-        layerContainer.prototype.remomveObject = function (targetObject) {
-            if (targetObject != null && this.selectedLayer != null) {
-                this.selectedLayer.metaObjectsInLayer = this.selectedLayer.metaObjectsInLayer.filter(function (x) { return x != targetObject; });
-            }
-        };
-        layerContainer.prototype.isMouseInsideObject = function (obj, mouseTestX, mouseTestY) {
-            var width = -1;
-            var height = -1;
-            if (obj.tile != null) {
-                width = obj.tile.get(0).width;
-                height = obj.tile.get(0).height;
-            }
-            else {
-                if (canvasRenderer.classAndImage[obj.name] != null) {
-                    width = canvasRenderer.classAndImage[obj.name].width;
-                    height = canvasRenderer.classAndImage[obj.name].height;
-                }
-                else {
-                    width = 98;
-                    height = 98;
-                }
-            }
-            if (mouseTestX - this.gridXOffset >= obj.x &&
-                mouseTestX - this.gridXOffset < obj.x + width &&
-                mouseTestY - this.gridYOffset >= obj.y &&
-                mouseTestY - this.gridYOffset < obj.y + height) {
-                return true;
-            }
-            return false;
-        };
-        layerContainer.prototype.moveLayerUp = function (e) {
-            var _a;
-            var button = e.target;
-            var layerName = (_a = button.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
-            var previousName = undefined;
-            if (layerName != undefined) {
-                for (var i = 0; i < this.storedLayers.length; i++) {
-                    if (this.storedLayers[i].layerName == layerName && i != 0) {
-                        previousName = this.storedLayers[i - 1].layerName;
-                    }
-                }
-            }
-            console.log(previousName);
-            this.moveLayerDownInOrder(previousName);
-        };
-        layerContainer.prototype.moveLayerDown = function (e) {
-            var _a;
-            var button = e.target;
-            var layerName = (_a = button.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
-            this.moveLayerDownInOrder(layerName);
-        };
-        layerContainer.prototype.moveLayerDownInOrder = function (layerName) {
-            if (layerName != null) {
-                for (var _i = 0, _a = this.storedLayers; _i < _a.length; _i++) {
-                    var l = _a[_i];
-                    if (l.layerName == layerName) {
-                        for (var _b = 0, _c = this.storedLayers; _b < _c.length; _b++) {
-                            var sl = _c[_b];
-                            if (sl.zIndex == l.zIndex + 1) {
-                                l.zIndex = l.zIndex ^ sl.zIndex;
-                                sl.zIndex = l.zIndex ^ sl.zIndex;
-                                l.zIndex = l.zIndex ^ sl.zIndex;
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-                this.initializeLayerModule(this.storedLayers);
-            }
-            if (layerName != null) {
-                if (this.selectedLayer != null) {
-                    this.selectLayer(this.selectedLayer);
-                }
-            }
-        };
-        layerContainer.prototype.initializeLayerModule = function (layers) {
-            while (this.containerElement.firstChild) {
-                this.containerElement.removeChild(this.containerElement.firstChild);
-            }
-            layers.sort(function (a, b) {
-                return a.zIndex - b.zIndex;
-            });
-            for (var _i = 0, layers_1 = layers; _i < layers_1.length; _i++) {
-                var cLayer = layers_1[_i];
-                this.createLayerOption(cLayer.layerName, cLayer.hidden);
-            }
-        };
-        layerContainer.prototype.selectFirstLayer = function () {
-            this.selectLayer(this.storedLayers[0]);
-        };
-        layerContainer.prototype.createNewLayer = function (newLayerName) {
-            var nextIndex = 0;
-            this.storedLayers.forEach(function (layer) {
-                if (layer.zIndex >= nextIndex) {
-                    nextIndex = layer.zIndex + 1;
-                }
-            });
-            var newLayer = new layer(newLayerName, nextIndex);
-            newLayer.zIndex = nextIndex;
-            this.storedLayers.push(newLayer);
-            this.initializeLayerModule(this.storedLayers);
-            this.selectLayer(newLayer);
-        };
-        layerContainer.prototype.deleteLayer = function (layerName) {
-            if (this.storedLayers.length <= 1) {
-                alert("You need to have at least one layer");
-                return;
-            }
-            var layer = this.storedLayers.filter(function (l) { return l.layerName == layerName; })[0];
-            if (layer == undefined) {
-                alert("The layer does not exist");
-            }
-            else {
-                this.storedLayers = this.storedLayers.filter(function (l) { return l.layerName != layerName; });
-                this.initializeLayerModule(this.storedLayers);
-                this.selectLayer();
-            }
-        };
-        return layerContainer;
-    }());
-
-    var canvasRenderer = /** @class */ (function () {
-        function canvasRenderer(canvasName) {
-            var _this = this;
-            var _a, _b;
-            this.gridXOffset = 0;
-            this.gridYOffset = 0;
-            this.canvasScaleX = 1;
-            this.canvasScaleY = 1;
-            this.layers = [];
-            this.counter = 0;
-            this.haveSelectedFromHover = false;
-            this.missingImage = new Image();
-            this.missingImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAZQTFRF/wDj////hdfaxwAAAA5JREFUeJxjCGVYxYCEAR6cA/1tfYfmAAAAAElFTkSuQmCC";
-            this.canvas = document.getElementById(canvasName);
-            this.ctx = this.canvas.getContext("2d");
-            this.gridWidth = 16;
-            this.gridHeight = 16;
-            this.layerHandler = new layerContainer(this.ctx);
-            this.buttonSetSize = document.getElementById("setSizeButton");
-            this.buttonZoomIn = document.getElementById("zoomIn");
-            this.buttonZoomIn.addEventListener("mouseup", this.zoomIn.bind(this));
-            this.buttonZoomOut = document.getElementById("zoomOut");
-            this.buttonZoomOut.addEventListener("mouseup", this.zoomOut.bind(this));
-            this.inputGridx = document.getElementById("gridXInput");
-            this.inputGridx.value = this.gridWidth + "";
-            this.inputGridy = document.getElementById("gridYInput");
-            this.inputGridy.value = this.gridHeight + "";
-            this.buttonSetSize.onclick = this.setCanvasWidth.bind(this);
-            (_a = document.getElementById("gridXInput")) === null || _a === void 0 ? void 0 : _a.addEventListener("change", this.onGridSizeChange.bind(this));
-            (_b = document.getElementById("gridYInput")) === null || _b === void 0 ? void 0 : _b.addEventListener("change", this.onGridSizeChange.bind(this));
-            this.container = document.getElementById("canvasAndFilesCon");
-            window.onresize = this.windowResize.bind(this);
-            setTimeout(function () {
-                _this.windowResize();
-            }, 800);
-        }
-        canvasRenderer.prototype.updateCanvasOffset = function (dx, dy) {
-            this.gridXOffset += dx;
-            this.gridYOffset += dy;
-            this.layerHandler.gridXOffset = this.gridXOffset;
-            this.layerHandler.gridYOffset = this.gridYOffset;
-        };
-        canvasRenderer.prototype.windowResize = function () {
-            this.canvas.style.width = window.innerWidth + "px";
-            this.canvas.style.height = window.innerHeight + "px";
-            this.canvas.width = window.innerWidth;
-            this.canvas.height = window.innerHeight;
-        };
-        canvasRenderer.prototype.onGridSizeChange = function () {
-            var _a, _b;
-            this.gridWidth = parseInt(this.inputGridx.value);
-            this.gridHeight = parseInt(this.inputGridy.value);
-            (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.setTransform(1, 0, 0, 1, 0, 0);
-            (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.scale(this.canvasScaleX, this.canvasScaleY);
-        };
-        canvasRenderer.prototype.zoomIn = function () {
-            var _a, _b;
-            this.canvasScaleX *= 1.1;
-            this.canvasScaleY *= 1.1;
-            (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.setTransform(1, 0, 0, 1, 0, 0);
-            (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.scale(this.canvasScaleX, this.canvasScaleY);
-        };
-        canvasRenderer.prototype.zoomOut = function () {
-            var _a, _b;
-            this.canvasScaleX *= 0.9;
-            this.canvasScaleY *= 0.9;
-            (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.setTransform(1, 0, 0, 1, 0, 0);
-            (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.scale(this.canvasScaleX, this.canvasScaleY);
-        };
-        canvasRenderer.prototype.setCanvasWidth = function () {
-            this.gridWidth = parseInt(this.inputGridx.value);
-            this.gridHeight = parseInt(this.inputGridy.value);
-        };
-        canvasRenderer.prototype.getCanvasMousePositions = function (e) {
-            var x = e.clientX;
-            var y = e.clientY;
-            var rect = this.canvas.getBoundingClientRect();
-            x -= rect.left;
-            y -= rect.top;
-            var ratioScaleX = (this.canvas.width / this.canvasScaleX) / this.canvas.width;
-            var ratioScaleY = (this.canvas.height / this.canvasScaleY) / this.canvas.height;
-            x *= ratioScaleX;
-            y *= ratioScaleY;
-            return [x, y];
-        };
-        canvasRenderer.prototype.render = function (mouseX, mouseY, cursor) {
-            var _a, _b, _c;
-            this.counter++;
-            this.haveSelectedFromHover = false;
-            (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.clearRect(0, 0, this.canvas.width / this.canvasScaleX, this.canvas.height / this.canvasScaleY);
-            this.ctx.fillStyle = document.getElementById("backgroundColorInput").value;
-            (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.fillRect(0, 0, this.canvas.width / this.canvasScaleX, this.canvas.height / this.canvasScaleY);
-            (_c = this.ctx) === null || _c === void 0 ? void 0 : _c.fill();
-            this.drawGrid();
-            this.drawObjects(mouseX, mouseY);
-            this.drawCameraBounds();
-            this.drawMouse(mouseX, mouseY, cursor);
-        };
-        canvasRenderer.prototype.drawObjects = function (mouseX, mouseY) {
-            var _this = this;
-            this.layerHandler.storedLayers.forEach(function (layer) {
-                if (layer.hidden == false) {
-                    layer.metaObjectsInLayer.forEach(function (meta) {
-                        var _a, _b, _c, _d;
-                        if (meta.tile == null) {
-                            if (canvasRenderer.classAndImage[meta.name] != null) {
-                                if (canvasRenderer.classAndImage[meta.name].complete) {
-                                    if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
-                                        _this.drawMouseOverSelection(meta, mouseX, mouseY);
-                                    }
-                                    (_a = _this.ctx) === null || _a === void 0 ? void 0 : _a.drawImage(canvasRenderer.classAndImage[meta.name], meta.x + _this.gridXOffset, meta.y + _this.gridYOffset);
-                                }
-                            }
-                            else {
-                                if (_this.missingImage.complete) {
-                                    (_b = _this.ctx) === null || _b === void 0 ? void 0 : _b.drawImage(_this.missingImage, 0, 0, 8, 8, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, 98, 98);
-                                }
-                            }
-                        }
-                        else {
-                            var tileToDraw = meta.tile.get(_this.counter);
-                            if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
-                                _this.drawMouseOverSelection(meta, mouseX, mouseY);
-                            }
-                            if (tileSelector.resourceNameAndImage[tileToDraw.resourceName] != null) {
-                                (_c = _this.ctx) === null || _c === void 0 ? void 0 : _c.drawImage(tileSelector.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
-                            }
-                            else {
-                                if (_this.missingImage.complete) {
-                                    (_d = _this.ctx) === null || _d === void 0 ? void 0 : _d.drawImage(_this.missingImage, tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
-                                }
-                            }
-                        }
-                    });
-                }
-            });
-        };
-        canvasRenderer.prototype.drawMouseOverSelection = function (obj, mouseX, mouseY) {
-            var _a, _b, _c;
-            if (this.layerHandler.isMouseInsideObject(obj, mouseX, mouseY)
-                && this.haveSelectedFromHover == false
-                && obj.isCombinationOfTiles == false) {
-                this.haveSelectedFromHover = true;
-                var width = -1;
-                var height = -1;
-                if (obj.tile != null) {
-                    width = obj.tile.get(this.counter).width;
-                    height = obj.tile.get(this.counter).height;
-                }
-                else {
-                    if (canvasRenderer.classAndImage[obj.name] != null) {
-                        width = canvasRenderer.classAndImage[obj.name].width;
-                        height = canvasRenderer.classAndImage[obj.name].height;
-                    }
-                    else {
-                        width = 98;
-                        height = 98;
-                    }
-                }
-                this.ctx.strokeStyle = 'red';
-                this.ctx.lineWidth = 5;
-                (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.beginPath();
-                (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.rect(obj.x + this.gridXOffset - 2.5, obj.y + this.gridYOffset - 2.5, width + 5, height + 5);
-                (_c = this.ctx) === null || _c === void 0 ? void 0 : _c.stroke();
-            }
-        };
-        canvasRenderer.prototype.drawGrid = function () {
-            var _a, _b, _c, _d, _e, _f, _g, _h;
-            this.ctx.lineWidth = 1;
-            var drawGridWidth = this.gridWidth;
-            var drawGridHeight = this.gridHeight;
-            var horizontalLines = Math.ceil((this.canvas.height / this.canvasScaleX) / drawGridHeight) + 1;
-            var verticallines = Math.ceil((this.canvas.width / this.canvasScaleY) / this.gridWidth) + 1;
-            this.ctx.strokeStyle = 'black';
-            this.ctx.lineWidth = 0.5 / this.canvasScaleX;
-            for (var i = 0; i < horizontalLines; i++) {
-                (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.beginPath();
-                (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.moveTo(0, (i) * drawGridWidth + 0.5 + (this.gridYOffset % drawGridHeight) - drawGridHeight);
-                (_c = this.ctx) === null || _c === void 0 ? void 0 : _c.lineTo(this.canvas.width / this.canvasScaleX, (i) * drawGridWidth + 0.5 + (this.gridYOffset % drawGridHeight) - drawGridHeight);
-                (_d = this.ctx) === null || _d === void 0 ? void 0 : _d.stroke();
-            }
-            for (var i = 0; i < verticallines; i++) {
-                (_e = this.ctx) === null || _e === void 0 ? void 0 : _e.beginPath();
-                (_f = this.ctx) === null || _f === void 0 ? void 0 : _f.moveTo((i) * drawGridWidth + 0.5 + (this.gridXOffset % drawGridWidth) - drawGridWidth, 0);
-                (_g = this.ctx) === null || _g === void 0 ? void 0 : _g.lineTo((i) * drawGridWidth + 0.5 + (this.gridXOffset % drawGridWidth) - drawGridWidth, this.canvas.height / this.canvasScaleY);
-                (_h = this.ctx) === null || _h === void 0 ? void 0 : _h.stroke();
-            }
-        };
-        canvasRenderer.prototype.drawCameraBounds = function () {
-            var startXCam = parseInt(document.getElementById("cameraBoundsX").value);
-            var startYCam = parseInt(document.getElementById("cameraBoundsY").value);
-            var widthCam = parseInt(document.getElementById("cameraBoundsWidth").value);
-            var heightCam = parseInt(document.getElementById("cameraBoundsHeight").value);
-            if (startXCam != null && startYCam != null && widthCam != null && heightCam != null) {
-                this.ctx.strokeStyle = "red";
-                this.ctx.lineWidth = 16;
-                this.ctx.rect(startXCam + this.gridXOffset, startYCam + this.gridYOffset, widthCam, heightCam);
-                this.ctx.stroke();
-            }
-        };
-        canvasRenderer.prototype.drawMouse = function (mouseX, mouseY, cursor) {
-            var _a, _b, _e, _f, _g;
-            var mouseGridX = (Math.floor(mouseX / this.gridWidth) * this.gridWidth) + ((this.gridXOffset) % this.gridWidth);
-            var mouseGridY = (Math.floor(mouseY / this.gridHeight) * this.gridHeight) + ((this.gridYOffset) % this.gridHeight);
-            if (cursorData.cursorType == cursorType.pensil) {
-                if (cursor.objectSelected != null) {
-                    this.ctx.strokeStyle = 'red';
-                    this.ctx.lineWidth = 1;
-                    (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.rect(mouseGridX, mouseGridY, this.gridWidth, this.gridHeight);
-                    (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.stroke();
-                    if (cursor.objectSelected.objectMouseImageReady && cursorData.cursorType == cursorType.pensil) {
-                        {
-                            (_e = this.ctx) === null || _e === void 0 ? void 0 : _e.drawImage((_f = cursor.objectSelected) === null || _f === void 0 ? void 0 : _f.objectToPlaceImageUrl, mouseGridX, mouseGridY);
-                        }
-                    }
-                }
-                else if (cursor.currentSubTile != null) {
-                    var xMousePut = 0;
-                    var yMousePut = 0;
-                    {
-                        xMousePut = mouseGridX;
-                        yMousePut = mouseGridY;
-                    }
-                    if (cursor.currentSubTile.get(0) == undefined) {
-                        console.log("can't get first image from tile: ", cursor.currentSubTile);
-                    }
-                    if (tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName] != null) {
-                        var image = tileSelector.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
-                        (_g = this.ctx) === null || _g === void 0 ? void 0 : _g.drawImage(image, cursor.currentSubTile.get(0).startX, cursor.currentSubTile.get(0).startY, cursor.currentSubTile.get(0).width, cursor.currentSubTile.get(0).height, xMousePut, yMousePut, cursor.currentSubTile.get(0).width, cursor.currentSubTile.get(0).height);
-                    }
-                    else {
-                        console.log("Can't find resource ", cursor.currentSubTile.get(0).resourceName);
-                        console.log("In resource pool: ", tileSelector.resourceNameAndImage);
-                    }
-                }
-            }
-        };
-        canvasRenderer.classAndImage = {};
-        return canvasRenderer;
-    }());
-
-    var fileSystemHandlerObjects = /** @class */ (function () {
-        function fileSystemHandlerObjects(canvasHandler, cursor) {
-            var _this = this;
-            this.generateObjects = new objectGenerator();
-            this.parameters = {
-                itemName: "File",
-                disableInteraction: true,
-                onlyUniqueNames: true,
-                createItemButtonOn: true,
-                canResize: false
-            };
-            this.preLoadedImage = false;
-            this.savedImageDataUrls = {};
-            this.cursor = cursor;
-            this.canvasHandler = canvasHandler;
-            this.system = new prettyFiles.init().getInit("fileSystemObjects", this.parameters);
-            this.system.onCreateNewFile = this.onCreateNewFile.bind(this);
-            this.system.onClickFile = this.onClickFile.bind(this);
-            window.node.getFolderContent("../../objects", function (returnData) {
-                returnData.forEach(function (room) {
-                    room[0] = room[0].substr(room[0].indexOf("objects"));
-                });
-                _this.populateFileSystem(returnData);
-            });
-            this.generateObjects.getAvailibleObjects().forEach(function (obj) {
-                var tempObj = obj(0, 0);
-                var appRenderObject = new PIXI.Application({
-                    width: tempObj.g.width,
-                    height: tempObj.g.height,
-                    transparent: true
-                });
-                appRenderObject.stage.addChild(tempObj.g);
-                appRenderObject.render();
-                _this.preLoadedImage = true;
-                _this.system.sticker = appRenderObject.view.toDataURL();
-                var functionAsString = tempObj.constructor.toString();
-                var tempNewImage = new Image();
-                tempNewImage.src = _this.system.sticker;
-                var funcNameOnly = tools.getClassNameFromConstructorName(functionAsString);
-                canvasRenderer.classAndImage[funcNameOnly] = tempNewImage;
-                _this.savedImageDataUrls[funcNameOnly] = _this.system.sticker;
-            });
-        }
-        fileSystemHandlerObjects.prototype.populateFileSystem = function (roomData) {
-            var _this = this;
-            var dataToInsertIntoFileSystem = [];
-            var idCounter = 0;
-            roomData.forEach(function (roomMeta) {
-                var roomSrc = roomMeta[0];
-                var roomData = roomMeta[1];
-                var roomDirParts = roomSrc.split("/");
-                var currentFolder = null;
-                roomDirParts.forEach(function (item) {
-                    if (item != "..") {
-                        var newEntry = void 0;
-                        if (item.indexOf(".ts") != -1) {
-                            //It's a file
-                            var nameOnly = item.split(".")[0];
-                            newEntry = new fileSystemEntry("file", nameOnly, [], idCounter, [nameOnly, roomData]);
-                            newEntry.image = _this.savedImageDataUrls[nameOnly];
-                            if (currentFolder == null) {
-                                dataToInsertIntoFileSystem.push(newEntry);
-                            }
-                            else {
-                                currentFolder.contains.push(newEntry);
-                            }
-                        }
-                        else {
-                            //It's a folder
-                            //Check if folder already exists
-                            var foundFolder = false;
-                            if (currentFolder == null) {
-                                for (var _i = 0, dataToInsertIntoFileSystem_1 = dataToInsertIntoFileSystem; _i < dataToInsertIntoFileSystem_1.length; _i++) {
-                                    var elem = dataToInsertIntoFileSystem_1[_i];
-                                    if (elem.type == "folder" && elem.name == item) {
-                                        currentFolder = elem;
-                                        foundFolder = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            else {
-                                for (var _a = 0, _b = currentFolder.contains; _a < _b.length; _a++) {
-                                    var elem = _b[_a];
-                                    if (elem.type == "folder" && elem.name == item) {
-                                        currentFolder = elem;
-                                        foundFolder = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (foundFolder == false) {
-                                newEntry = new fileSystemEntry("folder", item, [], idCounter, undefined);
-                                if (currentFolder == null) {
-                                    dataToInsertIntoFileSystem.push(newEntry);
-                                }
-                                else {
-                                    currentFolder.contains.push(newEntry);
-                                }
-                                currentFolder = newEntry;
-                            }
-                        }
-                        //let newFolderId = this.system.createFolder(item);
-                        //console.log(newFolderId);
-                        idCounter++;
-                    }
-                });
-            });
-            this.system.insertData(JSON.stringify(dataToInsertIntoFileSystem));
-        };
-        fileSystemHandlerObjects.prototype.getFileSystemElement = function () {
-            return document.getElementById("fileSystemObjects");
-        };
-        fileSystemHandlerObjects.prototype.onClickFile = function (fileClicked, id, image, customData) {
-            this.cursor.currentSubTile = null;
-            this.cursor.objectSelected = new objectSelectedData(customData[0], customData.width, customData.height, image);
-        };
-        fileSystemHandlerObjects.prototype.onCreateNewFile = function (name, id, proceed) {
-            var _this = this;
-            if (this.preLoadedImage == false) {
-                this.system.prompt("Image", "Include an image source", "", function (input) {
-                    if (input != null && input.replace(/ /g, '') != '') {
-                        _this.system.sticker = input;
-                        if (proceed()) {
-                            _this.system.sticker = input;
-                        }
-                    }
-                });
-            }
-            else {
-                if (proceed()) {
-                    this.system.sticker = new Image();
-                }
-            }
-        };
-        return fileSystemHandlerObjects;
     }());
 
     var fileSystemHandlerResources = /** @class */ (function () {
@@ -4624,10 +3695,761 @@
             }
         };
         fileSystemHandlerRooms.prototype.saveRoom = function (roomDataCompressed) {
-            console.log("Save this: ", roomDataCompressed);
             window.node.saveRoom(this.currentRoom[0], roomDataCompressed);
         };
         return fileSystemHandlerRooms;
+    }());
+
+    var objectMetaData = /** @class */ (function () {
+        function objectMetaData(x, y, name, tile) {
+            this.inputString = "";
+            this.tile = null;
+            this.isCombinationOfTiles = false;
+            this.idOfStaticTileCombination = "";
+            this.isPartOfCombination = false;
+            this.x = x;
+            this.y = y;
+            this.name = name;
+            if (tile != null) {
+                this.tile = tileAnimation.initFromJsonGeneratedObj(tile);
+            }
+        }
+        return objectMetaData;
+    }());
+
+    var layer = /** @class */ (function () {
+        function layer(layerName, zIndex) {
+            this.metaObjectsInLayer = [];
+            this.hidden = false;
+            this.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1}";
+            this.layerName = layerName;
+            this.zIndex = zIndex;
+        }
+        return layer;
+    }());
+
+    var roomData = /** @class */ (function () {
+        function roomData(layerData) {
+            this.cameraBoundsX = null;
+            this.cameraBoundsY = null;
+            this.cameraBoundsWidth = null;
+            this.cameraBoundsHeight = null;
+            this.backgroundColor = "#FFFFFF";
+            this.layerData = layerData;
+        }
+        return roomData;
+    }());
+
+    var layerCompressor = /** @class */ (function () {
+        function layerCompressor() {
+        }
+        layerCompressor.compressRoom = function (roomName, layerData) {
+            window.node.clearPreviouslyGeneratedImages(roomName);
+            var compressed = [];
+            //Loop through each layer and compress
+            layerData.forEach(function (l) {
+                var compressedLayer = layerCompressor.compressLayer(l, roomName);
+                compressed.push(compressedLayer);
+            });
+            var compressedRoom = new roomData(compressed);
+            compressedRoom.cameraBoundsX = parseInt(document.getElementById("cameraBoundsX").value);
+            compressedRoom.cameraBoundsY = parseInt(document.getElementById("cameraBoundsY").value);
+            compressedRoom.cameraBoundsWidth = parseInt(document.getElementById("cameraBoundsWidth").value);
+            compressedRoom.cameraBoundsHeight = parseInt(document.getElementById("cameraBoundsHeight").value);
+            compressedRoom.backgroundColor = document.getElementById("backgroundColorInput").value;
+            console.log("Exported room: ", compressedRoom);
+            return compressedRoom;
+        };
+        layerCompressor.compressLayer = function (l, roomName) {
+            //remove old combined tiles
+            window.node.removeOldCompiledTiles(roomName);
+            //get each static tile from the layer
+            var compressedLayer = new layer(l.layerName, l.zIndex);
+            compressedLayer.hidden = l.hidden;
+            compressedLayer.settings = l.settings;
+            for (var _i = 0, _a = l.metaObjectsInLayer; _i < _a.length; _i++) {
+                var d = _a[_i];
+                if (d.tile != null) {
+                    d.isPartOfCombination = false;
+                }
+            }
+            var staticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length == 1; });
+            if (staticTiles.length > 0) {
+                var combinedStaticTiles_1 = layerCompressor.combineStaticTilesIntoOne(staticTiles, roomName);
+                compressedLayer.metaObjectsInLayer.push(combinedStaticTiles_1);
+                //Mark static tiles that were combined
+                for (var _b = 0, staticTiles_1 = staticTiles; _b < staticTiles_1.length; _b++) {
+                    var t = staticTiles_1[_b];
+                    t.isPartOfCombination = true;
+                }
+                staticTiles.forEach(function (tile) {
+                    tile.idOfStaticTileCombination = combinedStaticTiles_1.name;
+                    compressedLayer.metaObjectsInLayer.push(tile);
+                });
+            }
+            var nonStaticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length > 1; });
+            for (var _c = 0, nonStaticTiles_1 = nonStaticTiles; _c < nonStaticTiles_1.length; _c++) {
+                var t = nonStaticTiles_1[_c];
+                compressedLayer.metaObjectsInLayer.push(t);
+            }
+            //add rest of the objects to the layer
+            l.metaObjectsInLayer.forEach(function (obj) {
+                if (obj.tile == null) {
+                    compressedLayer.metaObjectsInLayer.push(obj);
+                }
+            });
+            return compressedLayer;
+        };
+        layerCompressor.combineStaticTilesIntoOne = function (staticTiles, roomName) {
+            var canvas = document.createElement("canvas");
+            var ctx = canvas.getContext("2d");
+            var width = 0;
+            var height = 0;
+            var xStart = null;
+            var yStart = null;
+            //Resize the canvas to fit all tiles
+            staticTiles.forEach(function (obj) {
+                if (xStart == null || obj.x < xStart) {
+                    xStart = obj.x;
+                }
+                if (yStart == null || obj.y < yStart) {
+                    yStart = obj.y;
+                }
+            });
+            staticTiles.forEach(function (obj) {
+                if ((obj.x + obj.tile.tiles[0].width) - xStart > width) {
+                    width = (obj.x + obj.tile.tiles[0].width) - xStart;
+                }
+                if ((obj.y + obj.tile.tiles[0].height) - yStart > height) {
+                    height = (obj.y + obj.tile.tiles[0].height) - yStart;
+                }
+            });
+            canvas.width = width;
+            canvas.height = height;
+            canvas.style.width = width + "px";
+            canvas.style.height = height + "px";
+            //Render tiles
+            staticTiles.forEach(function (tile) {
+                var tileDraw = tile.tile.tiles[0];
+                var image = resourcesTiles.resourceNameAndImage[tileDraw.resourceName];
+                console.log(image.src);
+                if (image == null) {
+                    console.log("tile: ", tile);
+                    console.log("Image is null ", image);
+                }
+                ctx === null || ctx === void 0 ? void 0 : ctx.drawImage(image, tileDraw.startX, tileDraw.startY, tileDraw.width, tileDraw.height, tile.x - xStart, tile.y - yStart, tileDraw.width, tileDraw.height);
+            });
+            var generatedName = uidGen.new() + ".png";
+            canvas.toBlob(function (blob) {
+                if (blob != null) {
+                    console.log(blob);
+                    blob.arrayBuffer().then(function (buffer) {
+                        return window.node.saveCompiledTiles(roomName, generatedName, buffer);
+                    });
+                }
+                else {
+                    console.log("Blob is null, staticTiles: ", staticTiles);
+                }
+            });
+            var newTile = new subTileMeta(generatedName, xStart, yStart, width, height);
+            var combinedTiles = new tileAnimation([newTile]);
+            var compressetMeta = new objectMetaData(xStart, yStart, generatedName, combinedTiles);
+            compressetMeta.isCombinationOfTiles = true;
+            return compressetMeta;
+        };
+        return layerCompressor;
+    }());
+
+    var layerContainer = /** @class */ (function () {
+        function layerContainer(canvasContext) {
+            this.storedLayers = [];
+            this.currentRoom = "";
+            this.selectedLayer = null;
+            this.gridXOffset = 0;
+            this.gridYOffset = 0;
+            this.ctx = canvasContext;
+            this.containerElement = document.getElementById("layerContainer");
+        }
+        layerContainer.prototype.importRoom = function (clickedFile, jsonString) {
+            this.currentRoom = clickedFile;
+            var arayOfData = new roomData([]);
+            if (jsonString != "") {
+                console.log("jsonString: ", jsonString);
+                arayOfData = JSON.parse(jsonString);
+                if (arayOfData.cameraBoundsX != undefined) {
+                    document.getElementById("cameraBoundsX").value = arayOfData.cameraBoundsX.toString();
+                }
+                else {
+                    document.getElementById("cameraBoundsX").value = "";
+                }
+                if (arayOfData.cameraBoundsX != undefined) {
+                    document.getElementById("cameraBoundsY").value = arayOfData.cameraBoundsY.toString();
+                }
+                else {
+                    document.getElementById("cameraBoundsY").value = "";
+                }
+                if (arayOfData.cameraBoundsX != undefined) {
+                    document.getElementById("cameraBoundsWidth").value = arayOfData.cameraBoundsWidth.toString();
+                }
+                else {
+                    document.getElementById("cameraBoundsWidth").value = "";
+                }
+                if (arayOfData.cameraBoundsX != undefined) {
+                    document.getElementById("cameraBoundsHeight").value = arayOfData.cameraBoundsHeight.toString();
+                }
+                else {
+                    document.getElementById("cameraBoundsHeight").value = "";
+                }
+                if (arayOfData.backgroundColor != undefined) {
+                    document.getElementById("backgroundColorInput").value = arayOfData.backgroundColor.toString();
+                }
+                else {
+                    document.getElementById("backgroundColorInput").value = "0xFFFFFF";
+                }
+            }
+            if (arayOfData.layerData.length == 0) {
+                arayOfData.layerData.push(new layer("Layer 1", 0));
+            }
+            this.storedLayers.length = 0;
+            var _loop_1 = function (i) {
+                var dataLayer = arayOfData.layerData[i];
+                console.log("dataLayer: ", dataLayer);
+                var newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
+                newLayer.hidden = dataLayer.hidden;
+                if (dataLayer.settings == "undefined" || dataLayer.settings == "" || dataLayer.settings == undefined || dataLayer.settings == null) {
+                    dataLayer.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1}";
+                }
+                newLayer.settings = dataLayer.settings;
+                dataLayer.metaObjectsInLayer.forEach(function (obj) {
+                    if (obj.isCombinationOfTiles == false) {
+                        var newObj = new objectMetaData(obj.x, obj.y, obj.name, obj.tile);
+                        newObj.inputString = obj.inputString;
+                        newLayer.metaObjectsInLayer.push(newObj);
+                    }
+                });
+                this_1.storedLayers.push(newLayer);
+            };
+            var this_1 = this;
+            for (var i = 0; i < arayOfData.layerData.length; i++) {
+                _loop_1(i);
+            }
+            console.log("this.storedLayers: ", this.storedLayers);
+            //populate layer select element
+            this.initializeLayerModule(this.storedLayers);
+            this.selectFirstLayer();
+        };
+        layerContainer.prototype.exportRoom = function () {
+            return LZString.compressToEncodedURIComponent(JSON.stringify(layerCompressor.compressRoom(this.currentRoom, this.storedLayers)));
+        };
+        layerContainer.prototype.createLayerOption = function (layerName, hidden) {
+            var layerOption = document.createElement("div");
+            layerOption.className = "layerOptionContainer";
+            layerOption.addEventListener("mouseup", this.clickLayerOption.bind(this));
+            var textSpan = document.createElement("span");
+            textSpan.innerHTML = layerName;
+            layerOption.appendChild(textSpan);
+            var moveUpButton = document.createElement("button");
+            moveUpButton.innerHTML = "up";
+            moveUpButton.addEventListener("mouseup", this.moveLayerUp.bind(this));
+            layerOption.appendChild(moveUpButton);
+            var moveDownButton = document.createElement("button");
+            moveDownButton.innerHTML = "down";
+            moveDownButton.addEventListener("mouseup", this.moveLayerDown.bind(this));
+            layerOption.appendChild(moveDownButton);
+            var hideCheck = document.createElement("input");
+            hideCheck.type = "checkbox";
+            hideCheck.checked = hidden;
+            hideCheck.addEventListener("change", this.clickHideLayer.bind(this));
+            layerOption.appendChild(hideCheck);
+            var edit = document.createElement("button");
+            edit.innerHTML = "edit";
+            edit.addEventListener("mouseup", this.setLayerSettings.bind(this));
+            layerOption.appendChild(edit);
+            this.containerElement.appendChild(layerOption);
+            return layerOption;
+        };
+        layerContainer.prototype.setLayerSettings = function (e) {
+            var _a;
+            var target = e.target;
+            var layerName = (_a = target.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
+            var clickedLayer = null;
+            if (layerName != null) {
+                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
+                    var layer_1 = _b[_i];
+                    if (layer_1.layerName == layerName) {
+                        clickedLayer = layer_1;
+                        break;
+                    }
+                }
+            }
+            if (clickedLayer != null) {
+                var currentSettings = clickedLayer.settings;
+                window.node.promptDefaultText("Type in the name of the layer you want to delete", currentSettings, function (text) {
+                    if (text != null) {
+                        clickedLayer.settings = text;
+                        /*var parsed = JSON.parse(text) as any;
+                        let newSpeedX: number = parseFloat(parsed.scrollSpeedX);
+                        let newSpeedY: number = parseFloat(parsed.scrollSpeedY);
+        
+                        clickedLayer!.scrollSpeedX = newSpeedX;
+                        clickedLayer!.scrollSpeedY = newSpeedY;*/
+                    }
+                });
+            }
+        };
+        layerContainer.prototype.clickLayerOption = function (e) {
+            var _a;
+            var target = e.target;
+            var layerName = (_a = target.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
+            if (layerName != null) {
+                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
+                    var layer_2 = _b[_i];
+                    if (layer_2.layerName == layerName) {
+                        this.selectLayer(layer_2);
+                        break;
+                    }
+                }
+            }
+        };
+        layerContainer.prototype.selectLayer = function (selectThisLayer) {
+            if (selectThisLayer === void 0) { selectThisLayer = null; }
+            var layerOptions = document.getElementsByClassName("layerOptionContainer");
+            for (var i = 0; i < layerOptions.length; i++) {
+                var element = layerOptions[i];
+                var elementLayerName = element.getElementsByTagName("span")[0].innerHTML;
+                if (selectThisLayer == null && i == 0) {
+                    element.className = "layerOptionContainer selectedLayer";
+                    this.selectedLayer = selectThisLayer;
+                }
+                else if (selectThisLayer != null && elementLayerName == selectThisLayer.layerName) {
+                    element.className = "layerOptionContainer selectedLayer";
+                    this.selectedLayer = selectThisLayer;
+                }
+                else {
+                    element.className = "layerOptionContainer";
+                }
+            }
+        };
+        layerContainer.prototype.clickHideLayer = function (e) {
+            var _a;
+            var target = e.target;
+            var layerName = (_a = target.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
+            if (target.checked && layerName != null) {
+                for (var _i = 0, _b = this.storedLayers; _i < _b.length; _i++) {
+                    var l = _b[_i];
+                    if (l.layerName == layerName) {
+                        l.hidden = true;
+                        break;
+                    }
+                }
+            }
+            else if (target.checked == false && layerName != null) {
+                for (var _c = 0, _d = this.storedLayers; _c < _d.length; _c++) {
+                    var l = _d[_c];
+                    if (l.layerName == layerName) {
+                        l.hidden = false;
+                        break;
+                    }
+                }
+            }
+        };
+        layerContainer.prototype.isLayerHidden = function (layerName) {
+            for (var _i = 0, _a = this.storedLayers; _i < _a.length; _i++) {
+                var layer_3 = _a[_i];
+                if (layer_3.layerName == layerName) {
+                    return layer_3.hidden;
+                }
+            }
+            return false;
+        };
+        layerContainer.prototype.addToLayer = function (newObj) {
+            if (this.selectedLayer != null) {
+                this.selectedLayer.metaObjectsInLayer.push(newObj);
+            }
+        };
+        layerContainer.prototype.hasObjectPos = function (x, y) {
+            var _a;
+            if (this.selectedLayer != null) {
+                for (var _i = 0, _b = (_a = this.selectedLayer) === null || _a === void 0 ? void 0 : _a.metaObjectsInLayer; _i < _b.length; _i++) {
+                    var obj = _b[_i];
+                    if (obj.x == x && obj.y == y) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+        layerContainer.prototype.getObjectAtPos = function (mouseTestX, mouseTestY) {
+            var _a;
+            if (this.selectedLayer != null) {
+                for (var _i = 0, _b = (_a = this.selectedLayer) === null || _a === void 0 ? void 0 : _a.metaObjectsInLayer; _i < _b.length; _i++) {
+                    var obj = _b[_i];
+                    if (this.isMouseInsideObject(obj, mouseTestX, mouseTestY)) {
+                        return obj;
+                    }
+                }
+            }
+            return null;
+        };
+        layerContainer.prototype.removeObject = function (targetObject) {
+            if (targetObject != null && this.selectedLayer != null) {
+                this.selectedLayer.metaObjectsInLayer = this.selectedLayer.metaObjectsInLayer.filter(function (x) { return x != targetObject; });
+            }
+        };
+        layerContainer.prototype.isMouseInsideObject = function (obj, mouseTestX, mouseTestY) {
+            var width = -1;
+            var height = -1;
+            if (obj.tile != null) {
+                width = obj.tile.get(0).width;
+                height = obj.tile.get(0).height;
+            }
+            else {
+                if (fileSystemHandlerObjects.classAndImage[obj.name] != null) {
+                    width = fileSystemHandlerObjects.classAndImage[obj.name].width;
+                    height = fileSystemHandlerObjects.classAndImage[obj.name].height;
+                }
+                else {
+                    width = 98;
+                    height = 98;
+                }
+            }
+            if (mouseTestX - this.gridXOffset >= obj.x &&
+                mouseTestX - this.gridXOffset < obj.x + width &&
+                mouseTestY - this.gridYOffset >= obj.y &&
+                mouseTestY - this.gridYOffset < obj.y + height) {
+                return true;
+            }
+            return false;
+        };
+        layerContainer.prototype.moveLayerUp = function (e) {
+            var _a;
+            var button = e.target;
+            var layerName = (_a = button.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
+            var previousName = undefined;
+            if (layerName != undefined) {
+                for (var i = 0; i < this.storedLayers.length; i++) {
+                    if (this.storedLayers[i].layerName == layerName && i != 0) {
+                        previousName = this.storedLayers[i - 1].layerName;
+                    }
+                }
+            }
+            this.moveLayerDownInOrder(previousName);
+        };
+        layerContainer.prototype.moveLayerDown = function (e) {
+            var _a;
+            var button = e.target;
+            var layerName = (_a = button.parentElement) === null || _a === void 0 ? void 0 : _a.getElementsByTagName("span")[0].innerHTML;
+            this.moveLayerDownInOrder(layerName);
+        };
+        layerContainer.prototype.moveLayerDownInOrder = function (layerName) {
+            if (layerName != null) {
+                for (var _i = 0, _a = this.storedLayers; _i < _a.length; _i++) {
+                    var l = _a[_i];
+                    if (l.layerName == layerName) {
+                        for (var _b = 0, _c = this.storedLayers; _b < _c.length; _b++) {
+                            var sl = _c[_b];
+                            if (sl.zIndex == l.zIndex + 1) {
+                                l.zIndex = l.zIndex ^ sl.zIndex;
+                                sl.zIndex = l.zIndex ^ sl.zIndex;
+                                l.zIndex = l.zIndex ^ sl.zIndex;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                this.initializeLayerModule(this.storedLayers);
+            }
+            if (layerName != null) {
+                if (this.selectedLayer != null) {
+                    this.selectLayer(this.selectedLayer);
+                }
+            }
+        };
+        layerContainer.prototype.initializeLayerModule = function (layers) {
+            while (this.containerElement.firstChild) {
+                this.containerElement.removeChild(this.containerElement.firstChild);
+            }
+            layers.sort(function (a, b) {
+                return a.zIndex - b.zIndex;
+            });
+            for (var _i = 0, layers_1 = layers; _i < layers_1.length; _i++) {
+                var cLayer = layers_1[_i];
+                this.createLayerOption(cLayer.layerName, cLayer.hidden);
+            }
+        };
+        layerContainer.prototype.selectFirstLayer = function () {
+            this.selectLayer(this.storedLayers[0]);
+        };
+        layerContainer.prototype.createNewLayer = function (newLayerName) {
+            var nextIndex = 0;
+            this.storedLayers.forEach(function (layer) {
+                if (layer.zIndex >= nextIndex) {
+                    nextIndex = layer.zIndex + 1;
+                }
+            });
+            var newLayer = new layer(newLayerName, nextIndex);
+            newLayer.zIndex = nextIndex;
+            this.storedLayers.push(newLayer);
+            this.initializeLayerModule(this.storedLayers);
+            this.selectLayer(newLayer);
+        };
+        layerContainer.prototype.deleteLayer = function (layerName) {
+            if (this.storedLayers.length <= 1) {
+                alert("You need to have at least one layer");
+                return;
+            }
+            var layer = this.storedLayers.filter(function (l) { return l.layerName == layerName; })[0];
+            if (layer == undefined) {
+                alert("The layer does not exist");
+            }
+            else {
+                this.storedLayers = this.storedLayers.filter(function (l) { return l.layerName != layerName; });
+                this.initializeLayerModule(this.storedLayers);
+                this.selectLayer();
+            }
+        };
+        return layerContainer;
+    }());
+
+    var canvasRenderer = /** @class */ (function () {
+        function canvasRenderer(canvasName) {
+            var _this = this;
+            var _a, _b;
+            this.gridXOffset = 0;
+            this.gridYOffset = 0;
+            this.canvasScaleX = 1;
+            this.canvasScaleY = 1;
+            this.layers = [];
+            this.counter = 0;
+            this.haveSelectedFromHover = false;
+            this.missingImage = new Image();
+            this.missingImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAZQTFRF/wDj////hdfaxwAAAA5JREFUeJxjCGVYxYCEAR6cA/1tfYfmAAAAAElFTkSuQmCC";
+            this.canvas = document.getElementById(canvasName);
+            this.ctx = this.canvas.getContext("2d");
+            this.gridWidth = 16;
+            this.gridHeight = 16;
+            this.layerHandler = new layerContainer(this.ctx);
+            this.buttonSetSize = document.getElementById("setSizeButton");
+            this.buttonZoomIn = document.getElementById("zoomIn");
+            this.buttonZoomIn.addEventListener("mouseup", this.zoomIn.bind(this));
+            this.buttonZoomOut = document.getElementById("zoomOut");
+            this.buttonZoomOut.addEventListener("mouseup", this.zoomOut.bind(this));
+            this.inputGridx = document.getElementById("gridXInput");
+            this.inputGridx.value = this.gridWidth + "";
+            this.inputGridy = document.getElementById("gridYInput");
+            this.inputGridy.value = this.gridHeight + "";
+            this.buttonSetSize.onclick = this.setCanvasWidth.bind(this);
+            (_a = document.getElementById("gridXInput")) === null || _a === void 0 ? void 0 : _a.addEventListener("change", this.onGridSizeChange.bind(this));
+            (_b = document.getElementById("gridYInput")) === null || _b === void 0 ? void 0 : _b.addEventListener("change", this.onGridSizeChange.bind(this));
+            this.container = document.getElementById("canvasAndFilesCon");
+            window.onresize = this.windowResize.bind(this);
+            setTimeout(function () {
+                _this.windowResize();
+            }, 800);
+        }
+        canvasRenderer.prototype.updateCanvasOffset = function (dx, dy) {
+            this.gridXOffset += dx;
+            this.gridYOffset += dy;
+            this.layerHandler.gridXOffset = this.gridXOffset;
+            this.layerHandler.gridYOffset = this.gridYOffset;
+        };
+        canvasRenderer.prototype.windowResize = function () {
+            this.canvas.style.width = window.innerWidth + "px";
+            this.canvas.style.height = window.innerHeight + "px";
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        };
+        canvasRenderer.prototype.onGridSizeChange = function () {
+            var _a, _b;
+            this.gridWidth = parseInt(this.inputGridx.value);
+            this.gridHeight = parseInt(this.inputGridy.value);
+            (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.setTransform(1, 0, 0, 1, 0, 0);
+            (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.scale(this.canvasScaleX, this.canvasScaleY);
+        };
+        canvasRenderer.prototype.zoomIn = function () {
+            var _a, _b;
+            this.canvasScaleX *= 1.1;
+            this.canvasScaleY *= 1.1;
+            (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.setTransform(1, 0, 0, 1, 0, 0);
+            (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.scale(this.canvasScaleX, this.canvasScaleY);
+        };
+        canvasRenderer.prototype.zoomOut = function () {
+            var _a, _b;
+            this.canvasScaleX *= 0.9;
+            this.canvasScaleY *= 0.9;
+            (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.setTransform(1, 0, 0, 1, 0, 0);
+            (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.scale(this.canvasScaleX, this.canvasScaleY);
+        };
+        canvasRenderer.prototype.setCanvasWidth = function () {
+            this.gridWidth = parseInt(this.inputGridx.value);
+            this.gridHeight = parseInt(this.inputGridy.value);
+        };
+        canvasRenderer.prototype.getCanvasMousePositions = function (e) {
+            var x = e.clientX;
+            var y = e.clientY;
+            var rect = this.canvas.getBoundingClientRect();
+            x -= rect.left;
+            y -= rect.top;
+            var ratioScaleX = (this.canvas.width / this.canvasScaleX) / this.canvas.width;
+            var ratioScaleY = (this.canvas.height / this.canvasScaleY) / this.canvas.height;
+            x *= ratioScaleX;
+            y *= ratioScaleY;
+            return [x, y];
+        };
+        canvasRenderer.prototype.render = function (mouseX, mouseY, cursor) {
+            var _a, _b, _c;
+            this.counter++;
+            this.haveSelectedFromHover = false;
+            (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.clearRect(0, 0, this.canvas.width / this.canvasScaleX, this.canvas.height / this.canvasScaleY);
+            this.ctx.fillStyle = document.getElementById("backgroundColorInput").value;
+            (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.fillRect(0, 0, this.canvas.width / this.canvasScaleX, this.canvas.height / this.canvasScaleY);
+            (_c = this.ctx) === null || _c === void 0 ? void 0 : _c.fill();
+            this.drawGrid();
+            this.drawObjects(mouseX, mouseY);
+            this.drawCameraBounds();
+            this.drawMouse(mouseX, mouseY, cursor);
+        };
+        canvasRenderer.prototype.drawObjects = function (mouseX, mouseY) {
+            var _this = this;
+            this.layerHandler.storedLayers.forEach(function (layer) {
+                if (layer.hidden == false) {
+                    layer.metaObjectsInLayer.forEach(function (meta) {
+                        var _a, _b, _c, _d;
+                        if (meta.tile == null) {
+                            if (fileSystemHandlerObjects.classAndImage[meta.name] != null) {
+                                if (fileSystemHandlerObjects.classAndImage[meta.name].complete) {
+                                    if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
+                                        _this.drawMouseOverSelection(meta, mouseX, mouseY);
+                                    }
+                                    (_a = _this.ctx) === null || _a === void 0 ? void 0 : _a.drawImage(fileSystemHandlerObjects.classAndImage[meta.name], meta.x + _this.gridXOffset, meta.y + _this.gridYOffset);
+                                }
+                            }
+                            else {
+                                if (_this.missingImage.complete) {
+                                    (_b = _this.ctx) === null || _b === void 0 ? void 0 : _b.drawImage(_this.missingImage, 0, 0, 8, 8, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, 98, 98);
+                                }
+                            }
+                        }
+                        else {
+                            var tileToDraw = meta.tile.get(_this.counter);
+                            if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
+                                _this.drawMouseOverSelection(meta, mouseX, mouseY);
+                            }
+                            if (resourcesTiles.resourceNameAndImage[tileToDraw.resourceName] != null) {
+                                (_c = _this.ctx) === null || _c === void 0 ? void 0 : _c.drawImage(resourcesTiles.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                            }
+                            else {
+                                if (_this.missingImage.complete) {
+                                    (_d = _this.ctx) === null || _d === void 0 ? void 0 : _d.drawImage(_this.missingImage, tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        };
+        canvasRenderer.prototype.drawMouseOverSelection = function (obj, mouseX, mouseY) {
+            var _a, _b, _c;
+            if (this.layerHandler.isMouseInsideObject(obj, mouseX, mouseY)
+                && this.haveSelectedFromHover == false
+                && obj.isCombinationOfTiles == false) {
+                this.haveSelectedFromHover = true;
+                var width = -1;
+                var height = -1;
+                if (obj.tile != null) {
+                    width = obj.tile.get(this.counter).width;
+                    height = obj.tile.get(this.counter).height;
+                }
+                else {
+                    if (fileSystemHandlerObjects.classAndImage[obj.name] != null) {
+                        width = fileSystemHandlerObjects.classAndImage[obj.name].width;
+                        height = fileSystemHandlerObjects.classAndImage[obj.name].height;
+                    }
+                    else {
+                        width = 98;
+                        height = 98;
+                    }
+                }
+                this.ctx.strokeStyle = 'red';
+                this.ctx.lineWidth = 5;
+                (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.beginPath();
+                (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.rect(obj.x + this.gridXOffset - 2.5, obj.y + this.gridYOffset - 2.5, width + 5, height + 5);
+                (_c = this.ctx) === null || _c === void 0 ? void 0 : _c.stroke();
+            }
+        };
+        canvasRenderer.prototype.drawGrid = function () {
+            var _a, _b, _c, _d, _e, _f, _g, _h;
+            this.ctx.lineWidth = 1;
+            var drawGridWidth = this.gridWidth;
+            var drawGridHeight = this.gridHeight;
+            var horizontalLines = Math.ceil((this.canvas.height / this.canvasScaleX) / drawGridHeight) + 1;
+            var verticallines = Math.ceil((this.canvas.width / this.canvasScaleY) / this.gridWidth) + 1;
+            this.ctx.strokeStyle = 'black';
+            this.ctx.lineWidth = 0.5 / this.canvasScaleX;
+            for (var i = 0; i < horizontalLines; i++) {
+                (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.beginPath();
+                (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.moveTo(0, (i) * drawGridWidth + 0.5 + (this.gridYOffset % drawGridHeight) - drawGridHeight);
+                (_c = this.ctx) === null || _c === void 0 ? void 0 : _c.lineTo(this.canvas.width / this.canvasScaleX, (i) * drawGridWidth + 0.5 + (this.gridYOffset % drawGridHeight) - drawGridHeight);
+                (_d = this.ctx) === null || _d === void 0 ? void 0 : _d.stroke();
+            }
+            for (var i = 0; i < verticallines; i++) {
+                (_e = this.ctx) === null || _e === void 0 ? void 0 : _e.beginPath();
+                (_f = this.ctx) === null || _f === void 0 ? void 0 : _f.moveTo((i) * drawGridWidth + 0.5 + (this.gridXOffset % drawGridWidth) - drawGridWidth, 0);
+                (_g = this.ctx) === null || _g === void 0 ? void 0 : _g.lineTo((i) * drawGridWidth + 0.5 + (this.gridXOffset % drawGridWidth) - drawGridWidth, this.canvas.height / this.canvasScaleY);
+                (_h = this.ctx) === null || _h === void 0 ? void 0 : _h.stroke();
+            }
+        };
+        canvasRenderer.prototype.drawCameraBounds = function () {
+            var startXCam = parseInt(document.getElementById("cameraBoundsX").value);
+            var startYCam = parseInt(document.getElementById("cameraBoundsY").value);
+            var widthCam = parseInt(document.getElementById("cameraBoundsWidth").value);
+            var heightCam = parseInt(document.getElementById("cameraBoundsHeight").value);
+            if (startXCam != null && startYCam != null && widthCam != null && heightCam != null) {
+                this.ctx.strokeStyle = "red";
+                this.ctx.lineWidth = 16;
+                this.ctx.rect(startXCam + this.gridXOffset, startYCam + this.gridYOffset, widthCam, heightCam);
+                this.ctx.stroke();
+            }
+        };
+        canvasRenderer.prototype.drawMouse = function (mouseX, mouseY, cursor) {
+            var _a, _b, _e, _f, _g;
+            var mouseGridX = (Math.floor(mouseX / this.gridWidth) * this.gridWidth) + ((this.gridXOffset) % this.gridWidth);
+            var mouseGridY = (Math.floor(mouseY / this.gridHeight) * this.gridHeight) + ((this.gridYOffset) % this.gridHeight);
+            if (cursorData.cursorType == cursorType.pensil) {
+                if (cursor.objectSelected != null) {
+                    this.ctx.strokeStyle = 'red';
+                    this.ctx.lineWidth = 1;
+                    (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.rect(mouseGridX, mouseGridY, this.gridWidth, this.gridHeight);
+                    (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.stroke();
+                    if (cursor.objectSelected.objectMouseImageReady && cursorData.cursorType == cursorType.pensil) {
+                        {
+                            (_e = this.ctx) === null || _e === void 0 ? void 0 : _e.drawImage((_f = cursor.objectSelected) === null || _f === void 0 ? void 0 : _f.objectToPlaceImageUrl, mouseGridX, mouseGridY);
+                        }
+                    }
+                }
+                else if (cursor.currentSubTile != null) {
+                    var xMousePut = 0;
+                    var yMousePut = 0;
+                    {
+                        xMousePut = mouseGridX;
+                        yMousePut = mouseGridY;
+                    }
+                    if (cursor.currentSubTile.get(0) == undefined) {
+                        console.log("can't get first image from tile: ", cursor.currentSubTile);
+                    }
+                    if (resourcesTiles.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName] != null) {
+                        var image = resourcesTiles.resourceNameAndImage[cursor.currentSubTile.get(0).resourceName];
+                        (_g = this.ctx) === null || _g === void 0 ? void 0 : _g.drawImage(image, cursor.currentSubTile.get(0).startX, cursor.currentSubTile.get(0).startY, cursor.currentSubTile.get(0).width, cursor.currentSubTile.get(0).height, xMousePut, yMousePut, cursor.currentSubTile.get(0).width, cursor.currentSubTile.get(0).height);
+                    }
+                    else {
+                        console.log("Can't find resource ", cursor.currentSubTile.get(0).resourceName);
+                        console.log("In resource pool: ", resourcesTiles.resourceNameAndImage);
+                    }
+                }
+            }
+        };
+        return canvasRenderer;
     }());
 
     var handleCanvas = /** @class */ (function () {
@@ -4639,6 +4461,8 @@
             this.previousMouseY = -1;
             this.noGridMouse = false;
             this.mouseDown = false;
+            this.genObj = new objectGenerator();
+            this.currentRoomName = "";
             this.cursor = cursor;
             this.canvasRenderPart = new canvasRenderer(canvasName);
             this.layerCreateButton = document.getElementById("createLayerButton");
@@ -4718,8 +4542,8 @@
                 }
             }
             else if (cursorData.cursorType == cursorType.eraser && this.canvasRenderPart.layerHandler.selectedLayer != null) {
-                var objTarget = this.canvasRenderPart.layerHandler.getObjectAtPos(this.mouseXPosition, this.mouseYPosition);
-                this.canvasRenderPart.layerHandler.remomveObject(objTarget);
+                var objTarget_1 = this.canvasRenderPart.layerHandler.getObjectAtPos(this.mouseXPosition, this.mouseYPosition);
+                this.canvasRenderPart.layerHandler.removeObject(objTarget_1);
             }
             else if (cursorData.cursorType == cursorType.grabber) {
                 if (this.previousMouseX != -1 && this.previousMouseY != -1) {
@@ -4730,9 +4554,27 @@
                 this.previousMouseX = this.mouseXPosition;
                 this.previousMouseY = this.mouseYPosition;
             }
+            else if (cursorData.cursorType == cursorType.editor && this.canvasRenderPart.layerHandler.selectedLayer != null) {
+                var objTarget = this.canvasRenderPart.layerHandler.getObjectAtPos(this.mouseXPosition, this.mouseYPosition);
+                if (objTarget != null) {
+                    var inputTemplate = this.genObj.generateObject(objTarget.name, 0, 0, null, "").inputTemplate;
+                    var inputString = objTarget.inputString;
+                    if (inputString == "") {
+                        inputString = inputTemplate;
+                    }
+                    window.node.promptDefaultText("Input string for object:", inputString, function (text) {
+                        if (text != null) {
+                            if (objTarget != null) {
+                                objTarget.inputString = text;
+                            }
+                        }
+                    });
+                }
+            }
             this.mouseDown = true;
         };
         handleCanvas.prototype.importRoom = function (roomName, jsonString) {
+            this.currentRoomName = roomName;
             this.canvasRenderPart.layerHandler.importRoom(roomName, jsonString);
         };
         handleCanvas.prototype.exportRoom = function () {

@@ -2,23 +2,17 @@ fs = require('fs');
 const path = require('path');
 const glob = require("glob");
 
-const stringAnchorStart = "//{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)";
-const stringAnchorEnd = "//{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)";
-
-const startImportAnchor = "//{NEW IMPORTS START HERE}";
-const endImportAnchor = "//{NEW IMPORTS END HERE}";
 
 
 
-
-let objectNames = [];
+let sceneNames = [];
 let objectDirsAndName = [];
 
 var getDirectories = function (src, callback) {
   glob(src + '/**/*', callback);
 };
-//console.log(path.join(__dirname, '../')+'src/objects');
-getDirectories(path.join(__dirname, '../')+'src/objects', function (err, res) {
+
+getDirectories(path.join(__dirname, '../')+'src/scenes', function (err, res) {
   if (err) {
     console.log('Error', err);
   } else {
@@ -26,30 +20,34 @@ getDirectories(path.join(__dirname, '../')+'src/objects', function (err, res) {
         objectDirsAndName.push(dir);
         let exploded = dir.split("/");
         if(exploded[exploded.length-1].indexOf(".ts") != -1){
-            objectNames.push(exploded[exploded.length-1]);
+            sceneNames.push(exploded[exploded.length-1]);
         }
     });
 
-    //console.log(objectNames);
-    insertNewObjects(objectNames);
+    insertScenes(sceneNames);
   }
 });
 
 
-function insertNewObjects(objectNames){
-    fs.readFile(path.join(__dirname, '../')+'src/shared/objectGenerator.ts', 'utf8', function (err,data) {
-        if (err) {
-          return console.log(err);
+function insertScenes(sceneNames){
+    console.log(sceneNames);
+    var imports = "";
+    var scriptBody = "";
+    sceneNames.forEach(scene => {
+        let sceneNoFileType = scene.substring(0, scene.indexOf(".ts"));
+        if(sceneNoFileType != "scene_index"){
+            imports += 'import { '+sceneNoFileType+' } from "./'+sceneNoFileType+'";\n';
+            scriptBody += '"'+sceneNoFileType+'": '+sceneNoFileType+',';
         }
-        let newFileData = insertObjects(data);
-        newFileData = insertImports(newFileData);
         
-        fs.writeFileSync(path.join(__dirname, '../')+'src/shared/objectGenerator.ts', newFileData, "utf8", function(err){
-          if (err) return console.log(err);
-        });
     });
-
-    
+    fs.writeFileSync(path.join(__dirname, '../')+'src/scenes/scene_index.ts',imports+`
+    export var roomIndex: { [key: string]: string; } = {
+        `+scriptBody+`
+    };
+    `, "utf8", function(err){
+        if (err) return console.log(err);
+    });
 }
 
 
@@ -61,7 +59,7 @@ function insertObjects(data){
   let lastStringPart = stringAnchorEnd+data.substring(indexEnd + stringAnchorEnd.length)
 
   let insertString = "";
-  objectNames.forEach(objName => {
+  sceneNames.forEach(objName => {
     let objNameOnly = objName.split(".")[0];
       insertString += "\t\t(xp: number, yp: number, input: string)=>{return new "+objNameOnly+"(xp, yp, input);},\n";
   });

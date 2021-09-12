@@ -7,13 +7,13 @@ import { gameCamera } from "../gameCamera";
 import { layer } from "../../shared/layer";
 import { roomLayer } from "./roomLayer";
 import * as PIXI from 'pixi.js'
+import { objectGlobalData } from "./objectGlobalData";
 
 
 export class objectContainer{
     private specificObjects: {[key: string]: Array<objectBase>};
     private layers: {[key: number]: roomLayer};
     private layerNames: {[key: string]: number} = {};
-    //private layersContainer: {[key: number]: PIXI.Container} = {};
 
     private layerKeysOrdered: Array<number> = [];
     private objectToRemoveBuffer: Array<iObject> = [];
@@ -57,7 +57,6 @@ export class objectContainer{
         if(hidden == false){
             this.layers[targetlayer].graphicsContainer.addChild(obj.g);
         }
-        
     }
 
     addObject(obj: objectBase, layerIndex:number){
@@ -103,7 +102,7 @@ export class objectContainer{
     }
 
 
-    foreachObjectType(targets: string[], func:(arg:iObject)=>boolean): iObject{
+    loopThroughObjectsUntilCondition(targets: string[], func:(arg:iObject)=>boolean): iObject{
         for(var i=0; i<targets.length; i++){
             if(this.specificObjects[targets[i]] != null){
                 for(var j=0; j<this.specificObjects[targets[i]].length; j++){
@@ -113,7 +112,7 @@ export class objectContainer{
                 }
             }
         }
-        return objectBase.null;
+        return objectGlobalData.null;
     }
 
 
@@ -126,6 +125,15 @@ export class objectContainer{
             let key = this.layerKeysOrdered[x];
             for(var i=0; i<this.layers[key].objects.length; i++){
                 this.layers[key].objects[i].logic(logicModule);
+            }
+        }
+    }
+
+    forEveryObject(func: ((x:objectBase)=>void)){
+        for(let x = 0; x<this.layerKeysOrdered.length; x++){
+            let key = this.layerKeysOrdered[x];
+            for(var i=0; i<this.layers[key].objects.length; i++){
+                func(this.layers[key].objects[i]);
             }
         }
     }

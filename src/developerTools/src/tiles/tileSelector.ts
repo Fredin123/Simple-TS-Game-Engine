@@ -1,12 +1,12 @@
 import { subTileMeta } from "../../../shared/tile/subTileMeta";
 import { animatedTypeCreator } from "./animatedTypeCreator";
 import { tileAnimation } from "../../../shared/tile/tileAnimation";
+import { resourcesTiles } from "./resourcesTiles";
+
 
 declare var window: any;
 
 export class tileSelector{
-    static resourceNameAndImage: Record<string, HTMLImageElement> = {};
-
     private saveDatePremadeTilesName = "customAnimatedTilesMetaData_DONT_DELETE";
     static resourceCreatedTileAnimations: Record<string, Array<tileAnimation>> = {};
 
@@ -248,7 +248,7 @@ export class tileSelector{
         this.callbackSubTile = tileDoneCallback;
         this.resourceName = resourceName;
 
-        if(tileSelector.resourceNameAndImage[resourceName] == null){
+        if(resourcesTiles.resourceNameAndImage[resourceName] == null){
             this.loadResource(imageSource, resourceName);
         }else {
             this.renderCanvas();
@@ -268,11 +268,11 @@ export class tileSelector{
     }
 
     resizeCanvas(){
-        if(this.resourceName != null && tileSelector.resourceNameAndImage[this.resourceName] != undefined && tileSelector.resourceNameAndImage[this.resourceName].complete){
-            this.canvasRenderer.width = tileSelector.resourceNameAndImage[this.resourceName].width+640;
-            this.canvasRenderer.height = tileSelector.resourceNameAndImage[this.resourceName].height+640;
-            this.canvasRenderer.style.width = (tileSelector.resourceNameAndImage[this.resourceName].width + 640)+"px";
-            this.canvasRenderer.style.height = (tileSelector.resourceNameAndImage[this.resourceName].height+640)+"px";
+        if(this.resourceName != null && resourcesTiles.resourceNameAndImage[this.resourceName] != undefined && resourcesTiles.resourceNameAndImage[this.resourceName].complete){
+            this.canvasRenderer.width = resourcesTiles.resourceNameAndImage[this.resourceName].width+640;
+            this.canvasRenderer.height = resourcesTiles.resourceNameAndImage[this.resourceName].height+640;
+            this.canvasRenderer.style.width = (resourcesTiles.resourceNameAndImage[this.resourceName].width + 640)+"px";
+            this.canvasRenderer.style.height = (resourcesTiles.resourceNameAndImage[this.resourceName].height+640)+"px";
         }
 
         this.renderCanvas();
@@ -280,15 +280,15 @@ export class tileSelector{
     }
 
     loadResource(imageSource: string, resourceName: string){
-        tileSelector.resourceNameAndImage[resourceName] = new Image();
-        tileSelector.resourceNameAndImage[resourceName].onload = () => {
+        resourcesTiles.resourceNameAndImage[resourceName] = new Image();
+        resourcesTiles.resourceNameAndImage[resourceName].onload = () => {
             this.resizeCanvas();
-            this.canvasContext?.drawImage(tileSelector.resourceNameAndImage[resourceName], 0, 0);
+            this.canvasContext?.drawImage(resourcesTiles.resourceNameAndImage[resourceName], 0, 0);
 
 
             this.renderCanvas();
         };
-        tileSelector.resourceNameAndImage[resourceName].src = imageSource;
+        resourcesTiles.resourceNameAndImage[resourceName].src = imageSource;
     }
 
 
@@ -313,6 +313,9 @@ export class tileSelector{
                 deleteButton.addEventListener("mouseup", () => {
                     let pos = tileSelector.resourceCreatedTileAnimations[resourceName].indexOf(tileSet);
                     tileSelector.resourceCreatedTileAnimations[resourceName].splice(pos, 1);
+                    if(tileSelector.resourceCreatedTileAnimations[resourceName].length == 0){
+                        delete tileSelector.resourceCreatedTileAnimations[resourceName];
+                    }
                     this.populateStoredTileAnimations(resourceName);
                     if(this.tileCreator.animation.name == tileSet.name){
                         this.tileCreator.animation = new tileAnimation();
@@ -401,7 +404,7 @@ export class tileSelector{
     renderCanvas(){
         this.canvasContext?.clearRect(0, 0, this.canvasRenderer.width, this.canvasRenderer.height);
         if(this.resourceName != ""){
-            this.canvasContext?.drawImage(tileSelector.resourceNameAndImage[this.resourceName], 0, 0);
+            this.canvasContext?.drawImage(resourcesTiles.resourceNameAndImage[this.resourceName], 0, 0);
         }
         
 

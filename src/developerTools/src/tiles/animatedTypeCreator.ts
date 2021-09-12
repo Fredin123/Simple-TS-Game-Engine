@@ -1,6 +1,6 @@
 import { subTileMeta } from "../../../shared/tile/subTileMeta";
 import { tileAnimation } from "../../../shared/tile/tileAnimation";
-import { tileSelector } from "./tileSelector";
+import { resourcesTiles } from "./resourcesTiles";
 
 
 export class animatedTypeCreator{
@@ -188,7 +188,7 @@ export class animatedTypeCreator{
 
         var previewCtx = this.tilePreview.getContext("2d");
         previewCtx?.clearRect(0, 0, this.tilePreview.width, this.tilePreview.height)
-        previewCtx?.drawImage(tileSelector.resourceNameAndImage[targetTile.resourceName], targetTile.startX, 
+        previewCtx?.drawImage(resourcesTiles.resourceNameAndImage[targetTile.resourceName], targetTile.startX, 
             targetTile.startY, 
             targetTile.width, 
             targetTile.height,

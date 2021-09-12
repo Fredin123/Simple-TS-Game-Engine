@@ -143,7 +143,6 @@ export class fileSystemHandlerRooms{
 
 
     saveRoom(roomDataCompressed: string) {
-        console.log("Save this: ",roomDataCompressed);
         window.node.saveRoom(this.currentRoom[0], roomDataCompressed);
     }
 

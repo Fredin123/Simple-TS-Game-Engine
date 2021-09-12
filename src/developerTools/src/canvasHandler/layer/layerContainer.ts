@@ -1,9 +1,9 @@
-import { handleCanvas } from "../handleCanvas";
 import { layer } from "../../../../shared/layer";
 import { objectMetaData } from "../../objectMetaData";
 import { canvasRenderer } from "../canvasRenderer";
 import { layerCompressor } from "./layerCompressor";
 import { roomData } from "../../../../shared/roomData";
+import { fileSystemHandlerObjects } from "../../fileSystemHandlerObjects";
 
 declare var LZString: any;
 declare var window : any;
@@ -29,6 +29,7 @@ export class layerContainer{
         this.currentRoom = clickedFile;
         let arayOfData: roomData = new roomData([]);
         if(jsonString != ""){
+            console.log("jsonString: ",jsonString);
             arayOfData = JSON.parse(jsonString);
 
             if(arayOfData.cameraBoundsX != undefined){
@@ -60,15 +61,6 @@ export class layerContainer{
             }else{
                 (document.getElementById("backgroundColorInput") as HTMLInputElement).value = "0xFFFFFF";
             }
-
-            for(var l of arayOfData.layerData){
-                if(l.scrollSpeedX == undefined){
-                    l.scrollSpeedX = 1;
-                }
-                if(l.scrollSpeedY == undefined){
-                    l.scrollSpeedY = 1;
-                }
-            }
         }
         if(arayOfData.layerData.length == 0){
             arayOfData.layerData.push(new layer("Layer 1", 0));
@@ -80,16 +72,15 @@ export class layerContainer{
             console.log("dataLayer: ",dataLayer);
             let newLayer = new layer(dataLayer.layerName, dataLayer.zIndex);
             newLayer.hidden = dataLayer.hidden;
-            newLayer.scrollSpeedX = dataLayer.scrollSpeedX;
-            newLayer.scrollSpeedY = dataLayer.scrollSpeedY;
             if(dataLayer.settings == "undefined" || dataLayer.settings == "" || dataLayer.settings == undefined || dataLayer.settings == null){
-                dataLayer.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1, \"blur\": 0}";
+                dataLayer.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1}";
             }
             newLayer.settings = dataLayer.settings;
 
             dataLayer.metaObjectsInLayer.forEach(obj => {
                 if(obj.isCombinationOfTiles == false){
                     let newObj = new objectMetaData(obj.x, obj.y, obj.name, obj.tile);
+                    newObj.inputString = obj.inputString;
                     newLayer.metaObjectsInLayer.push(newObj);
                 }
             });
@@ -267,7 +258,7 @@ export class layerContainer{
         return null;
     }
 
-    remomveObject(targetObject: objectMetaData | null){
+    removeObject(targetObject: objectMetaData | null){
         if(targetObject != null && this.selectedLayer != null){
             this.selectedLayer.metaObjectsInLayer = this.selectedLayer.metaObjectsInLayer.filter(x => x != targetObject);
         }
@@ -280,9 +271,9 @@ export class layerContainer{
             width = obj.tile.get(0).width;
             height = obj.tile.get(0).height;
         }else{
-            if(canvasRenderer.classAndImage[obj.name] != null){
-                width = canvasRenderer.classAndImage[obj.name].width;
-                height = canvasRenderer.classAndImage[obj.name].height;
+            if(fileSystemHandlerObjects.classAndImage[obj.name] != null){
+                width = fileSystemHandlerObjects.classAndImage[obj.name].width;
+                height = fileSystemHandlerObjects.classAndImage[obj.name].height;
             }else{
                 width = 98;
                 height = 98;
@@ -311,7 +302,6 @@ export class layerContainer{
                 }
             }
         }
-        console.log(previousName);
 
         this.moveLayerDownInOrder(previousName);
         

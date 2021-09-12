@@ -3,5 +3,6 @@
 export enum cursorType{
     pensil,
     eraser,
-    grabber
+    grabber,
+    editor,
 }

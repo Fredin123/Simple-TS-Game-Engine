@@ -13,20 +13,18 @@ import { resourcesHand } from "../preload sources/resourcesHand";
 import { animConfig } from "./animConfig";
 import { AnimatedSprite } from "pixi.js";
 import * as PIXI from 'pixi.js'
+import { objectGlobalData } from "./objectGlobalData";
 
 
 export class objectBase implements iObject{
     isTile = false;
     tileStepTime: number = -1;
-    static null: iObject = new nulliObject(0, 0);
     readonly ID: string =  uidGen.new();
     private _g: PIXI.Container = new PIXI.Container();
     private gSprites : {[key: string]: PIXI.AnimatedSprite} = {};
     friction: number = 0.98;
     airFriction: number = 0.9;
-    percentage: number = 0;
-
-    resourcesNeeded: string[] = [];
+    
 
     stickyBottom: boolean = false;
     stickyTop: boolean = false;
@@ -38,9 +36,8 @@ export class objectBase implements iObject{
     _hasBeenMoved_Tick: number = 0;
     _isColliding_Special: boolean = false;
 
-    static objectsThatCollideWith: {[key: string]: Array<string>} = {};
-    static objectsThatMoveWith: {[key: string]: Array<string>} = {};
-
+    inputTemplate: string = "";
+    outputString: string = "";
     onLayer: number = 0;
 
 
@@ -73,6 +70,9 @@ export class objectBase implements iObject{
         this._g.y = y;
     }
 
+    init(roomEvents: roomEvent){
+
+    }
 
     addMoveCollisionTarget(...collNames:string[]){
         /*for(let i=0; i<collNames.length; i++){
@@ -97,11 +97,11 @@ export class objectBase implements iObject{
     addCollisionTarget(...collNames:string[]){
         for(let i=0; i<collNames.length; i++){
             if(this._collisionTargets.indexOf(collNames[i]) == -1){
-                if(objectBase.objectsThatCollideWith[collNames[i]] == null){
-                    objectBase.objectsThatCollideWith[collNames[i]] = new Array<string>();
+                if(objectGlobalData.objectsThatCollideWith[collNames[i]] == null){
+                    objectGlobalData.objectsThatCollideWith[collNames[i]] = new Array<string>();
                 }
-                if(objectBase.objectsThatCollideWith[collNames[i]].indexOf(this.objectName) == -1){
-                    objectBase.objectsThatCollideWith[collNames[i]].push(this.objectName);
+                if(objectGlobalData.objectsThatCollideWith[collNames[i]].indexOf(this.objectName) == -1){
+                    objectGlobalData.objectsThatCollideWith[collNames[i]].push(this.objectName);
                 }
 
                 if(this._collisionTargets.indexOf(collNames[i]) == -1){
@@ -115,7 +115,7 @@ export class objectBase implements iObject{
     removeCollisionTarget(...collNames:string[]){
         throw new Error("Function removeCollisionTarget has not been implemented correctly");
         this._collisionTargets = this.collisionTargets.filter(x => { collNames.indexOf(x) == -1 });
-        objectBase.objectsThatCollideWith[this.objectName] = objectBase.objectsThatCollideWith[this.objectName].filter(x => { collNames.indexOf(x) == -1 });
+        objectGlobalData.objectsThatCollideWith[this.objectName] = objectGlobalData.objectsThatCollideWith[this.objectName].filter(x => { collNames.indexOf(x) == -1 });
     }
 
     removeAllCollisionTargets(){
@@ -137,7 +137,6 @@ export class objectBase implements iObject{
 
 
     addSprite(settings: animConfig){
-        
         let newAnimation = resourcesHand.getAnimatedSprite(settings.animationName);
         if(newAnimation != null){
             newAnimation.x = settings.x;

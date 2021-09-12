@@ -1,4 +1,4 @@
-import { hitbox } from "../../objects/hitboxes/hitbox";
+import { hitbox } from "../hitboxes/hitbox";
 import { iVector } from "../dataObjects/vector/iVector";
 import { iObject } from "../objectHandlers/iObject";
 import { roomEvent } from "../roomEvent";
@@ -96,24 +96,6 @@ export class tools{
     }
 
 
-    public static createHitbox({ startupTime, x, y, creator, life, size, offset, hitboxDirection , aerial, type}: 
-        { startupTime: number; x: number; y: number; creator: iObject; life: number; size: [number, number]; offset: [number, number]; 
-            hitboxDirection: iVector; aerial: boolean; type:string;}){
-        let newHitbox: hitbox = new hitbox(x, y);
-        newHitbox.type = type;
-        newHitbox.creator = creator;
-        newHitbox.life = life;
-        newHitbox.setSize(size[0], size[1]);
-        newHitbox.setOffset(offset[0], offset[1]);
-        newHitbox.hitboxDirection = hitboxDirection;
-        newHitbox.aerial = aerial;
-        console.log("Passed life: ",life);
-        console.log("new hitbox: ",newHitbox);
-        
-        let hitboxData: [number, hitbox] = [startupTime, newHitbox];
-
-
-        return hitboxData;
-    }
+    
 
 }

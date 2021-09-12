@@ -5,6 +5,7 @@ import { tileAnimation } from "../../../../shared/tile/tileAnimation";
 import { tileSelector } from "../../tiles/tileSelector";
 import { layer } from "../../../../shared/layer";
 import { roomData } from "../../../../shared/roomData";
+import { resourcesTiles } from "../../tiles/resourcesTiles";
 
 declare var window: any;
 
@@ -28,16 +29,18 @@ export class layerCompressor{
         compressedRoom.cameraBoundsHeight = parseInt((document.getElementById("cameraBoundsHeight") as HTMLInputElement).value);
         compressedRoom.backgroundColor = (document.getElementById("backgroundColorInput") as HTMLInputElement).value;
 
+        console.log("Exported room: ",compressedRoom);
         return compressedRoom;
     }
 
 
     private static compressLayer(l: layer, roomName: string){
+        //remove old combined tiles
+        window.node.removeOldCompiledTiles(roomName);
+
         //get each static tile from the layer
         let compressedLayer: layer = new layer(l.layerName, l.zIndex);
         compressedLayer.hidden = l.hidden;
-        compressedLayer.scrollSpeedX = l.scrollSpeedX;
-        compressedLayer.scrollSpeedY = l.scrollSpeedY;
         compressedLayer.settings = l.settings;
 
         for(var d of l.metaObjectsInLayer){
@@ -58,6 +61,7 @@ export class layerCompressor{
             }
 
             staticTiles.forEach(tile => {
+                tile.idOfStaticTileCombination = combinedStaticTiles.name;
                 compressedLayer.metaObjectsInLayer.push(tile);
             });
         }
@@ -114,7 +118,7 @@ export class layerCompressor{
         //Render tiles
         staticTiles.forEach(tile => {
             let tileDraw = tile.tile!.tiles[0];
-            let image = tileSelector.resourceNameAndImage[tileDraw.resourceName];
+            let image = resourcesTiles.resourceNameAndImage[tileDraw.resourceName];
             console.log(image.src);
             if(image == null){
                 console.log("tile: ", tile);

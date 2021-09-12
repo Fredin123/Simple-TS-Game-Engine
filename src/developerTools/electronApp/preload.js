@@ -26,6 +26,19 @@ contextBridge.exposeInMainWorld('node', {
     fs.createWriteStream("../../resources/_generated_tiles/"+nameWithNoEnding+"/"+fileName).write(buffer);
   },
 
+  removeOldCompiledTiles: (roomName) => {
+    let nameWithNoEnding = roomName.split(".")[0];
+
+
+    if(fs.existsSync("../../resources/_generated_tiles/"+nameWithNoEnding)){
+      let filenames = fs.readdirSync("../../resources/_generated_tiles/"+nameWithNoEnding);
+      filenames.forEach(file => {
+        fs.unlinkSync("../../resources/_generated_tiles/"+nameWithNoEnding+"/"+file);
+      });
+      
+    }
+  },
+
   saveJsonData: (dataName, jsonString) => {
     let targetDir = path.resolve(dataName+".json");
     fs.writeFile(targetDir, jsonString, "utf8", function (err) {

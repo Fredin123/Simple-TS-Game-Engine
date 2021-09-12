@@ -6,10 +6,13 @@ export class objectMetaData{
     x: number;
     y: number;
     name: string;
+    inputString: string = "";
 
     tile: tileAnimation | null = null;
 
     isCombinationOfTiles: boolean = false;
+
+    idOfStaticTileCombination: string = "";
 
     isPartOfCombination: boolean = false;
 

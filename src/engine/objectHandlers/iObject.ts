@@ -16,7 +16,7 @@ export interface iObject{
     tileStepTime: number;
     g: PIXI.Container;
     collisionBox: boxCollider;
-    resourcesNeeded: string[];
+    //resourcesNeeded: string[];
     objectName: string;
     collisionTargets: Array<string>;
     moveCollisionTargets: Array<string>;
@@ -29,7 +29,6 @@ export interface iObject{
     airFriction: number;
     gravity: iVector;
     weight: number;
-    percentage: number;
 
     _hasBeenMoved_Tick : number;
     _isColliding_Special: boolean;

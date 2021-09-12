@@ -1,4 +1,3 @@
-import { objectGenerator } from "../../shared/objectGenerator";
 import { tileAnimation } from "../../shared/tile/tileAnimation";
 import { calculations } from "../calculations";
 import * as PIXI from 'pixi.js'
@@ -8,7 +7,6 @@ declare var Howl: any;
 
 export class resourcesHand{
     private static app: PIXI.Application;
-    objectGen: objectGenerator = new objectGenerator();
 
     private static resourcesToLoad: string[] = [];
     
@@ -163,8 +161,8 @@ export class resourcesHand{
         if(resourcesHand.animatedSprite[name] != null){
             return new PIXI.AnimatedSprite(resourcesHand.animatedSprite[name]);
         }
-        console.log("Wanted to find this animated sprite: ",name);
-        console.log("In this resource pool: ",resourcesHand.animatedSprite);
+        //console.log("Wanted to find this animated sprite: ",name);
+        //console.log("In this resource pool: ",resourcesHand.animatedSprite);
         return null;
     }
 

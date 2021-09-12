@@ -2,8 +2,13 @@ import { resourcesHand } from "../preload sources/resourcesHand";
 import * as PIXI from 'pixi.js'
 
 export class interaction{
-    isInUse = false;
-    inputContainer: PIXI.Container = new PIXI.Container();
+    private isInUse = false;
+    private inputContainer: PIXI.Container;
+
+
+    constructor(inputContainer: PIXI.Container){
+        this.inputContainer = inputContainer;
+    }
 
     openText(text: string){
         this.isInUse = true;

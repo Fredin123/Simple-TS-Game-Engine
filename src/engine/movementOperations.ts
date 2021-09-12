@@ -3,16 +3,17 @@ import { internalFunction } from "./internalFunctions";
 import { logger } from "./logger";
 import { boxCollider } from "./objectHandlers/collision/boxCollider";
 import { iObject } from "./objectHandlers/iObject";
-import { objectBase } from "./objectHandlers/objectBase";
 import { objectContainer } from "./objectHandlers/objectContainer";
-import { roomEvent } from "./roomEvent";
 import { vector } from "./dataObjects/vector/vector";
+import { objectGlobalData } from "./objectHandlers/objectGlobalData";
+import { ticker } from "./ticker";
 
 
 export class movementOperations{
 
 
-    static moveByForce(target: iObject, force: vector, collisionNames: string[], objContainer: objectContainer, deltaTime: number){
+    static moveByForce(target: iObject, force: vector, 
+        collisionNames: string[], objContainer: objectContainer, deltaTime: number){
         force.Dx = force.Dx * deltaTime;
         force.Dy = force.Dy * deltaTime;
 
@@ -48,7 +49,7 @@ export class movementOperations{
         if(magnitude == 0) return;
         let sign: number = magnitude>0?1:-1;
         let objectsThatWereCollidingThisObjectWhileMoving = new Array<iObject>();
-        let collisionTarget: iObject = objectBase.null;
+        let collisionTarget: iObject = objectGlobalData.null;
         
         for(let i=0; i<Math.abs(magnitude); i+=1){
             objectsThatWereCollidingThisObjectWhileMoving.length = 0;
@@ -56,12 +57,12 @@ export class movementOperations{
 
             target.g.x += sign;
 
-            if(objectBase.objectsThatCollideWith[target.objectName] != null){
+            if(objectGlobalData.objectsThatCollideWith[target.objectName] != null){
                 //Push object
-                objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
+                objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
                     if(internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
                         collisionTarget = this.pushObjectHorizontal(target, testCollisionWith, sign, objContainer);
-                        if(collisionTarget == objectBase.null){
+                        if(collisionTarget == objectGlobalData.null){
                             target.force.Dx *= 1-testCollisionWith.weight;
                         }
                     }
@@ -80,13 +81,13 @@ export class movementOperations{
                 }
                 if(target.stickyTop || target.stickyBottom){
                     //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
-                    objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
+                    objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
                         if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
-                            if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
+                            if(testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()){
                                 objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                 testCollisionWith.g.x += sign;
                                 if(i >= Math.abs(magnitude)-1){
-                                    testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                    testCollisionWith._hasBeenMoved_Tick = ticker.getTicks();
                                 }
                             }
                         }
@@ -97,11 +98,11 @@ export class movementOperations{
             }
             
             
-            if(collisionTarget == objectBase.null){
+            if(collisionTarget == objectGlobalData.null){
                 collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
             }
             
-            if(collisionTarget != objectBase.null && target._isColliding_Special == false){
+            if(collisionTarget != objectGlobalData.null && target._isColliding_Special == false){
                 
                 sign *= -1;
                 target.g.x += 1*sign;
@@ -146,7 +147,7 @@ export class movementOperations{
 
         if(target.stickyLeftSide || target.stickyRightSide){
             
-            objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
+            objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
                 if(sign > 0){
                     //Moving right
                     if(testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x+target.collisionBox.width && internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
@@ -174,20 +175,20 @@ export class movementOperations{
         if(magnitude == 0)return;
         let sign: number = magnitude>0?1:-1;
         let objectsThatWereCollidingThisObjectWhileMoving = new Array<iObject>();
-        let collisionTarget: iObject = objectBase.null;
+        let collisionTarget: iObject = objectGlobalData.null;
 
         for(let i=0; i<Math.abs(magnitude); i+=1){
             
 
             target.g.y += sign;
 
-            if(objectBase.objectsThatCollideWith[target.objectName] != null){
+            if(objectGlobalData.objectsThatCollideWith[target.objectName] != null){
 
                 //Moving objects
-                objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
+                objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
                     if(internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
                         collisionTarget = this.pushObjectVertical(target, testCollisionWith, sign, objContainer);
-                        if(collisionTarget == objectBase.null){
+                        if(collisionTarget == objectGlobalData.null){
                             target.force.Dy *= 1-testCollisionWith.weight;
                         }
                     }
@@ -206,13 +207,13 @@ export class movementOperations{
                 }
                 if(target.stickyLeftSide || target.stickyRightSide){
                     //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
-                    objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
+                    objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
                         if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
-                            if(testCollisionWith._hasBeenMoved_Tick < roomEvent.getTicks()){
+                            if(testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()){
                                 objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                 testCollisionWith.g.y += sign;
                                 if(i >= Math.abs(magnitude)-1){
-                                    testCollisionWith._hasBeenMoved_Tick = roomEvent.getTicks();
+                                    testCollisionWith._hasBeenMoved_Tick = ticker.getTicks();
                                 }
                             }
                         }
@@ -226,11 +227,11 @@ export class movementOperations{
 
 
             //This has to be more optimized
-            if(collisionTarget == objectBase.null){
+            if(collisionTarget == objectGlobalData.null){
                 collisionTarget = this.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
             }
             
-            if(collisionTarget != objectBase.null){
+            if(collisionTarget != objectGlobalData.null){
                 sign *= -1;
                 target.g.y += sign;
 
@@ -272,7 +273,7 @@ export class movementOperations{
 
         //Sticky draging
         if(target.stickyTop || target.stickyBottom){
-            objContainer.foreachObjectType(objectBase.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
+            objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
                 if(sign > 0){
                     //Moving down
                     if(testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y+target.collisionBox.height && internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
@@ -304,10 +305,10 @@ export class movementOperations{
                 return pusher;
             }
             objectBeingPushed.g.x += sign;
-            objContainer.foreachObjectType(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
+            objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
                 if(testCollision.objectName != pusher.objectName && 
                     internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
-                    && this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null){
+                    && this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null){
                         objectBeingPushed.g.x += sign*-1;
                         collided = true;
                 }
@@ -317,7 +318,7 @@ export class movementOperations{
         if(collided){
             return objectBeingPushed;
         }
-        return objectBase.null;
+        return objectGlobalData.null;
     }
 
     public static pushObjectVertical(pusher: iObject, objectBeingPushed: iObject, sign: number, objContainer: objectContainer){
@@ -331,10 +332,10 @@ export class movementOperations{
                 objectBeingPushed.g.y += sign*-1;
                 collided = true;
             }else{
-                objContainer.foreachObjectType(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
+                objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
                     if(testCollision.objectName != pusher.objectName && 
                         internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
-                        && this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectBase.null){
+                        && this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null){
                             objectBeingPushed.g.y += sign*-1;
                             collided = true;
                     }
@@ -346,7 +347,7 @@ export class movementOperations{
         if(collided){
             return objectBeingPushed;
         }
-        return objectBase.null;
+        return objectGlobalData.null;
     }
 
 
@@ -357,7 +358,7 @@ export class movementOperations{
     private static boxIntersectionSpecificClass = (new class {
 
         inc = (initiator: iObject, boxData: boxCollider, targetObjects: string[], excludeObject: string, objContainer: objectContainer) : iObject=> {
-            return objContainer.foreachObjectType(targetObjects, (testCollisionWith: iObject)=>{
+            return objContainer.loopThroughObjectsUntilCondition(targetObjects, (testCollisionWith: iObject)=>{
                 if(testCollisionWith.objectName != excludeObject && internalFunction.intersecting(initiator, boxData, testCollisionWith)){
                     return true;
                 }

@@ -13,6 +13,7 @@ declare var window: any;
 
 
 export class fileSystemHandlerObjects{
+    static classAndImage: Record<string, HTMLImageElement> = {};
     generateObjects:objectGenerator = new objectGenerator();
     parameters: any = {
 		itemName: "File",
@@ -51,7 +52,7 @@ export class fileSystemHandlerObjects{
         });
 
         this.generateObjects.getAvailibleObjects().forEach(obj => {
-            var tempObj: objectBase = obj(0, 0);
+            var tempObj: objectBase = obj(0, 0, "");
             let appRenderObject = new PIXI.Application({
                 width: tempObj.g.width,
                 height: tempObj.g.height,
@@ -71,7 +72,7 @@ export class fileSystemHandlerObjects{
 
 
             var funcNameOnly = tools.getClassNameFromConstructorName(functionAsString); 
-            canvasRenderer.classAndImage[funcNameOnly] = tempNewImage;
+            fileSystemHandlerObjects.classAndImage[funcNameOnly] = tempNewImage;
             this.savedImageDataUrls[funcNameOnly] = this.system.sticker;
         });
 
