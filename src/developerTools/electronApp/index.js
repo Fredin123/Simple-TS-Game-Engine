@@ -1170,6 +1170,7 @@
         vectorFixedDelta.prototype.limitHorizontalMagnitude = function (limit) {
             throw new Error("Method not implemented.");
         };
+<<<<<<< HEAD
         vectorFixedDelta.prototype.limitVerticalMagnitude = function (limit) {
             throw new Error("Method not implemented.");
         };
@@ -1251,29 +1252,36 @@
         block.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
         };
+=======
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
         block.objectName = "block";
         return block;
     }(objectBase));
 
+<<<<<<< HEAD
     var movingBlockHori = /** @class */ (function (_super) {
         __extends(movingBlockHori, _super);
         function movingBlockHori(xp, yp, input) {
             var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
+=======
+    var player = /** @class */ (function (_super) {
+        __extends(player, _super);
+        function player(xp, yp) {
+            var _this = _super.call(this, xp, yp, player.objectName) || this;
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
             _this.switch = false;
-            _this.friction = 0.873;
-            _this.stickyTop = true;
-            _this.stickyRightSide = true;
-            _this.stickyLeftSide = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.beginFill(0xFF0000);
+                newGraphics.drawRect(0, 0, 128, 128);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
                 return g;
             });
             return _this;
+<<<<<<< HEAD
         }
         movingBlockHori.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
@@ -1309,15 +1317,21 @@
                 return g;
             });
             return _this;
+=======
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
         }
-        movingBlockVert.prototype.logic = function (l) {
+        player.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
-            if (this.switch) {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 1);
+            if (l.checkKeyHeld("a")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 2);
             }
-            else {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
+            else if (l.checkKeyHeld("d")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 2);
             }
+<<<<<<< HEAD
             if (ticker.getTicks() % 55 == 0) {
                 this.switch = !this.switch;
             }
@@ -1388,6 +1402,20 @@
         };
         wideBlock.objectName = "wideBlock";
         return wideBlock;
+=======
+            if (l.checkKeyHeld("w")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 2);
+            }
+            else if (l.checkKeyHeld("s")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 2);
+            }
+            this.force.limitHorizontalMagnitude(10);
+            this.force.limitVerticalMagnitude(10);
+            l.camera.setTarget(this.g.x, this.g.y);
+        };
+        player.objectName = "player";
+        return player;
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
     }(objectBase));
 
     var dummySandbag = /** @class */ (function (_super) {
@@ -1438,7 +1466,7 @@
             _this.haveHitThese = [];
             _this.startupTime = 0;
             _this.life = 10;
-            _this.targets = [dummySandbag.objectName];
+            _this.targets = [];
             _this.creator = null;
             _this.offsetX = 0;
             _this.offsetY = 0;
@@ -1490,13 +1518,14 @@
                     for (var _i = 0, _a = this.targets; _i < _a.length; _i++) {
                         var t = _a[_i];
                         l.foreachObjectType(t, function (obj) {
-                            var _a, _b, _c, _d;
+                            var _a, _b;
                             if (_this.haveHitThese.indexOf(obj.ID) == -1
                                 && internalFunction.intersecting(_this, _this.collisionBox, obj)) {
                                 _this.haveHitThese.push(obj.ID);
                                 if (_this.hitboxDirection != null) {
                                     /*if(this.type == "sword"){
                                         resourcesHand.playAudioVolume("WeaponImpact1.ogg", 0.25);
+<<<<<<< HEAD
                                     }*/
                                     if (_this.creator.facingRight) {
                                         obj.addForceAngleMagnitude((_a = _this.hitboxDirection) === null || _a === void 0 ? void 0 : _a.delta, (_b = _this.hitboxDirection) === null || _b === void 0 ? void 0 : _b.magnitude);
@@ -1504,6 +1533,10 @@
                                     else {
                                         obj.addForceAngleMagnitude(calculations.PI - ((_c = _this.hitboxDirection) === null || _c === void 0 ? void 0 : _c.delta), (_d = _this.hitboxDirection) === null || _d === void 0 ? void 0 : _d.magnitude);
                                     }
+=======
+                                    }
+                                    obj.addForceAngleMagnitude((_a = _this.hitboxDirection) === null || _a === void 0 ? void 0 : _a.delta, (_b = _this.hitboxDirection) === null || _b === void 0 ? void 0 : _b.magnitude);
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
                                 }
                             }
                             return true;
@@ -1519,14 +1552,8 @@
             if (this.creator != null) {
                 this.g.x = this.creator.g.x + (this.creator.collisionBox.width / 2) - (this.collisionBox.width / 2);
                 this.g.y = this.creator.g.y + this.creator.collisionBox.height / 2;
-                if (this.creator.facingRight) {
-                    this.g.x += this.offsetX;
-                    this.g.y += this.offsetY;
-                }
-                else {
-                    this.g.x -= this.offsetX;
-                    this.g.y += this.offsetY;
-                }
+                this.g.x += this.offsetX;
+                this.g.y += this.offsetY;
             }
         };
         hitbox.objectName = "hitbox";
@@ -1613,6 +1640,7 @@
         return threeHitNormal;
     }(baseAttack));
 
+<<<<<<< HEAD
     var ladder = /** @class */ (function (_super) {
         __extends(ladder, _super);
         function ladder(xp, yp, input) {
@@ -2653,6 +2681,8 @@
         return roomChanger;
     }(objectBase));
 
+=======
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
     var tileMetaObj = /** @class */ (function (_super) {
         __extends(tileMetaObj, _super);
         function tileMetaObj(xp, yp) {
@@ -2705,6 +2735,7 @@
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
+<<<<<<< HEAD
                 //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
                 function (xp, yp, input) { return new baseAttack(xp, yp, input); },
                 function (xp, yp, input) { return new threeHitNormal(xp, yp, input); },
@@ -2725,6 +2756,11 @@
                 function (xp, yp, input) { return new roomChanger(xp, yp, input); },
                 function (xp, yp, input) { return new mio(xp, yp, input); },
                 function (xp, yp, input) { return new player(xp, yp, input); },
+=======
+                //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+                function (xp, yp) { return new block(xp, yp); },
+                function (xp, yp) { return new player(xp, yp); },
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
@@ -2924,6 +2960,7 @@
         return fileSystemHandlerObjects;
     }());
 
+<<<<<<< HEAD
     var subTileMeta = /** @class */ (function () {
         function subTileMeta(resourceName, startX, startY, width, height) {
             this.tileName = "";
@@ -2932,6 +2969,17 @@
             this.startY = startY;
             this.width = width;
             this.height = height;
+=======
+    var layer = /** @class */ (function () {
+        function layer(layerName, zIndex) {
+            this.metaObjectsInLayer = [];
+            this.hidden = false;
+            this.scrollSpeedX = 1;
+            this.scrollSpeedY = 1;
+            this.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1, \"blur\": 0}";
+            this.layerName = layerName;
+            this.zIndex = zIndex;
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
         }
         subTileMeta.prototype.clone = function () {
             return new subTileMeta(this.resourceName, this.startX, this.startY, this.width, this.height);

@@ -1,4 +1,5 @@
 //{NEW IMPORTS START HERE}
+<<<<<<< HEAD
 import { baseAttack } from "../objects/attacks/baseAttack";
 import { threeHitNormal } from "../objects/attacks/player/threeHitNormal";
 import { movingBlockHori } from "../objects/blocks/movingBlockHori";
@@ -17,6 +18,9 @@ import { ladder } from "../objects/environment/interactive/ladder";
 import { textPrompt } from "../objects/environment/interactive/textPrompt";
 import { roomChanger } from "../objects/environment/roomChanger";
 import { mio } from "../objects/mio";
+=======
+import { block } from "../objects/block";
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
 import { player } from "../objects/player";
 //{NEW IMPORTS END HERE}
 
@@ -31,6 +35,7 @@ import { tileMetaObj } from "../engine/Tile/tileMeteObj";
 
 
 export class objectGenerator{
+<<<<<<< HEAD
     private availibleObjects: Array<(xp: number, yp: number, input: string) => objectBase> = [
         //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
 		(xp: number, yp: number, input: string)=>{return new baseAttack(xp, yp, input);},
@@ -53,6 +58,13 @@ export class objectGenerator{
 		(xp: number, yp: number, input: string)=>{return new mio(xp, yp, input);},
 		(xp: number, yp: number, input: string)=>{return new player(xp, yp, input);},
 //{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
+=======
+    private availibleObjects: Array<(xp: number, yp: number) => objectBase> = [
+        //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+		(xp: number, yp: number)=>{return new block(xp, yp);},
+		(xp: number, yp: number)=>{return new player(xp, yp);},
+//{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
 
     ];
 

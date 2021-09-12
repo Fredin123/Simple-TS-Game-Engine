@@ -1169,25 +1169,30 @@
         return block;
     }(objectBase));
 
+<<<<<<< HEAD
     var movingBlockHori = /** @class */ (function (_super) {
         __extends(movingBlockHori, _super);
         function movingBlockHori(xp, yp, input) {
             var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
+=======
+    var player = /** @class */ (function (_super) {
+        __extends(player, _super);
+        function player(xp, yp) {
+            var _this = _super.call(this, xp, yp, player.objectName) || this;
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
             _this.switch = false;
-            _this.friction = 0.873;
-            _this.stickyTop = true;
-            _this.stickyRightSide = true;
-            _this.stickyLeftSide = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.beginFill(0xFF0000);
+                newGraphics.drawRect(0, 0, 128, 128);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
                 return g;
             });
             return _this;
+<<<<<<< HEAD
         }
         movingBlockHori.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
@@ -1223,15 +1228,21 @@
                 return g;
             });
             return _this;
+=======
+            /*setInterval(()=>{
+                this.switch = !this.switch;
+            }, 700);*/
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
         }
-        movingBlockVert.prototype.logic = function (l) {
+        player.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
-            if (this.switch) {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 1);
+            if (l.checkKeyHeld("a")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 2);
             }
-            else {
-                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
+            else if (l.checkKeyHeld("d")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 2);
             }
+<<<<<<< HEAD
             if (ticker.getTicks() % 55 == 0) {
                 this.switch = !this.switch;
             }
@@ -1341,6 +1352,20 @@
         };
         dummySandbag.objectName = "dummySandbag";
         return dummySandbag;
+=======
+            if (l.checkKeyHeld("w")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 2);
+            }
+            else if (l.checkKeyHeld("s")) {
+                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 2);
+            }
+            this.force.limitHorizontalMagnitude(10);
+            this.force.limitVerticalMagnitude(10);
+            l.camera.setTarget(this.g.x, this.g.y);
+        };
+        player.objectName = "player";
+        return player;
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
     }(objectBase));
 
     var hitbox = /** @class */ (function (_super) {
@@ -1352,7 +1377,7 @@
             _this.haveHitThese = [];
             _this.startupTime = 0;
             _this.life = 10;
-            _this.targets = [dummySandbag.objectName];
+            _this.targets = [];
             _this.creator = null;
             _this.offsetX = 0;
             _this.offsetY = 0;
@@ -1404,13 +1429,14 @@
                     for (var _i = 0, _a = this.targets; _i < _a.length; _i++) {
                         var t = _a[_i];
                         l.foreachObjectType(t, function (obj) {
-                            var _a, _b, _c, _d;
+                            var _a, _b;
                             if (_this.haveHitThese.indexOf(obj.ID) == -1
                                 && internalFunction.intersecting(_this, _this.collisionBox, obj)) {
                                 _this.haveHitThese.push(obj.ID);
                                 if (_this.hitboxDirection != null) {
                                     /*if(this.type == "sword"){
                                         resourcesHand.playAudioVolume("WeaponImpact1.ogg", 0.25);
+<<<<<<< HEAD
                                     }*/
                                     if (_this.creator.facingRight) {
                                         obj.addForceAngleMagnitude((_a = _this.hitboxDirection) === null || _a === void 0 ? void 0 : _a.delta, (_b = _this.hitboxDirection) === null || _b === void 0 ? void 0 : _b.magnitude);
@@ -1418,6 +1444,10 @@
                                     else {
                                         obj.addForceAngleMagnitude(calculations.PI - ((_c = _this.hitboxDirection) === null || _c === void 0 ? void 0 : _c.delta), (_d = _this.hitboxDirection) === null || _d === void 0 ? void 0 : _d.magnitude);
                                     }
+=======
+                                    }
+                                    obj.addForceAngleMagnitude((_a = _this.hitboxDirection) === null || _a === void 0 ? void 0 : _a.delta, (_b = _this.hitboxDirection) === null || _b === void 0 ? void 0 : _b.magnitude);
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
                                 }
                             }
                             return true;
@@ -1433,14 +1463,8 @@
             if (this.creator != null) {
                 this.g.x = this.creator.g.x + (this.creator.collisionBox.width / 2) - (this.collisionBox.width / 2);
                 this.g.y = this.creator.g.y + this.creator.collisionBox.height / 2;
-                if (this.creator.facingRight) {
-                    this.g.x += this.offsetX;
-                    this.g.y += this.offsetY;
-                }
-                else {
-                    this.g.x -= this.offsetX;
-                    this.g.y += this.offsetY;
-                }
+                this.g.x += this.offsetX;
+                this.g.y += this.offsetY;
             }
         };
         hitbox.objectName = "hitbox";
@@ -1527,6 +1551,7 @@
         return threeHitNormal;
     }(baseAttack));
 
+<<<<<<< HEAD
     var ladder = /** @class */ (function (_super) {
         __extends(ladder, _super);
         function ladder(xp, yp, input) {
@@ -2569,6 +2594,16 @@
 
     var tools = /** @class */ (function () {
         function tools() {
+=======
+    var tileMetaObj = /** @class */ (function (_super) {
+        __extends(tileMetaObj, _super);
+        function tileMetaObj(xp, yp) {
+            var _this = _super.call(this, xp, yp, tileMetaObj.objectName) || this;
+            _this.isTile = true;
+            _this.animation = null;
+            _this.currentTileIndex = 0;
+            return _this;
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
         }
         /*download(filename: string, text:string) {
             var element = document.createElement('a');
@@ -2690,6 +2725,7 @@
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
+<<<<<<< HEAD
                 //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
                 function (xp, yp, input) { return new baseAttack(xp, yp, input); },
                 function (xp, yp, input) { return new threeHitNormal(xp, yp, input); },
@@ -2710,6 +2746,11 @@
                 function (xp, yp, input) { return new roomChanger(xp, yp, input); },
                 function (xp, yp, input) { return new mio(xp, yp, input); },
                 function (xp, yp, input) { return new player(xp, yp, input); },
+=======
+                //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
+                function (xp, yp) { return new block(xp, yp); },
+                function (xp, yp) { return new player(xp, yp); },
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
@@ -3163,6 +3204,7 @@
                 }
             }
         };
+<<<<<<< HEAD
         roomEvent.prototype.getRoomStartString = function () {
             return this.roomStartString;
         };
@@ -3171,6 +3213,80 @@
             var _a, _b, _c, _d;
             this.roomStartString = roomStartString;
             var loadRoom = JSON.parse(LZString.decompressFromEncodedURIComponent(loadRoomString));
+=======
+        return task;
+    }());
+
+    var firstRoom = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALnVQBsSAacaeJNLbATUOLMslgRQxwHUBLTABcAFs1IUqHWt2wAJGHwDmwwWNYgARhDABrRXDqYAwshLI4hEAGIAZnfshKJCAE94AEQiCIhANqhYbwB5DQArGDBBbABJdAAZV3g-UEE+Ehg1CT5sEygNPnQvPmR0IJsAFTSYbEIbCBJsGEpsgAUIOEEy3PzC1JLa+sbKAA9CAEYAJgAOShdxgBZ5ykLYSw0zXRAAX3IUqszmnOQ8gqKSssr0moI6hqaQVvbOm27TvvQBu5HxiYB2ADoAJzAkGgkFLEBzAh-CbLahrDY6ba7ECpdIHB5HE69YqlCpVa63IaYtodLrHHpnD43Qb3UYEX4AVlhkIWEJWGQImkRyL26KI4kOrxx53xV0+xMeZJeFLeuIldMITJZUJhcNWXPWyE2Oz5nJYWSxlPeFwJCsOpOewqp5pA9LGAAYJhCoQBaCaMgBs6s53O1SN1qP2AvU2WtJrF1VtUqtspF1KJioIYzGzNmhHdXp9CP9vKD-INQrjVNN4ppXxJT3J2Jt5eJ9umDvTBEz3pAHJzOpRaP1gsx4dxpajdfuMerxvlI++yfmDpmrJbHrbHc1PMDPYxYeLEcuw8TFqrMpr71t9s98ym-wd15vt+vKp+1+zq9z6+Dhf728HkcJtIP0oHfopztcYximF0lU9ecVz9Ls9U3I05VFXdfwrMcjwnID9xAghAV+NsoWZaD4RfOD817UNEPjIdUMlbBLXHJCEz-HDXQAZgmJsF0mJ92xI2CA27d8+y3Y9vxQ6N6MPQDmIrekuKhKYOOfAS8w3ENDRkmjJIYjCmNPDNpnnN1Zy4mCtTI9SP1EzC8Qk4D0JkgyCDYz0ATBDzgQglsxk9Mz+IswT4I0osxOQs0HKkgCvywlj6XmQFGSBTywW811fP8jVVLfAsRKoksfx06SYtk+tCHmVNkpS8Fm0BZd+IAB2cNwLByijNJK7TIt0pzgPpNUFz84issC7YAF1KGEARMBgUr7mwMADDIABlBqYBgTB8GTSgFqWkhVvWzAmG2kBGkEVJ0EUa4QGAAAdU7FtMfa1o23B7oIAACMZyA++7dqeg6NoYd6vq2RwQGa+AADl+ISFqvvBgAvWIZvkrYxq2IA";
+
+    var gameRunner = /** @class */ (function () {
+        function gameRunner(gameContainer, gameProperties, app) {
+            var _this = this;
+            this.tasker = new task();
+            this.tileContainer = [];
+            this.generateObjects = new objectGenerator();
+            this.targetFps = 30;
+            this.fpsLimiter = 0;
+            this.frameDelay = 0;
+            this.cameraBounds = [0, 0, 0, 0];
+            this.godrayFilter = new filterGodray.GodrayFilter({
+                lacunarity: 2.5,
+                gain: 0.5,
+                time: 0,
+                alpha: 0.8
+            });
+            this.gameContainerElement = document.getElementById(gameContainer);
+            this.app = new PIXI.Application({
+                antialias: false,
+                autoDensity: false
+            });
+            this.app.renderer.view.width = 806;
+            this.app.renderer.view.height = 504;
+            this.app.renderer.view.style.width = 806 + "px";
+            this.app.renderer.view.style.height = 504 + "px";
+            //PIXI.settings.PRECISION_FRAGMENT = PIXI.PRECISION.HIGH;
+            PIXI.settings.ROUND_PIXELS = true;
+            this.objContainer = new objectContainer();
+            gameProperties.applySettings(this.app);
+            this.gameContainerElement.appendChild(this.app.view);
+            //this.graphicsModule = new graphics(this.canvasContext);
+            this.logicModule = new roomEvent(this.gameContainerElement, this.objContainer, this.tasker);
+            this.app.ticker.add(function (delta) {
+                if (_this.fpsLimiter == 0) {
+                    _this.logicModule.deltaTime = delta;
+                    roomEvent.tick();
+                    _this.tasker.tick(_this.logicModule);
+                    _this.logicModule.queryKey();
+                    _this.objContainer.loopThrough(_this.logicModule);
+                    _this.objContainer.populateFromList();
+                    _this.objContainer.purgeObjects();
+                    _this.fpsLimiter = _this.frameDelay;
+                    if (_this.logicModule.camera.getIsInUse()) {
+                        _this.app.stage.pivot.x = Math.floor(_this.logicModule.camera.getX() + _this.logicModule.camera.cameraOffsetX);
+                        _this.app.stage.pivot.y = Math.floor(_this.logicModule.camera.getY() + _this.logicModule.camera.cameraOffsetY);
+                        _this.app.stage.position.x = _this.app.renderer.width / 2;
+                        _this.app.stage.position.y = _this.app.renderer.height / 2;
+                    }
+                    for (var _i = 0, _a = _this.tileContainer; _i < _a.length; _i++) {
+                        var t = _a[_i];
+                        if (roomEvent.getTicks() % t.tileStepTime == 0) {
+                            t.animate();
+                        }
+                    }
+                    _this.logicModule.camera.moveCamera(_this.app, _this.cameraBounds);
+                    _this.objContainer.updateLayerOffsets(_this.logicModule.camera, _this.app);
+                    //this.godrayFilter.time += 0.005 * delta;
+                }
+                if (_this.fpsLimiter > 0) {
+                    _this.fpsLimiter--;
+                }
+            });
+            this.loadRoom(JSON.parse(LZString.decompressFromEncodedURIComponent(firstRoom)));
+        }
+        gameRunner.prototype.loadRoom = function (loadRoom) {
+            var _a, _b, _c, _d;
+            console.log("loadRoom: ", loadRoom);
+>>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
             this.objContainer.removeObjects();
             this.cameraBounds[0] = (_a = loadRoom.cameraBoundsX) !== null && _a !== void 0 ? _a : 0;
             this.cameraBounds[1] = (_b = loadRoom.cameraBoundsY) !== null && _b !== void 0 ? _b : 0;

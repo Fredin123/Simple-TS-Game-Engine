@@ -7,7 +7,6 @@ import { objectBase } from './objectHandlers/objectBase';
 import { iObject } from './objectHandlers/iObject';
 import { tileMetaObj } from './Tile/tileMeteObj';
 import { task } from './tools/task';
-import { scene_home } from '../scenes/scene_home';
 import { roomData } from '../shared/roomData';
 import {TiltShiftFilter} from '@pixi/filter-tilt-shift';
 import {GodrayFilter} from '@pixi/filter-godray';
