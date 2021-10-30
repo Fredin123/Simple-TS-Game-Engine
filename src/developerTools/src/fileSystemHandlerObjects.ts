@@ -6,7 +6,6 @@ import { objectGenerator } from "../../shared/objectGenerator";
 import { fileSystemEntry } from "./fileSystemEntry";
 import { cursorData } from "./cursor/cursorData";
 import { objectSelectedData } from "./cursor/objectSelectedData";
-import { canvasRenderer } from "./canvasHandler/canvasRenderer";
 
 declare var prettyFiles: any;
 declare var window: any;

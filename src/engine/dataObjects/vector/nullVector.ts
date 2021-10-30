@@ -1,21 +1,22 @@
 import { iVector } from "./iVector";
 
 export class nullVector implements iVector{
-    delta: number= -1;
+    static null: iVector = new nullVector;
+    delta: number = 0;
     increaseMagnitude(addValue: number): void {
-        throw new Error("Method not implemented.");
+        
     }
-    Dx: number = -1;
-    Dy: number = -1;
+    Dx: number = 0;
+    Dy: number = 0;
 
-    angle: number = -1;
-    magnitude: number = -1;
+    angle: number = 0;
+    magnitude: number = 0;
     
     limitHorizontalMagnitude(limit: number){
-        throw new Error("Method not implemented.");
+        
     }
 
     limitVerticalMagnitude(limit: number){
-        throw new Error("Method not implemented.");
+        
     }
 }

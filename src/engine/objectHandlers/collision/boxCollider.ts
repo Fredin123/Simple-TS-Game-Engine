@@ -1,7 +1,4 @@
-
-
 export class boxCollider{
-
     x: number;
     y: number;
     width: number;
@@ -16,7 +13,6 @@ export class boxCollider{
             this.width = width;
             this.height = height;
     }
-
 
     static copy(copyTarget: boxCollider){
         return new boxCollider(copyTarget.x, copyTarget.y, copyTarget.width, copyTarget.height);
@@ -47,12 +43,10 @@ export class boxCollider{
         this.height -= 2*amountY;
     }
 
-
     expand(aamountX: number, amountY: number){
         this.x -= aamountX;
         this.y -= amountY;
         this.width += 2*aamountX;
         this.height += 2*amountY;
     }
-
 }

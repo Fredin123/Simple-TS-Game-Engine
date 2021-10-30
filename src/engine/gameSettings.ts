@@ -2,8 +2,6 @@ import * as PIXI from 'pixi.js'
 
 export class gameSettings{
     stretchToWindow: boolean = false;
-    fixedCanvasWidth: number = 640;
-    fixedCanvasHeight: number = 380;
     app: PIXI.Application | undefined;
 
     applySettings(a: PIXI.Application){
@@ -11,6 +9,8 @@ export class gameSettings{
         this.app.renderer.backgroundColor = 0xFFFFFF;
 
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+        PIXI.settings.PRECISION_FRAGMENT = PIXI.PRECISION.LOW;
+        PIXI.settings.TARGET_FPMS = 0.06;
         
         /*if(this.stretchToWindow){
             this.windowStretchListener();

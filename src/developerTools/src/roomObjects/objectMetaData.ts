@@ -1,8 +1,8 @@
-import { subTileMeta } from "../../shared/tile/subTileMeta";
-import { tileAnimation } from "../../shared/tile/tileAnimation";
+
+import { tileAnimation } from "../../../shared/tile/tileAnimation";
 
 
-export class objectMetaData{
+export class objectMetaDataold{
     x: number;
     y: number;
     name: string;
@@ -15,6 +15,8 @@ export class objectMetaData{
     idOfStaticTileCombination: string = "";
 
     isPartOfCombination: boolean = false;
+
+    
 
     constructor(x: number, y: number, name: string, tile: tileAnimation | null){
         this.x = x;

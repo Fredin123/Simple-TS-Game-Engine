@@ -1,12 +1,6 @@
-import { vector } from "../dataObjects/vector/vector";
 import { roomEvent } from "../roomEvent";
-import { resourceMeta } from "../preload sources/resourceMeta";
 import { boxCollider } from "./collision/boxCollider";
-import { uidGen } from "../tools/uidGen";
-import { objectContainer } from "./objectContainer";
-import { movementOperations } from "../movementOperations";
 import { iVector } from "../dataObjects/vector/iVector";
-import { nulliObject } from "./nulliObject";
 import * as PIXI from 'pixi.js'
 
 
@@ -32,7 +26,15 @@ export interface iObject{
 
     _hasBeenMoved_Tick : number;
     _isColliding_Special: boolean;
+    collidesWithPolygonGeometry: boolean;
 
+    onLayer: number;
+    outputString: string;
+
+    horizontalCollision: number;
+    verticalCollision: number;
+
+    init(roomEvents: roomEvent): void;
     
     addMoveCollisionTarget(...collNames:string[]): void;
 
@@ -53,12 +55,13 @@ export interface iObject{
     setNewForceAngleMagnitude(a: number, b: number): void
 
     
-    
-    x: number;
+    setNewForce(xd: number, yd: number): void;
 
+    addForce(xd: number, yd: number): void;
 
+    setNewForceAngleMagnitude(angle: number, magnitude: number): void;
 
-    y: number;
+    addForceAngleMagnitude(angle: number, magnitude: number): void;
 
 
 

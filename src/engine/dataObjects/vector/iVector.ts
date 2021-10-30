@@ -1,6 +1,3 @@
-import { nulliObject } from "../../objectHandlers/nulliObject";
-import { vector } from "./vector";
-
 export interface iVector{
     Dx: number;
     Dy: number;

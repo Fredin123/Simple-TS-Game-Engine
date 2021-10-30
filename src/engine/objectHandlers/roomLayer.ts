@@ -1,11 +1,12 @@
 import { objectBase } from "./objectBase";
 import * as PIXI from 'pixi.js'
+import { iObject } from "./iObject";
 
 
 export class roomLayer{
 
     layerName: string;
-    objects: Array<objectBase> = [];
+    objects: Array<iObject> = [];
     graphicsContainer: PIXI.Container;
     zIndex: number;
     hidden: boolean = false;

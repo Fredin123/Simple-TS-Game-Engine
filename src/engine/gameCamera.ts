@@ -1,5 +1,5 @@
-import { brain } from "./brain";
 import * as PIXI from 'pixi.js'
+import { calculations } from "./calculations";
 
 export class gameCamera{
     private isInUse: boolean = true;
@@ -28,9 +28,9 @@ export class gameCamera{
     }
 
     public moveCamera(app: PIXI.Application, cameraBounds: number[]){
-        let angle = brain.angleBetweenPoints((this.cameraX - this.targetX), (this.cameraY - this.targetY));
+        let angle = calculations.angleBetweenPoints((this.cameraX - this.targetX), (this.cameraY - this.targetY));
             
-        let distance = brain.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
+        let distance = calculations.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
             
         this.cameraX += Math.cos(angle) * distance * this.camMovementSpeedX;
         this.cameraY += Math.sin(angle) * distance * this.camMovementSpeedY;

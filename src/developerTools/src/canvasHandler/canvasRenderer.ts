@@ -1,10 +1,9 @@
 import { layer } from "../../../shared/layer";
 import { layerContainer } from "./layer/layerContainer";
-import { objectMetaData } from "../objectMetaData";
 import { cursorData } from "../cursor/cursorData";
 import { cursorType } from "../cursor/cursorType";
-import { fileSystemHandlerObjects } from "../fileSystemHandlerObjects";
 import { resourcesTiles } from "../tiles/resourcesTiles";
+import { geometryObject } from "../roomObjects/geometryObject";
 
 
 
@@ -32,12 +31,18 @@ export class canvasRenderer{
 
     container: HTMLElement | null;
 
-    
+    private cameraBoundButton;
+    private displayCameraBounds = true;
 
     private counter: number = 0;
     haveSelectedFromHover: boolean = false;
 
     private missingImage = new Image();
+
+    private geometryDummy = new geometryObject(0, 0);
+    private toggleGridButton: HTMLElement | null;
+    private renderGrid = true;
+    
 
     constructor(canvasName: string){
         this.missingImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAZQTFRF/wDj////hdfaxwAAAA5JREFUeJxjCGVYxYCEAR6cA/1tfYfmAAAAAElFTkSuQmCC";
@@ -54,6 +59,8 @@ export class canvasRenderer{
         this.buttonZoomOut = document.getElementById("zoomOut") as HTMLButtonElement;
         this.buttonZoomOut.addEventListener("mouseup", this.zoomOut.bind(this));
 
+        document.addEventListener("keypress", this.keysDown.bind(this));
+
         this.inputGridx = document.getElementById("gridXInput") as HTMLInputElement;
         this.inputGridx.value = this.gridWidth + "";
         this.inputGridy = document.getElementById("gridYInput") as HTMLInputElement;
@@ -64,6 +71,12 @@ export class canvasRenderer{
         document.getElementById("gridXInput")?.addEventListener("change", this.onGridSizeChange.bind(this));
         document.getElementById("gridYInput")?.addEventListener("change", this.onGridSizeChange.bind(this));
 
+        this.cameraBoundButton = document.getElementById("toggleCameraBounds");
+        this.cameraBoundButton?.addEventListener("click", this.toggleCameraBounds.bind(this));
+
+        this.toggleGridButton = document.getElementById("toggleGrid");
+        this.toggleGridButton?.addEventListener("click", this.toggleGridRender.bind(this));
+
         this.container = document.getElementById("canvasAndFilesCon");
 
         window.onresize = this.windowResize.bind(this);
@@ -73,6 +86,19 @@ export class canvasRenderer{
             this.windowResize();
         }, 800);
     }
+
+    keysDown(e: KeyboardEvent){
+        if(e.key == "1"){
+            this.zoomIn();
+        }else if(e.key == "2"){
+            this.zoomOut();
+        }else if(e.key == "g"){
+            this.toggleGridRender();
+        }else if(e.key == "c"){
+            this.toggleCameraBounds();
+        }
+    }
+
 
     updateCanvasOffset(dx: number, dy: number){
         this.gridXOffset += dx;
@@ -111,6 +137,14 @@ export class canvasRenderer{
         this.canvasScaleY *= 0.9;
         this.ctx?.setTransform(1, 0, 0, 1, 0, 0);
         this.ctx?.scale(this.canvasScaleX, this.canvasScaleY);
+    }
+
+    private toggleCameraBounds(){
+        this.displayCameraBounds = !this.displayCameraBounds;
+    }
+
+    private toggleGridRender(){
+        this.renderGrid = !this.renderGrid;
     }
 
     setCanvasWidth(){
@@ -158,95 +192,18 @@ export class canvasRenderer{
         this.layerHandler.storedLayers.forEach(layer => {
             if(layer.hidden == false){
                 layer.metaObjectsInLayer.forEach(meta => {
-                    if(meta.tile == null){
-                        
-                        if(fileSystemHandlerObjects.classAndImage[meta.name] != null){
-                            if(fileSystemHandlerObjects.classAndImage[meta.name].complete){
-                                if(this.layerHandler.selectedLayer!.layerName == layer.layerName){
-                                    this.drawMouseOverSelection(meta, mouseX, mouseY);
-                                }
-                                
-                                    this.ctx?.drawImage(fileSystemHandlerObjects.classAndImage[meta.name], 
-                                        meta.x + this.gridXOffset, 
-                                        meta.y + this.gridYOffset);
-                            }
-                        }else{
-                            if(this.missingImage.complete){
-                                this.ctx?.drawImage(this.missingImage, 
-                                        0, 
-                                        0, 
-                                        8, 
-                                        8,
-                                        meta.x + this.gridXOffset, meta.y + this.gridYOffset, 98, 98);
-                            }
-                            
-                        }
-                        
-                    }else{
-                        let tileToDraw = meta.tile.get(this.counter);
-                        if(this.layerHandler.selectedLayer!.layerName == layer.layerName){
-                            this.drawMouseOverSelection(meta, mouseX, mouseY);
-                        }
-                        
-                        if(resourcesTiles.resourceNameAndImage[tileToDraw.resourceName] != null){
-                            this.ctx?.drawImage(resourcesTiles.resourceNameAndImage[tileToDraw.resourceName], 
-                                tileToDraw.startX, 
-                                tileToDraw.startY, 
-                                tileToDraw.width, 
-                                tileToDraw.height,
-                                meta.x + this.gridXOffset, meta.y + this.gridYOffset, tileToDraw.width, tileToDraw.height);
-                        }else{
-                            if(this.missingImage.complete){
-                                this.ctx?.drawImage(this.missingImage, 
-                                    tileToDraw.startX, 
-                                    tileToDraw.startY, 
-                                    tileToDraw.width, 
-                                    tileToDraw.height,
-                                    meta.x + this.gridXOffset, meta.y + this.gridYOffset, tileToDraw.width, tileToDraw.height);
-                            }
-                        }
-                        
+                    if(this.layerHandler.selectedLayer!.layerName == layer.layerName){
+                        meta.drawMouseOverSelection(mouseX, mouseY, this.layerHandler, this.ctx!);
                     }
+                    meta.render(this.gridXOffset, this.gridYOffset, this.counter, this.ctx!);
                 });
             }
         });
     }
 
 
-
-    private drawMouseOverSelection(obj: objectMetaData, mouseX: number, mouseY: number){
-        if(this.layerHandler.isMouseInsideObject(obj, mouseX, mouseY) 
-        && this.haveSelectedFromHover == false
-        && obj.isCombinationOfTiles == false){
-            this.haveSelectedFromHover = true;
-            let width = -1;
-            let height = -1;
-            if(obj.tile != null){
-                width = obj.tile.get(this.counter).width;
-                height = obj.tile.get(this.counter).height;
-            }else{
-                if(fileSystemHandlerObjects.classAndImage[obj.name] != null){
-                    width = fileSystemHandlerObjects.classAndImage[obj.name].width;
-                    height = fileSystemHandlerObjects.classAndImage[obj.name].height;
-                }else{
-                    width = 98;
-                    height = 98;
-                }
-            }
-            this.ctx!.strokeStyle = 'red';
-            this.ctx!.lineWidth = 5;
-            this.ctx?.beginPath();
-            this.ctx?.rect(obj.x + this.gridXOffset-2.5, 
-                    obj.y + this.gridYOffset-2.5,
-                    width+5,
-                    height+5);
-            this.ctx?.stroke();
-        }
-    }
-
-
-
     private drawGrid(){
+        if(this.renderGrid == false) return;
         this.ctx!.lineWidth = 1;
         let drawGridWidth = this.gridWidth;
         let drawGridHeight = this.gridHeight;
@@ -282,6 +239,8 @@ export class canvasRenderer{
 
 
     private drawCameraBounds(){
+        if(this.displayCameraBounds == false) return;
+
         let startXCam = parseInt((document.getElementById("cameraBoundsX") as HTMLInputElement).value);
         let startYCam = parseInt((document.getElementById("cameraBoundsY") as HTMLInputElement).value);
         let widthCam = parseInt((document.getElementById("cameraBoundsWidth") as HTMLInputElement).value);
@@ -290,9 +249,9 @@ export class canvasRenderer{
         if(startXCam != null && startYCam != null && widthCam != null && heightCam != null){
             this.ctx!.strokeStyle = "red";
             this.ctx!.lineWidth = 16;
-            this.ctx!.rect(startXCam + this.gridXOffset, startYCam + this.gridYOffset, 
+            this.ctx!.strokeRect(startXCam + this.gridXOffset, startYCam + this.gridYOffset, 
                 widthCam, heightCam);
-            this.ctx!.stroke();
+            this.ctx!.lineWidth = 1;
         }
         
     }
@@ -348,6 +307,8 @@ export class canvasRenderer{
                 }
                 
             }
+        }else if(cursorData.cursorType == cursorType.geometry){
+            this.geometryDummy.render(mouseGridX, mouseGridY, 0, this.ctx!);
         }
     }
 

@@ -19,7 +19,6 @@ export class resourcesHand{
     constructor(app: PIXI.Application, onCompleteCallback: ()=>void, alternativePath: string = ""){
         resourcesHand.app = app;
 
-        PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 
         fetch(alternativePath+'/resources.txt', {
             method: 'get'
@@ -52,7 +51,7 @@ export class resourcesHand{
             resourcesHand.resourcesToLoad.forEach(resource => {
                 let split = resource.split("/");
                 let name = split[split.length-1];
-
+                //console.log("load resource: ", resource);
                 if(name.indexOf(".json") != -1){
                     resourcesHand.storeAnimatedArray(name);
                 }else if(split[0] == "_generated_tiles"){
@@ -110,7 +109,7 @@ export class resourcesHand{
     }
 
     static storeStaticTile(genName: string){
-
+        console.log("Try to store static tile: ",genName);
         var texturesTmp = resourcesHand.app.loader.resources[genName].texture;
         if(texturesTmp != null){
             resourcesHand.staticTile[genName] = texturesTmp;
@@ -176,6 +175,13 @@ export class resourcesHand{
     }
 
     static getStaticTile(genName: string){
+        if(genName.indexOf(".png") == -1){
+            genName += ".png";
+        }
+        if(resourcesHand.staticTile[genName] == null){
+            console.log("Tried to fetch static tile: ",genName," but it was not found");
+            console.log("static tiles: ",resourcesHand.staticTile);
+        }
         return new PIXI.Sprite(resourcesHand.staticTile[genName]);
     }
 
@@ -192,6 +198,11 @@ export class resourcesHand{
         }
         
         throw new Error("PNG resource does not exist: "+resourceName);
+    }
+
+    static convertGraphicsToTexture(graphics: PIXI.Graphics){
+        var texture = this.app.renderer.generateTexture(graphics);
+        return texture;
     }
     
 }

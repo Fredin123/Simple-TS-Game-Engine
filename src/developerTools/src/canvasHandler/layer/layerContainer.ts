@@ -1,9 +1,10 @@
 import { layer } from "../../../../shared/layer";
-import { objectMetaData } from "../../objectMetaData";
-import { canvasRenderer } from "../canvasRenderer";
 import { layerCompressor } from "./layerCompressor";
 import { roomData } from "../../../../shared/roomData";
-import { fileSystemHandlerObjects } from "../../fileSystemHandlerObjects";
+import { objectTypes } from "../../../../shared/objectTypes";
+import { userObject } from "../../roomObjects/userObject";
+import { geometryObject } from "../../roomObjects/geometryObject";
+import { IObjectMeta } from "../../../../shared/IObjectMeta";
 
 declare var LZString: any;
 declare var window : any;
@@ -29,7 +30,7 @@ export class layerContainer{
         this.currentRoom = clickedFile;
         let arayOfData: roomData = new roomData([]);
         if(jsonString != ""){
-            console.log("jsonString: ",jsonString);
+            //console.log("jsonString: ",jsonString);
             arayOfData = JSON.parse(jsonString);
 
             if(arayOfData.cameraBoundsX != undefined){
@@ -78,12 +79,25 @@ export class layerContainer{
             newLayer.settings = dataLayer.settings;
 
             dataLayer.metaObjectsInLayer.forEach(obj => {
-                if(obj.isCombinationOfTiles == false){
-                    let newObj = new objectMetaData(obj.x, obj.y, obj.name, obj.tile);
-                    newObj.inputString = obj.inputString;
-                    newLayer.metaObjectsInLayer.push(newObj);
+                if(obj.type == objectTypes.userObject){
+                    if((obj as userObject).isCombinationOfTiles == false){
+                        let newObj = new userObject(obj.x, obj.y, obj.name, (obj as userObject).tile);
+                        newObj.inputString = obj.inputString;
+                        newLayer.metaObjectsInLayer.push(newObj);
+                    }
                 }
             });
+
+            if(dataLayer.geometriesInLayer != undefined){
+                dataLayer.geometriesInLayer.forEach(geom => {
+                    let importedGeometry = new geometryObject(geom.x, geom.y);
+                    importedGeometry.geomPoints = geom.geomPoints;
+                    importedGeometry.geomWidth = geom.geomWidth;
+                    newLayer.metaObjectsInLayer.push(importedGeometry);
+                });
+            }
+            
+
             this.storedLayers.push(newLayer);
         }
         console.log("this.storedLayers: ",this.storedLayers);
@@ -230,7 +244,7 @@ export class layerContainer{
         return false;
     }
 
-    addToLayer(newObj: objectMetaData){
+    addToLayer(newObj: IObjectMeta){
         if(this.selectedLayer != null){
             this.selectedLayer.metaObjectsInLayer.push(newObj)
         }
@@ -247,48 +261,42 @@ export class layerContainer{
         return false;
     }
 
-    getObjectAtPos(mouseTestX: number, mouseTestY: number){
+    getObjectsAtPos(mouseTestX: number, mouseTestY: number, specificType: objectTypes | null = null){
+        let foundObjects: IObjectMeta[] = [];
         if(this.selectedLayer != null){
             for(let obj of this.selectedLayer?.metaObjectsInLayer){
-                if(this.isMouseInsideObject(obj, mouseTestX, mouseTestY)){
-                    return obj;
+                if(specificType == null){
+                    if(obj.isMouseInside(mouseTestX, mouseTestY, this)){
+                        foundObjects.push(obj);
+                    }
+                }else{
+                    if(obj.type == specificType && obj.isMouseInside(mouseTestX, mouseTestY, this)){
+                        foundObjects.push(obj);
+                    }
                 }
             }
         }
-        return null;
+        return foundObjects;
     }
 
-    removeObject(targetObject: objectMetaData | null){
+    getObjectsOfType(type: objectTypes){
+        let returnObjs: IObjectMeta[] = [];
+        if(this.selectedLayer != null){
+            for(let obj of this.selectedLayer?.metaObjectsInLayer){
+                if(obj.type == type){
+                    returnObjs.push(obj);
+                }
+            }
+        }
+        return returnObjs;
+    }
+
+    removeObject(targetObject: IObjectMeta | null){
         if(targetObject != null && this.selectedLayer != null){
             this.selectedLayer.metaObjectsInLayer = this.selectedLayer.metaObjectsInLayer.filter(x => x != targetObject);
         }
     }
 
-    isMouseInsideObject(obj: objectMetaData, mouseTestX: number, mouseTestY: number){
-        let width = -1;
-        let height = -1;
-        if(obj.tile != null){
-            width = obj.tile.get(0).width;
-            height = obj.tile.get(0).height;
-        }else{
-            if(fileSystemHandlerObjects.classAndImage[obj.name] != null){
-                width = fileSystemHandlerObjects.classAndImage[obj.name].width;
-                height = fileSystemHandlerObjects.classAndImage[obj.name].height;
-            }else{
-                width = 98;
-                height = 98;
-            }
-            
-        }
-        
-        if(mouseTestX - this.gridXOffset >= obj.x && 
-            mouseTestX - this.gridXOffset < obj.x+width &&
-            mouseTestY - this.gridYOffset >= obj.y && 
-            mouseTestY - this.gridYOffset < obj.y+height){
-                return true;
-        }
-        return false;
-    }
 
     private moveLayerUp(e: Event){
         let button = e.target as HTMLElement;

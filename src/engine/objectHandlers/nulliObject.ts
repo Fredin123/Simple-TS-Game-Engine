@@ -28,41 +28,51 @@ export class nulliObject implements iObject{
     exportedString: string = "";
     _hasBeenMoved_Tick: number = 0;
     _isColliding_Special: boolean = false;
-
+    collidesWithPolygonGeometry = false;
+    onLayer: number = 0;
+    outputString: string = "";
+    horizontalCollision: number = 0;
+    verticalCollision: number = 0;
+    
     constructor(xp: number, yp: number) {
 
     }
+    _hasCollidedWithPolygon: boolean = false;
+
+        
+    init(roomEvents: roomEvent){
+
+    }
+    
     addMoveCollisionTarget(...collNames: string[]): void {
-        throw new Error("Method not implemented.");
+        
     }
     setNewForceAngleMagnitude(a: number, b: number): void {
-        throw new Error("Method not implemented.");
+        
     }
     objectName: string = "";
     collisionBox: boxCollider = new boxCollider(0, 0, 0, 0);
-    x: number = 0;
-    y: number = 0;
 
     addCollisionTarget(...collNames: string[]): void {
-        throw new Error("Method not implemented.");
+        
     }
     removeCollisionTarget(...collNames: string[]): void {
-        throw new Error("Method not implemented.");
+        
     }
     removeAllCollisionTargets(): void {
-        throw new Error("Method not implemented.");
+        
     }
     style(newGraphics: (g: PIXI.Graphics) => PIXI.Graphics): void {
-        throw new Error("Method not implemented.");
+        
     }
     setCollision(xs: number, ys: number, width: number, height: number): void {
-        throw new Error("Method not implemented.");
+        
     }
     updatePosition(x: number, y: number): void {
-        throw new Error("Method not implemented.");
+        
     }
     setNewForce(angle: number, magnitude: number): void {
-        throw new Error("Method not implemented.");
+        
     }
 
     logic(l: roomEvent){
@@ -70,6 +80,12 @@ export class nulliObject implements iObject{
     };
 
 
+    addForce(xd: number, yd: number){
 
+    }
+
+    addForceAngleMagnitude(angle: number, magnitude: number){
+        
+    }
 
 }

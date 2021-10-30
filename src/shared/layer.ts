@@ -1,9 +1,10 @@
-import { objectMetaData } from "../developerTools/src/objectMetaData";
-
+import { geomObjData } from "../developerTools/src/roomObjects/geomObjData";
+import { IObjectMeta } from "./IObjectMeta";
 
 export class layer{
     layerName: string;
-    metaObjectsInLayer: Array<objectMetaData> = [];
+    metaObjectsInLayer: Array<IObjectMeta> = [];
+    geometriesInLayer: geomObjData[] = [];
     zIndex: number;
     hidden: boolean = false;
     settings: string = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1}";

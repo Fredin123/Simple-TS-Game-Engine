@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+environment/grass1.png
 gui/arrow_1.png
 gui/panel_1.png
 sounds/bladeDraw.ogg
@@ -12,6 +12,3 @@ sounds/footsteps/grass/footstepGrass3.wav
 sounds/footsteps/grass/footstepGrass4.wav
 sounds/playerBeastAttack1.ogg
 sounds/WeaponImpact1.ogg
-=======
-tiles/Mossy - FloatingPlatforms.png
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac

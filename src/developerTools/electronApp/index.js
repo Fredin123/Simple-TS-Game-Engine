@@ -1,4 +1,4 @@
-(function (PIXI) {
+(function (PIXI, filterAdjustment) {
     'use strict';
 
     var calculations = /** @class */ (function () {
@@ -29,6 +29,12 @@
             max = Math.floor(max);
             return Math.floor(Math.random() * (max - min + 1)) + min;
         };
+        calculations.angleBetweenPoints = function (dx, dy) {
+            return Math.atan2(dy, dx) + Math.PI;
+        };
+        calculations.distanceBetweenPoints = function (x1, y1, x2, y2) {
+            return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+        };
         calculations.PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
         calculations.EPSILON = 8.8541878128;
         return calculations;
@@ -38,7 +44,6 @@
         function resourcesHand(app, onCompleteCallback, alternativePath) {
             if (alternativePath === void 0) { alternativePath = ""; }
             resourcesHand.app = app;
-            PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
             fetch(alternativePath + '/resources.txt', {
                 method: 'get'
             })
@@ -62,6 +67,7 @@
                 resourcesHand.resourcesToLoad.forEach(function (resource) {
                     var split = resource.split("/");
                     var name = split[split.length - 1];
+                    //console.log("load resource: ", resource);
                     if (name.indexOf(".json") != -1) {
                         resourcesHand.storeAnimatedArray(name);
                     }
@@ -112,6 +118,7 @@
             }
         };
         resourcesHand.storeStaticTile = function (genName) {
+            console.log("Try to store static tile: ", genName);
             var texturesTmp = resourcesHand.app.loader.resources[genName].texture;
             if (texturesTmp != null) {
                 resourcesHand.staticTile[genName] = texturesTmp;
@@ -169,6 +176,13 @@
             return null;
         };
         resourcesHand.getStaticTile = function (genName) {
+            if (genName.indexOf(".png") == -1) {
+                genName += ".png";
+            }
+            if (resourcesHand.staticTile[genName] == null) {
+                console.log("Tried to fetch static tile: ", genName, " but it was not found");
+                console.log("static tiles: ", resourcesHand.staticTile);
+            }
             return new PIXI.Sprite(resourcesHand.staticTile[genName]);
         };
         resourcesHand.resourcePNG = function (resourceName) {
@@ -185,6 +199,10 @@
             }
             throw new Error("PNG resource does not exist: " + resourceName);
         };
+        resourcesHand.convertGraphicsToTexture = function (graphics) {
+            var texture = this.app.renderer.generateTexture(graphics);
+            return texture;
+        };
         resourcesHand.resourcesToLoad = [];
         resourcesHand.animatedSprite = {};
         resourcesHand.staticTile = {};
@@ -198,6 +216,9 @@
         cursorType[cursorType["eraser"] = 1] = "eraser";
         cursorType[cursorType["grabber"] = 2] = "grabber";
         cursorType[cursorType["editor"] = 3] = "editor";
+        cursorType[cursorType["geometry"] = 4] = "geometry";
+        cursorType[cursorType["geometryEdit"] = 5] = "geometryEdit";
+        cursorType[cursorType["geometryRemove"] = 6] = "geometryRemove";
     })(cursorType || (cursorType = {}));
 
     var cursorData = /** @class */ (function () {
@@ -350,42 +371,6 @@
       return r;
     }
 
-    var internalFunction = /** @class */ (function () {
-        function internalFunction() {
-        }
-        internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
-            var x1 = initiator.g.x + initiadorCollisionBox.x;
-            var y1 = initiator.g.y + initiadorCollisionBox.y;
-            var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
-            var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
-            return (x1 < x2 + collisionTarget.collisionBox.width &&
-                x1 + initiadorCollisionBox.width > x2 &&
-                y1 < y2 + collisionTarget.collisionBox.height &&
-                y1 + initiadorCollisionBox.height > y2);
-        };
-        return internalFunction;
-    }());
-
-    var nullVector = /** @class */ (function () {
-        function nullVector() {
-            this.delta = -1;
-            this.Dx = -1;
-            this.Dy = -1;
-            this.angle = -1;
-            this.magnitude = -1;
-        }
-        nullVector.prototype.increaseMagnitude = function (addValue) {
-            throw new Error("Method not implemented.");
-        };
-        nullVector.prototype.limitHorizontalMagnitude = function (limit) {
-            throw new Error("Method not implemented.");
-        };
-        nullVector.prototype.limitVerticalMagnitude = function (limit) {
-            throw new Error("Method not implemented.");
-        };
-        return nullVector;
-    }());
-
     var vector = /** @class */ (function () {
         function vector(a, b) {
             this.Dx = a;
@@ -413,6 +398,10 @@
         Object.defineProperty(vector.prototype, "magnitude", {
             get: function () {
                 return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
+            },
+            set: function (val) {
+                this.Dx = Math.cos(this.delta) * val;
+                this.Dy = Math.sin(this.delta) * val;
             },
             enumerable: false,
             configurable: true
@@ -442,7 +431,6 @@
                 }
             }
         };
-        vector.null = new nullVector;
         return vector;
     }());
 
@@ -508,6 +496,22 @@
         return uidGen;
     }());
 
+    var internalFunction = /** @class */ (function () {
+        function internalFunction() {
+        }
+        internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
+            var x1 = initiator.g.x + initiadorCollisionBox.x;
+            var y1 = initiator.g.y + initiadorCollisionBox.y;
+            var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
+            var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
+            return (x1 < x2 + collisionTarget.collisionBox.width &&
+                x1 + initiadorCollisionBox.width > x2 &&
+                y1 < y2 + collisionTarget.collisionBox.height &&
+                y1 + initiadorCollisionBox.height > y2);
+        };
+        return internalFunction;
+    }());
+
     var nulliObject = /** @class */ (function () {
         function nulliObject(xp, yp) {
             this.isTile = false;
@@ -530,51 +534,52 @@
             this.exportedString = "";
             this._hasBeenMoved_Tick = 0;
             this._isColliding_Special = false;
+            this.collidesWithPolygonGeometry = false;
+            this.onLayer = 0;
+            this.outputString = "";
+            this.horizontalCollision = 0;
+            this.verticalCollision = 0;
+            this._hasCollidedWithPolygon = false;
             this.objectName = "";
             this.collisionBox = new boxCollider(0, 0, 0, 0);
-            this.x = 0;
-            this.y = 0;
         }
+        nulliObject.prototype.init = function (roomEvents) {
+        };
         nulliObject.prototype.addMoveCollisionTarget = function () {
             var collNames = [];
             for (var _i = 0; _i < arguments.length; _i++) {
                 collNames[_i] = arguments[_i];
             }
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.setNewForceAngleMagnitude = function (a, b) {
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.addCollisionTarget = function () {
             var collNames = [];
             for (var _i = 0; _i < arguments.length; _i++) {
                 collNames[_i] = arguments[_i];
             }
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.removeCollisionTarget = function () {
             var collNames = [];
             for (var _i = 0; _i < arguments.length; _i++) {
                 collNames[_i] = arguments[_i];
             }
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.removeAllCollisionTargets = function () {
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.style = function (newGraphics) {
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.setCollision = function (xs, ys, width, height) {
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.updatePosition = function (x, y) {
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.setNewForce = function (angle, magnitude) {
-            throw new Error("Method not implemented.");
         };
         nulliObject.prototype.logic = function (l) {
+        };
+        nulliObject.prototype.addForce = function (xd, yd) {
+        };
+        nulliObject.prototype.addForceAngleMagnitude = function (angle, magnitude) {
         };
         nulliObject.objectName = "nulliObject";
         return nulliObject;
@@ -605,28 +610,72 @@
         return ticker;
     }());
 
-    var movementOperations = /** @class */ (function () {
-        function movementOperations() {
+    var moveOperationsPush = /** @class */ (function () {
+        function moveOperationsPush() {
         }
-        movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
-            force.Dx = force.Dx * deltaTime;
-            force.Dy = force.Dy * deltaTime;
-            var xdiff = force.Dx;
-            var ydiff = force.Dy;
-            this.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
-            this.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
-            force.Dx *= target.airFriction;
-            force.Dy *= target.airFriction;
-            if (target.gravity != vector.null) {
-                force.Dx += target.gravity.Dx;
-                force.Dy += target.gravity.Dy;
-                target.gravity.increaseMagnitude(target.weight);
-            }
-        };
-        movementOperations.moveForceHorizontal = function (magnitude, target, collisionNames, objContainer) {
+        moveOperationsPush.pushObjectHorizontal = function (pusher, objectBeingPushed, sign, objContainer) {
             var _this = this;
+            var collided = false;
+            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
+                if (objectBeingPushed.collisionTargets.length == 0) {
+                    return pusher;
+                }
+                objectBeingPushed.g.x += sign;
+                objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, function (testCollision) {
+                    if (testCollision.objectName != pusher.objectName &&
+                        internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
+                        && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
+                        objectBeingPushed.g.x += sign * -1;
+                        collided = true;
+                    }
+                    return false;
+                });
+            }
+            if (collided) {
+                return objectBeingPushed;
+            }
+            return objectGlobalData.null;
+        };
+        moveOperationsPush.pushObjectVertical = function (pusher, objectBeingPushed, sign, objContainer) {
+            var _this = this;
+            var collided = false;
+            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
+                if (objectBeingPushed.collisionTargets.length == 0) {
+                    return pusher;
+                }
+                objectBeingPushed.g.y += sign;
+                if (objectBeingPushed._isColliding_Special) {
+                    objectBeingPushed.g.y += sign * -1;
+                    collided = true;
+                    return objectBeingPushed;
+                }
+                else {
+                    objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, function (testCollision) {
+                        if (testCollision.objectName != pusher.objectName &&
+                            internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
+                            && _this.pushObjectVertical(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
+                            objectBeingPushed.g.y += sign * -1;
+                            collided = true;
+                        }
+                        return false;
+                    });
+                }
+            }
+            if (collided) {
+                return objectBeingPushed;
+            }
+            return objectGlobalData.null;
+        };
+        return moveOperationsPush;
+    }());
+
+    var horizontalMovement = /** @class */ (function () {
+        function horizontalMovement() {
+        }
+        horizontalMovement.moveForceHorizontal = function (magnitude, target, collisionNames, objContainer) {
             if (magnitude == 0)
                 return;
+            target.horizontalCollision = 0;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
             var collisionTarget = objectGlobalData.null;
@@ -637,7 +686,7 @@
                     //Push object
                     objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
                         if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                            collisionTarget = _this.pushObjectHorizontal(target, testCollisionWith, sign, objContainer);
+                            collisionTarget = moveOperationsPush.pushObjectHorizontal(target, testCollisionWith, sign, objContainer);
                             if (collisionTarget == objectGlobalData.null) {
                                 target.force.Dx *= 1 - testCollisionWith.weight;
                             }
@@ -670,7 +719,7 @@
                     }
                 }
                 if (collisionTarget == objectGlobalData.null) {
-                    collisionTarget = this_1.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                    collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
                 }
                 if (collisionTarget != objectGlobalData.null && target._isColliding_Special == false) {
                     sign *= -1;
@@ -678,6 +727,12 @@
                     objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
                         updaterObject.g.x += 1 * sign;
                     });
+                    if (target.force.Dx > 0) {
+                        target.horizontalCollision = 1;
+                    }
+                    else if (target.force.Dx < 0) {
+                        target.horizontalCollision = -1;
+                    }
                     target.force.Dx = 0;
                     var distance = 0;
                     if (sign <= 0) {
@@ -690,11 +745,10 @@
                         target.gravity.Dy *= distance / 90;
                         target.gravity.Dx *= 1 - (distance / 90);
                     }
-                    target.force.Dy *= collisionTarget.friction;
+                    target.force.Dy *= collisionTarget.friction * target.friction;
                     return "break";
                 }
             };
-            var this_1 = this;
             for (var i = 0; i < Math.abs(magnitude); i += 1) {
                 var state_1 = _loop_1(i);
                 if (state_1 === "break")
@@ -727,20 +781,27 @@
                 });
             }
         };
-        movementOperations.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
-            var _this = this;
+        return horizontalMovement;
+    }());
+
+    var verticalMovement = /** @class */ (function () {
+        function verticalMovement() {
+        }
+        verticalMovement.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
             if (magnitude == 0)
                 return;
+            target.verticalCollision = 0;
             var sign = magnitude > 0 ? 1 : -1;
             var objectsThatWereCollidingThisObjectWhileMoving = new Array();
             var collisionTarget = objectGlobalData.null;
-            var _loop_2 = function (i) {
+            var _loop_1 = function (i) {
+                objectsThatWereCollidingThisObjectWhileMoving.length = 0;
                 target.g.y += sign;
                 if (objectGlobalData.objectsThatCollideWith[target.objectName] != null) {
-                    //Moving objects
+                    //push objects
                     objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
                         if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                            collisionTarget = _this.pushObjectVertical(target, testCollisionWith, sign, objContainer);
+                            collisionTarget = moveOperationsPush.pushObjectVertical(target, testCollisionWith, sign, objContainer);
                             if (collisionTarget == objectGlobalData.null) {
                                 target.force.Dy *= 1 - testCollisionWith.weight;
                             }
@@ -748,18 +809,18 @@
                         return false;
                     });
                     //Sticky draging
-                    var stickyCheck_2 = boxCollider.copy(target.collisionBox);
-                    var checkDistance_2 = Math.abs(magnitude) + 2;
+                    var stickyCheck_1 = boxCollider.copy(target.collisionBox);
+                    var checkDistance_1 = Math.abs(magnitude) + 2;
                     if (target.stickyLeftSide) {
-                        stickyCheck_2.expandLeftSide(checkDistance_2);
+                        stickyCheck_1.expandLeftSide(checkDistance_1);
                     }
                     if (target.stickyRightSide) {
-                        stickyCheck_2.expandRightSide(checkDistance_2);
+                        stickyCheck_1.expandRightSide(checkDistance_1);
                     }
                     if (target.stickyLeftSide || target.stickyRightSide) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                         objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                            if (internalFunction.intersecting(target, stickyCheck_2, testCollisionWith)) {
+                            if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
                                 if (testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()) {
                                     objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                     testCollisionWith.g.y += sign;
@@ -774,7 +835,7 @@
                 }
                 //This has to be more optimized
                 if (collisionTarget == objectGlobalData.null) {
-                    collisionTarget = this_2.boxIntersectionSpecific(target, target.collisionBox, collisionNames, objContainer);
+                    collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
                 }
                 if (collisionTarget != objectGlobalData.null) {
                     sign *= -1;
@@ -782,6 +843,12 @@
                     objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
                         updaterObject.g.y += sign;
                     });
+                    if (target.force.Dy > 0) {
+                        target.verticalCollision = 1;
+                    }
+                    else if (target.force.Dy < 0) {
+                        target.verticalCollision = -1;
+                    }
                     target.force.Dy = 0;
                     var distance = 0;
                     if (sign >= 0) {
@@ -794,14 +861,15 @@
                         target.gravity.Dy *= distance / 90;
                         target.gravity.Dx *= 1 - (distance / 90);
                     }
-                    target.force.Dx *= collisionTarget.friction * target.friction;
+                    //console.log("Friction");
+                    //target.force.Dx *= collisionTarget.friction * target.friction;
+                    target.force.Dx *= target.friction;
                     return "break";
                 }
             };
-            var this_2 = this;
             for (var i = 0; i < Math.abs(magnitude); i += 1) {
-                var state_2 = _loop_2(i);
-                if (state_2 === "break")
+                var state_1 = _loop_1(i);
+                if (state_1 === "break")
                     break;
             }
             var stickyCheck = boxCollider.copy(target.collisionBox);
@@ -831,75 +899,92 @@
                 });
             }
         };
-        movementOperations.pushObjectHorizontal = function (pusher, objectBeingPushed, sign, objContainer) {
-            var _this = this;
-            var collided = false;
-            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
-                if (objectBeingPushed.collisionTargets.length == 0) {
-                    return pusher;
-                }
-                objectBeingPushed.g.x += sign;
-                objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, function (testCollision) {
-                    if (testCollision.objectName != pusher.objectName &&
-                        internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
-                        && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
-                        objectBeingPushed.g.x += sign * -1;
-                        collided = true;
+        return verticalMovement;
+    }());
+
+    var nullVector = /** @class */ (function () {
+        function nullVector() {
+            this.delta = 0;
+            this.Dx = 0;
+            this.Dy = 0;
+            this.angle = 0;
+            this.magnitude = 0;
+        }
+        nullVector.prototype.increaseMagnitude = function (addValue) {
+        };
+        nullVector.prototype.limitHorizontalMagnitude = function (limit) {
+        };
+        nullVector.prototype.limitVerticalMagnitude = function (limit) {
+        };
+        nullVector.null = new nullVector;
+        return nullVector;
+    }());
+
+    var polygonCollision = /** @class */ (function () {
+        function polygonCollision() {
+        }
+        polygonCollision.collisionTest = function (target, xTest, yTest, objContainer) {
+            if (target.collidesWithPolygonGeometry == true) {
+                var collisionObjects = objContainer.filterObjects(["polygonCollisionX"], function (testCollisionWith) {
+                    if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                        return true;
                     }
                     return false;
                 });
-            }
-            if (collided) {
-                return objectBeingPushed;
-            }
-            return objectGlobalData.null;
-        };
-        movementOperations.pushObjectVertical = function (pusher, objectBeingPushed, sign, objContainer) {
-            var _this = this;
-            var collided = false;
-            if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
-                if (objectBeingPushed.collisionTargets.length == 0) {
-                    return pusher;
+                //var collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, ["polygonCollisionX"]);
+                if (collisionObjects.length == 0) {
+                    //target._hasCollidedWithPolygon = false;
+                    return [false, target.gravity];
                 }
-                objectBeingPushed.g.y += sign;
-                if (objectBeingPushed._isColliding_Special) {
-                    objectBeingPushed.g.y += sign * -1;
-                    collided = true;
-                }
-                else {
-                    objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, function (testCollision) {
-                        if (testCollision.objectName != pusher.objectName &&
-                            internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
-                            && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
-                            objectBeingPushed.g.y += sign * -1;
-                            collided = true;
+                var collisionResults_1 = [];
+                collisionObjects.forEach(function (obj) {
+                    collisionResults_1.push(obj.collisionTest(target));
+                });
+                var currentFlatestCollision_1 = new nullVector();
+                currentFlatestCollision_1.delta = Math.PI / 2; //point north
+                collisionResults_1.forEach(function (collision) {
+                    if (collision[0] && collision[1].delta) {
+                        if (calculations.getShortestDeltaBetweenTwoRadians(collision[1].delta, 0) < calculations.getShortestDeltaBetweenTwoRadians(currentFlatestCollision_1.delta, 0)) {
+                            currentFlatestCollision_1 = collision[1];
                         }
-                        return false;
-                    });
-                }
+                    }
+                });
+                collisionResults_1[0];
+                //target._hasCollidedWithPolygon = false;
+                return collisionResults_1[0];
+                /*if(collisionTarget != objectGlobalData.null){
+                    return (collisionTarget as polygonCollisionX).collisionTest(target);
+                }*/
             }
-            if (collided) {
-                return objectBeingPushed;
-            }
-            return objectGlobalData.null;
+            //target._hasCollidedWithPolygon = false;
+            return [false, target.gravity];
         };
-        movementOperations.boxIntersectionSpecific = function (initiator, boxData, targetObjects, objContainer) {
-            return this.boxIntersectionSpecificClass(initiator, boxData, targetObjects, "", objContainer);
-        };
-        //Collision
-        movementOperations.boxIntersectionSpecificClass = (new /** @class */ (function () {
-            function class_1() {
-                this.inc = function (initiator, boxData, targetObjects, excludeObject, objContainer) {
-                    return objContainer.loopThroughObjectsUntilCondition(targetObjects, function (testCollisionWith) {
-                        if (testCollisionWith.objectName != excludeObject && internalFunction.intersecting(initiator, boxData, testCollisionWith)) {
-                            return true;
-                        }
-                        return false;
-                    });
-                };
+        return polygonCollision;
+    }());
+
+    var movementOperations = /** @class */ (function () {
+        function movementOperations() {
+        }
+        movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
+            force.Dx = force.Dx * deltaTime;
+            force.Dy = force.Dy * deltaTime;
+            force.Dx *= target.airFriction;
+            force.Dy *= target.airFriction;
+            var xdiff = force.Dx;
+            var ydiff = force.Dy;
+            target.gravity.increaseMagnitude(target.weight);
+            var polygonCollisionTest = polygonCollision.collisionTest(target, Math.round(xdiff), Math.round(ydiff), objContainer);
+            force.Dx += polygonCollisionTest[1].Dx;
+            force.Dy += polygonCollisionTest[1].Dy;
+            target.gravity.magnitude = polygonCollisionTest[1].magnitude;
+            /* if(target.gravity.magnitude < 1){
+                target.gravity.magnitude = 0K
+            }*/
+            horizontalMovement.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
+            if (polygonCollisionTest[0] == false) {
+                verticalMovement.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
             }
-            return class_1;
-        }())).inc;
+        };
         return movementOperations;
     }());
 
@@ -916,13 +1001,17 @@
             this.stickyTop = false;
             this.stickyLeftSide = false;
             this.stickyRightSide = false;
-            this.gravity = vector.null;
+            this.gravity = nullVector.null;
             this.weight = 0.4;
             this._hasBeenMoved_Tick = 0;
             this._isColliding_Special = false;
+            this.collidesWithPolygonGeometry = false;
+            this._hasCollidedWithPolygon = false;
             this.inputTemplate = "";
             this.outputString = "";
             this.onLayer = 0;
+            this.horizontalCollision = 0;
+            this.verticalCollision = 0;
             this._collisionBox = new boxCollider(0, 0, 0, 0);
             this._objectName = "iObject";
             this.moveCollisionTargets = [];
@@ -1115,6 +1204,12 @@
             this.collisionBox.y = ys;
             this.collisionBox.width = width;
             this.collisionBox.height = height;
+            if (ys < 0) {
+                this.collisionBox.height += ys / -1;
+            }
+            if (xs < 0) {
+                this.collisionBox.width += xs / -1;
+            }
         };
         Object.defineProperty(objectBase.prototype, "x", {
             get: function () {
@@ -1161,6 +1256,112 @@
         return objectBase;
     }());
 
+    var movingBlockHori = /** @class */ (function (_super) {
+        __extends(movingBlockHori, _super);
+        function movingBlockHori(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.873;
+            _this.stickyTop = true;
+            _this.stickyRightSide = true;
+            _this.stickyLeftSide = true;
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        movingBlockHori.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
+            if (this.switch) {
+                _super.prototype.setNewForce.call(this, 2, 0);
+            }
+            else {
+                _super.prototype.setNewForce.call(this, -2, 0);
+            }
+            if (ticker.getTicks() % 20 == 0) {
+                this.switch = !this.switch;
+            }
+        };
+        movingBlockHori.objectName = "movingBlockHori";
+        return movingBlockHori;
+    }(objectBase));
+
+    var movingBlockVert = /** @class */ (function (_super) {
+        __extends(movingBlockVert, _super);
+        function movingBlockVert(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, movingBlockVert.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.873;
+            _this.stickyTop = true;
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        movingBlockVert.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            if (this.switch) {
+                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 1);
+            }
+            else {
+                _super.prototype.setNewForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 1);
+            }
+            if (ticker.getTicks() % 55 == 0) {
+                this.switch = !this.switch;
+            }
+        };
+        movingBlockVert.objectName = "movingBlockVert";
+        return movingBlockVert;
+    }(objectBase));
+
+    var block = /** @class */ (function (_super) {
+        __extends(block, _super);
+        function block(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, block.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 32, 32);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        block.prototype.setCollision = function (x, y, width, height) {
+            _super.prototype.setCollision.call(this, x, y, width, height);
+            _super.prototype.style.call(this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(x, y, width, height);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+        };
+        block.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        block.objectName = "block";
+        return block;
+    }(objectBase));
+
     var vectorFixedDelta = /** @class */ (function () {
         function vectorFixedDelta(delta, inputMagnitude) {
             this.delta = delta;
@@ -1170,7 +1371,6 @@
         vectorFixedDelta.prototype.limitHorizontalMagnitude = function (limit) {
             throw new Error("Method not implemented.");
         };
-<<<<<<< HEAD
         vectorFixedDelta.prototype.limitVerticalMagnitude = function (limit) {
             throw new Error("Method not implemented.");
         };
@@ -1220,125 +1420,6 @@
         }
         return animConfig;
     }());
-
-    var block = /** @class */ (function (_super) {
-        __extends(block, _super);
-        function block(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, block.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.986;
-            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 32, 32);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-        }
-        block.prototype.setCollision = function (x, y, width, height) {
-            _super.prototype.setCollision.call(this, x, y, width, height);
-            _super.prototype.style.call(this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(x, y, width, height);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-        };
-        block.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-        };
-=======
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
-        block.objectName = "block";
-        return block;
-    }(objectBase));
-
-<<<<<<< HEAD
-    var movingBlockHori = /** @class */ (function (_super) {
-        __extends(movingBlockHori, _super);
-        function movingBlockHori(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, movingBlockHori.objectName) || this;
-=======
-    var player = /** @class */ (function (_super) {
-        __extends(player, _super);
-        function player(xp, yp) {
-            var _this = _super.call(this, xp, yp, player.objectName) || this;
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
-            _this.switch = false;
-            _this.friction = 0.986;
-            _super.prototype.setCollision.call(_this, 0, 0, 128, 128);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0xFF0000);
-                newGraphics.drawRect(0, 0, 128, 128);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-<<<<<<< HEAD
-        }
-        movingBlockHori.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            //super.setNewForceAngleMagnitude(calculations.degreesToRadians(180), 3);
-            if (this.switch) {
-                _super.prototype.setNewForce.call(this, 2, 0);
-            }
-            else {
-                _super.prototype.setNewForce.call(this, -2, 0);
-            }
-            if (ticker.getTicks() % 20 == 0) {
-                this.switch = !this.switch;
-            }
-        };
-        movingBlockHori.objectName = "movingBlockHori";
-        return movingBlockHori;
-    }(objectBase));
-
-    var movingBlockVert = /** @class */ (function (_super) {
-        __extends(movingBlockVert, _super);
-        function movingBlockVert(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, movingBlockVert.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.873;
-            _this.stickyTop = true;
-            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 256, 256);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-=======
-            /*setInterval(()=>{
-                this.switch = !this.switch;
-            }, 700);*/
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
-        }
-        player.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            if (l.checkKeyHeld("a")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), 2);
-            }
-            else if (l.checkKeyHeld("d")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), 2);
-            }
-<<<<<<< HEAD
-            if (ticker.getTicks() % 55 == 0) {
-                this.switch = !this.switch;
-            }
-        };
-        movingBlockVert.objectName = "movingBlockVert";
-        return movingBlockVert;
-    }(objectBase));
 
     var tinyBlock32 = /** @class */ (function (_super) {
         __extends(tinyBlock32, _super);
@@ -1402,322 +1483,7 @@
         };
         wideBlock.objectName = "wideBlock";
         return wideBlock;
-=======
-            if (l.checkKeyHeld("w")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 2);
-            }
-            else if (l.checkKeyHeld("s")) {
-                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(270), 2);
-            }
-            this.force.limitHorizontalMagnitude(10);
-            this.force.limitVerticalMagnitude(10);
-            l.camera.setTarget(this.g.x, this.g.y);
-        };
-        player.objectName = "player";
-        return player;
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
     }(objectBase));
-
-    var dummySandbag = /** @class */ (function (_super) {
-        __extends(dummySandbag, _super);
-        function dummySandbag(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
-            _this.switch = false;
-            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0);
-            _this.friction = 0.90;
-            _this.airFriction = 0.96;
-            _this.weight = 0.06;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 0, 64, 128);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x0000FF);
-                newGraphics.drawRect(0, 0, 64, 128);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                _super.prototype.addSprite.call(_this, new animConfig({
-                    animationName: "godrayPreview.mp4",
-                    scaleX: 3,
-                    scaleY: 3,
-                    speed: 0.3,
-                    x: 64,
-                    y: 77,
-                    anchorX: 0.5,
-                    anchorY: 0.34,
-                }));
-                return g;
-            });
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, movingBlockHori.objectName, movingBlockVert.objectName, tinyBlock32.objectName, wideBlock.objectName);
-            return _this;
-        }
-        dummySandbag.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-        };
-        dummySandbag.objectName = "dummySandbag";
-        return dummySandbag;
-    }(objectBase));
-
-    var hitbox = /** @class */ (function (_super) {
-        __extends(hitbox, _super);
-        function hitbox(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, hitbox.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.0;
-            _this.haveHitThese = [];
-            _this.startupTime = 0;
-            _this.life = 10;
-            _this.targets = [];
-            _this.creator = null;
-            _this.offsetX = 0;
-            _this.offsetY = 0;
-            _this.hitboxDirection = null;
-            _this.aerial = false;
-            _this.type = "";
-            return _this;
-        }
-        hitbox.initialize = function (_a) {
-            var startupTime = _a.startupTime, x = _a.x, y = _a.y, creator = _a.creator, life = _a.life, size = _a.size, offset = _a.offset, hitboxDirection = _a.hitboxDirection, aerial = _a.aerial, type = _a.type;
-            var newHitbox = new hitbox(x, y, "");
-            newHitbox.startupTime = startupTime;
-            newHitbox.type = type;
-            newHitbox.creator = creator;
-            newHitbox.life = life;
-            newHitbox.setSize(size[0], size[1]);
-            newHitbox.setOffset(offset[0], offset[1]);
-            newHitbox.hitboxDirection = hitboxDirection;
-            newHitbox.aerial = aerial;
-            return newHitbox;
-        };
-        hitbox.prototype.getStartupTime = function () {
-            return this.startupTime;
-        };
-        hitbox.prototype.setOffset = function (offX, offY) {
-            this.offsetX = offX;
-            this.offsetY = offY;
-        };
-        hitbox.prototype.setSize = function (width, height) {
-            _super.prototype.setCollision.call(this, 0, 0, width, height);
-            _super.prototype.style.call(this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x00FF50);
-                newGraphics.drawRect(0, 0, width, height);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-        };
-        hitbox.prototype.logic = function (l) {
-            var _this = this;
-            this.life--;
-            if (this.creator != null) {
-                this.moveWithCreator();
-                if (this.life <= 0) {
-                    l.deleteObject(this);
-                }
-                else {
-                    for (var _i = 0, _a = this.targets; _i < _a.length; _i++) {
-                        var t = _a[_i];
-                        l.foreachObjectType(t, function (obj) {
-                            var _a, _b;
-                            if (_this.haveHitThese.indexOf(obj.ID) == -1
-                                && internalFunction.intersecting(_this, _this.collisionBox, obj)) {
-                                _this.haveHitThese.push(obj.ID);
-                                if (_this.hitboxDirection != null) {
-                                    /*if(this.type == "sword"){
-                                        resourcesHand.playAudioVolume("WeaponImpact1.ogg", 0.25);
-<<<<<<< HEAD
-                                    }*/
-                                    if (_this.creator.facingRight) {
-                                        obj.addForceAngleMagnitude((_a = _this.hitboxDirection) === null || _a === void 0 ? void 0 : _a.delta, (_b = _this.hitboxDirection) === null || _b === void 0 ? void 0 : _b.magnitude);
-                                    }
-                                    else {
-                                        obj.addForceAngleMagnitude(calculations.PI - ((_c = _this.hitboxDirection) === null || _c === void 0 ? void 0 : _c.delta), (_d = _this.hitboxDirection) === null || _d === void 0 ? void 0 : _d.magnitude);
-                                    }
-=======
-                                    }
-                                    obj.addForceAngleMagnitude((_a = _this.hitboxDirection) === null || _a === void 0 ? void 0 : _a.delta, (_b = _this.hitboxDirection) === null || _b === void 0 ? void 0 : _b.magnitude);
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
-                                }
-                            }
-                            return true;
-                        });
-                    }
-                }
-            }
-            else {
-                l.deleteObject(this);
-            }
-        };
-        hitbox.prototype.moveWithCreator = function () {
-            if (this.creator != null) {
-                this.g.x = this.creator.g.x + (this.creator.collisionBox.width / 2) - (this.collisionBox.width / 2);
-                this.g.y = this.creator.g.y + this.creator.collisionBox.height / 2;
-                this.g.x += this.offsetX;
-                this.g.y += this.offsetY;
-            }
-        };
-        hitbox.objectName = "hitbox";
-        return hitbox;
-    }(objectBase));
-
-    var baseAttack = /** @class */ (function (_super) {
-        __extends(baseAttack, _super);
-        function baseAttack(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, hitbox.objectName) || this;
-            _this.attackSeries = [];
-            _this.attackSeriesIndex = 0;
-            _this.startupTime = -1;
-            return _this;
-        }
-        baseAttack.prototype.startAttack = function (creator) {
-            this.attackSeriesIndex = 0;
-            this.startupTime = -1;
-        };
-        baseAttack.prototype.tickAttack = function (l, caller) {
-            if (this.attackSeries[this.attackSeriesIndex] != null) {
-                if (this.startupTime == -1) {
-                    this.startupTime = this.attackSeries[this.attackSeriesIndex].getStartupTime();
-                }
-                if (this.startupTime > 0) {
-                    this.startupTime--;
-                    if (this.startupTime == 0) {
-                        this.startupTime = -1;
-                        this.attackSeriesIndex++;
-                        l.addObject(this.attackSeries[this.attackSeriesIndex], caller.onLayer);
-                    }
-                }
-            }
-        };
-        return baseAttack;
-    }(objectBase));
-
-    var threeHitNormal = /** @class */ (function (_super) {
-        __extends(threeHitNormal, _super);
-        function threeHitNormal(xp, yp, input) {
-            return _super.call(this, xp, yp, hitbox.objectName) || this;
-        }
-        threeHitNormal.prototype.startAttack = function (creator) {
-            _super.prototype.startAttack.call(this, creator);
-            /*tools.createHitbox({
-                startupTime: 18,
-                x: creator.g.x,
-                y: creator.g.y,
-                creator: creator,
-                life: 16,
-                size: [32, 16],
-                offset: [24, -8],
-                hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(80), 8),
-                aerial: true,
-                type: "sword"
-            }),
-            tools.createHitbox({
-                startupTime:32,
-                x: creator.g.x,
-                y: creator.g.y,
-                creator: creator,
-                life: 16,
-                size: [50, 64],
-                offset: [48, -26],
-                hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(24), 10),
-                aerial: true,
-                type: "sword"
-            })] */
-            this.attackSeries = [
-                hitbox.initialize({
-                    startupTime: 18,
-                    x: creator.g.x,
-                    y: creator.g.y,
-                    creator: creator,
-                    life: 16,
-                    size: [32, 16],
-                    offset: [24, -8],
-                    hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(80), 8),
-                    aerial: true,
-                    type: "sword"
-                })
-            ];
-        };
-        return threeHitNormal;
-    }(baseAttack));
-
-<<<<<<< HEAD
-    var ladder = /** @class */ (function (_super) {
-        __extends(ladder, _super);
-        function ladder(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, ladder.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.0;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 32, 64, 224);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0xFF3e50);
-                newGraphics.drawRect(0, 32, 64, 224);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                g.calculateBounds();
-                return g;
-            });
-            _super.prototype.addSprite.call(_this, new animConfig({
-                animationName: "ladder",
-                scaleX: 2,
-                scaleY: 2,
-                speed: 0.3,
-                x: 4,
-                y: 0,
-                anchorX: 0,
-                anchorY: 0,
-            }));
-            return _this;
-        }
-        ladder.prototype.logic = function (l) {
-        };
-        ladder.objectName = "ladder";
-        return ladder;
-    }(objectBase));
-
-    var textPrompt = /** @class */ (function (_super) {
-        __extends(textPrompt, _super);
-        function textPrompt(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, textPrompt.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.0;
-            _this.text = "[SPACE]";
-            _super.prototype.setCollision.call(_this, 0, 32, 64, 64);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x003eff);
-                newGraphics.drawRect(0, 32, 64, 64);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                var text = new PIXI.Text('[SPACE]', { fontFamily: 'Arial', fontSize: 24, fill: 0xff1010, align: 'center' });
-                g.addChild(text);
-                g.calculateBounds();
-                return g;
-            });
-            return _this;
-        }
-        textPrompt.prototype.logic = function (l) {
-            l.getInteractionObject().openText(this.text);
-        };
-        textPrompt.objectName = "textPrompt";
-        return textPrompt;
-    }(objectBase));
-
-    var spriteContainer = /** @class */ (function () {
-        function spriteContainer() {
-            this.currentSpriteObj = null;
-        }
-        spriteContainer.prototype.set = function (newSprite) {
-            this.currentSpriteObj = newSprite;
-        };
-        spriteContainer.prototype.update = function (updateFunc) {
-            if (this.currentSpriteObj != null) {
-                updateFunc(this.currentSpriteObj);
-            }
-        };
-        return spriteContainer;
-    }());
 
     var block32x64 = /** @class */ (function (_super) {
         __extends(block32x64, _super);
@@ -1755,50 +1521,1062 @@
         return block64x32;
     }(objectBase));
 
+    var dummySandbag = /** @class */ (function (_super) {
+        __extends(dummySandbag, _super);
+        function dummySandbag(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
+            _this.switch = false;
+            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0);
+            _this.friction = 0.90;
+            _this.airFriction = 0.96;
+            _this.weight = 0.02;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 24, 32);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x0000FF);
+                newGraphics.drawRect(0, 0, 24, 32);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, "player", block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, tinyBlock32.objectName, wideBlock.objectName);
+            return _this;
+        }
+        dummySandbag.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        dummySandbag.objectName = "dummySandbag";
+        return dummySandbag;
+    }(objectBase));
+
+    var ladder = /** @class */ (function (_super) {
+        __extends(ladder, _super);
+        function ladder(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, ladder.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.life = 1000;
+            _super.prototype.setCollision.call(_this, 0, 0, 20, 98);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x483e51);
+                newGraphics.drawRect(0, 0, 20, 98);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.calculateBounds();
+                return g;
+            });
+            _super.prototype.addSprite.call(_this, new animConfig({
+                animationName: "ladder",
+                scaleX: 2,
+                scaleY: 2,
+                speed: 0.3,
+                x: 4,
+                y: 0,
+                anchorX: 0,
+                anchorY: 0,
+            }));
+            return _this;
+        }
+        ladder.prototype.logic = function (l) {
+        };
+        ladder.objectName = "ladder";
+        return ladder;
+    }(objectBase));
+
+    var spriteContainer = /** @class */ (function () {
+        function spriteContainer() {
+            this.currentSpriteObj = null;
+        }
+        spriteContainer.prototype.set = function (newSprite) {
+            this.currentSpriteObj = newSprite;
+        };
+        spriteContainer.prototype.update = function (updateFunc) {
+            if (this.currentSpriteObj != null) {
+                updateFunc(this.currentSpriteObj);
+            }
+        };
+        return spriteContainer;
+    }());
+
+    var hitbox = /** @class */ (function (_super) {
+        __extends(hitbox, _super);
+        function hitbox(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, hitbox.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.color = 0x000000;
+            _this.hitDirection = new nullVector();
+            _this.targets = [];
+            _this.haveHitThese = [];
+            _this.userFaceRight = function () { return true; };
+            return _this;
+        }
+        hitbox.new = function (size, angle, magnitude, targets, userFaceRight) {
+            var newHitbox = new hitbox(0, 0, "");
+            newHitbox.setSize(size[0], size[1]);
+            newHitbox.hitDirection = new vectorFixedDelta(calculations.degreesToRadians(angle), magnitude);
+            newHitbox.targets = targets;
+            newHitbox.userFaceRight = userFaceRight;
+            return newHitbox;
+        };
+        hitbox.prototype.setSize = function (width, height) {
+            var _this = this;
+            console.log("height ", height);
+            _super.prototype.setCollision.call(this, 0, 0, width, height);
+            _super.prototype.style.call(this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(_this.color);
+                newGraphics.drawRect(0, 0, width, height);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+        };
+        hitbox.prototype.logic = function (l) {
+            var _this = this;
+            for (var _i = 0, _a = this.targets; _i < _a.length; _i++) {
+                var t = _a[_i];
+                l.foreachObjectType(t, function (obj) {
+                    if (_this.haveHitThese.indexOf(obj.ID) == -1
+                        && internalFunction.intersecting(_this, _this.collisionBox, obj)) {
+                        _this.haveHitThese.push(obj.ID);
+                        if (_this.hitDirection != null) {
+                            /*if(this.type == "sword"){
+                                resourcesHand.playAudioVolume("WeaponImpact1.ogg", 0.25);
+                            }*/
+                            obj.gravity.magnitude = 0;
+                            if (_this.userFaceRight()) {
+                                obj.addForceAngleMagnitude(_this.hitDirection.delta, _this.hitDirection.magnitude);
+                            }
+                            else {
+                                obj.addForceAngleMagnitude(calculations.PI - _this.hitDirection.delta, _this.hitDirection.magnitude);
+                            }
+                        }
+                    }
+                    return true;
+                });
+            }
+        };
+        hitbox.objectName = "hitbox";
+        return hitbox;
+    }(objectBase));
+
+    var movementDirection;
+    (function (movementDirection) {
+        movementDirection[movementDirection["left_right"] = 0] = "left_right";
+        movementDirection[movementDirection["up_down"] = 1] = "up_down";
+        movementDirection[movementDirection["right"] = 2] = "right";
+        movementDirection[movementDirection["left"] = 3] = "left";
+        movementDirection[movementDirection["up"] = 4] = "up";
+        movementDirection[movementDirection["down"] = 5] = "down";
+    })(movementDirection || (movementDirection = {}));
+
+    var actionCreatedObject = /** @class */ (function () {
+        function actionCreatedObject(life, obj, offsetX, offsetY) {
+            this.life = 0;
+            this.life = life;
+            this._obj = obj;
+            this._offsetX = offsetX;
+            this._offsetY = offsetY;
+        }
+        actionCreatedObject.prototype.obj = function () {
+            return this._obj;
+        };
+        actionCreatedObject.prototype.offsetX = function () {
+            return this._offsetX;
+        };
+        actionCreatedObject.prototype.offsetY = function () {
+            return this._offsetY;
+        };
+        return actionCreatedObject;
+    }());
+
+    var genericStatus;
+    (function (genericStatus) {
+        genericStatus[genericStatus["true"] = 0] = "true";
+        genericStatus[genericStatus["false"] = 1] = "false";
+        genericStatus[genericStatus["notSet"] = 2] = "notSet";
+    })(genericStatus || (genericStatus = {}));
+
+    var action = /** @class */ (function () {
+        function action(actionContainer) {
+            this.movementVector = new nullVector();
+            this._startupWait = 0;
+            this.originalStartupWait = 0;
+            this._endWait = 0;
+            this._repeat = 0;
+            this._resetUserGravity = false;
+            this._continueWindow = -1;
+            this._queriedAttacks = 0;
+            this._requiredQueriedAttacks = 0;
+            this.gravityShouldBeReset = false;
+            this.userShouldBeStill = genericStatus.notSet;
+            this.attackDirection = movementDirection.left_right;
+            this.payloadDone = false;
+            this.jobCompleted = false;
+            this.newUserFriction = -1;
+            this.usersPrevStoredFriction = 0;
+            this.firstTime = true;
+            this.objCreatorFunc = null;
+            this.objToCreateOffset = [0, 0];
+            this.objToCreateLife = 0;
+            this.beforePaylod = true;
+            this.destroyPreviousObjects = false;
+            this._actionContainer = actionContainer;
+        }
+        action.new = function (actionContainer) {
+            return new action(actionContainer);
+        };
+        action.prototype.newAction = function () {
+            return this._actionContainer.newAction();
+        };
+        action.prototype.queryAttack = function () {
+            this._queriedAttacks++;
+        };
+        action.prototype.removePrevObjsOnCreate = function () {
+            this.destroyPreviousObjects = true;
+            return this;
+        };
+        action.prototype.userFriction = function (friction) {
+            this.newUserFriction = friction;
+            return this;
+        };
+        action.prototype.continueWindow = function (val, requiredAttacks) {
+            if (requiredAttacks === void 0) { requiredAttacks = 1; }
+            this._continueWindow = val;
+            this._requiredQueriedAttacks = requiredAttacks;
+            return this;
+        };
+        action.prototype.create = function (objCreatorFunc) {
+            this.objCreatorFunc = objCreatorFunc;
+            return this;
+        };
+        action.prototype.objOffset = function (offset) {
+            this.objToCreateOffset = offset;
+            return this;
+        };
+        action.prototype.objLife = function (life) {
+            this.objToCreateLife = life;
+            return this;
+        };
+        action.prototype.resetUserGravity = function () {
+            this._resetUserGravity = true;
+            return this;
+        };
+        action.prototype.vector = function (angle, magnitude) {
+            this.movementVector = new vectorFixedDelta(calculations.degreesToRadians(angle), magnitude);
+            return this;
+        };
+        action.prototype.repeat = function (r) {
+            this._repeat = r;
+            return this;
+        };
+        action.prototype.startupWait = function (time) {
+            this._startupWait = time;
+            this.originalStartupWait = time;
+            return this;
+        };
+        action.prototype.endWait = function (time) {
+            this._endWait = time;
+            return this;
+        };
+        action.prototype.getAttackDirection = function () {
+            return this.attackDirection;
+        };
+        action.prototype.attackDirectionUpDown = function () {
+            this.attackDirection = movementDirection.up_down;
+            return this;
+        };
+        action.prototype.getGravityShouldBeReset = function () {
+            return this.gravityShouldBeReset;
+        };
+        action.prototype.resetGravity = function () {
+            this.gravityShouldBeReset = true;
+            return this;
+        };
+        action.prototype.getUserShouldBeStill = function () {
+            return this.userShouldBeStill;
+        };
+        action.prototype.userStill = function (stillStatus) {
+            if (stillStatus) {
+                this.userShouldBeStill = genericStatus.true;
+            }
+            else {
+                this.userShouldBeStill = genericStatus.false;
+            }
+            return this;
+        };
+        action.prototype.getMovementVector = function () {
+            return this.movementVector;
+        };
+        action.prototype.getRepeat = function () {
+            return this._repeat;
+        };
+        action.prototype.isCompleted = function () {
+            return this.jobCompleted;
+        };
+        action.prototype.play = function (user, l) {
+            if (this.jobCompleted)
+                return;
+            if (this.firstTime) {
+                this.usersPrevStoredFriction = user.friction;
+                if (this.newUserFriction != -1) {
+                    user.friction = this.newUserFriction;
+                    this.firstTime = false;
+                }
+            }
+            if (this._continueWindow > 0) {
+                this._continueWindow--;
+                if (this._queriedAttacks >= this._requiredQueriedAttacks) {
+                    this._continueWindow = -1;
+                }
+                else {
+                    return;
+                }
+            }
+            else if (this._continueWindow == 0) {
+                this.jobCompleted = true;
+                user.friction = this.usersPrevStoredFriction;
+                this._actionContainer.stop();
+            }
+            if (this._startupWait > 0) {
+                this._startupWait--;
+                if (this._startupWait == 0) {
+                    if (this.beforePaylod) {
+                        if (this.destroyPreviousObjects == true) {
+                            this._actionContainer.removeAllCreatedObjects(l);
+                        }
+                        this.beforePaylod = false;
+                    }
+                }
+            }
+            else {
+                if (this.payloadDone == false) {
+                    if (this._resetUserGravity) {
+                        user.gravity.magnitude = 0;
+                    }
+                    var delta = this.movementVector.delta;
+                    if (this._actionContainer.getDirection() == movementDirection.left) {
+                        delta = calculations.PI + ((calculations.PI * 2) - delta);
+                    }
+                    user.addForceAngleMagnitude(delta, this.movementVector.magnitude);
+                    if (this.objCreatorFunc != null) {
+                        var newObj = new actionCreatedObject(this.objToCreateLife, this.objCreatorFunc(), this.objToCreateOffset[0], this.objToCreateOffset[1]);
+                        this._actionContainer.objectsCreated.push(newObj);
+                        this._actionContainer.positionCreatedObject(user, newObj);
+                        l.addObject(newObj.obj(), user.onLayer);
+                    }
+                    this.payloadDone = true;
+                }
+                if (this._endWait > 0) {
+                    this._endWait--;
+                }
+                else {
+                    if (this._repeat > 0) {
+                        this._repeat--;
+                        this._startupWait = this.originalStartupWait;
+                        this.beforePaylod = true;
+                        this.payloadDone = false;
+                    }
+                    else {
+                        this.payloadDone = true;
+                        this.jobCompleted = true;
+                        user.friction = this.usersPrevStoredFriction;
+                    }
+                }
+            }
+        };
+        return action;
+    }());
+
+    var actionEmpty = /** @class */ (function () {
+        function actionEmpty() {
+            this.movementVector = new nullVector();
+        }
+        actionEmpty.prototype.objOffset = function (offset) {
+            return this;
+        };
+        actionEmpty.prototype.objLife = function (life) {
+            return this;
+        };
+        actionEmpty.prototype.queryAttack = function () {
+        };
+        actionEmpty.prototype.userFriction = function (friction) {
+            return this;
+        };
+        actionEmpty.prototype.removePrevObjsOnCreate = function () {
+            return this;
+        };
+        actionEmpty.prototype.continueWindow = function (val, requiredAttacks) {
+            return this;
+        };
+        actionEmpty.prototype.create = function (objCreatorFunc, offset, life) {
+            return this;
+        };
+        actionEmpty.prototype.resetUserGravity = function () {
+            return this;
+        };
+        actionEmpty.prototype.vector = function (angle, magnitude) {
+            return this;
+        };
+        actionEmpty.prototype.repeat = function (r) {
+            return this;
+        };
+        actionEmpty.prototype.startupWait = function (time) {
+            return this;
+        };
+        actionEmpty.prototype.endWait = function (time) {
+            return this;
+        };
+        actionEmpty.prototype.getAttackDirection = function () {
+            return movementDirection.left_right;
+        };
+        actionEmpty.prototype.attackDirectionUpDown = function () {
+            return this;
+        };
+        actionEmpty.prototype.getGravityShouldBeReset = function () {
+            return false;
+        };
+        actionEmpty.prototype.getUserShouldBeStill = function () {
+            return genericStatus.notSet;
+        };
+        actionEmpty.prototype.userStill = function (stillStatus) {
+            return this;
+        };
+        actionEmpty.prototype.resetGravity = function () {
+            return this;
+        };
+        actionEmpty.prototype.getMovementVector = function () {
+            return new nullVector();
+        };
+        actionEmpty.prototype.getRepeat = function () {
+            return 0;
+        };
+        actionEmpty.prototype.isCompleted = function () {
+            return true;
+        };
+        actionEmpty.prototype.play = function (user, l) {
+        };
+        return actionEmpty;
+    }());
+
+    var actionContainer = /** @class */ (function () {
+        function actionContainer() {
+            this.currentIndex = 0;
+            this.actionSeries = [];
+            this._keepUserStill = false;
+            this.objectsCreated = [];
+            this.direction = movementDirection.right;
+            this.stopped = false;
+        }
+        actionContainer.prototype.playCurrent = function (user, l, direction) {
+            this.direction = direction;
+            for (var i = this.objectsCreated.length - 1; i >= 0; i--) {
+                var objMeta = this.objectsCreated[i];
+                if (objMeta.life > 0) {
+                    objMeta.life--;
+                    this.positionCreatedObject(user, objMeta);
+                }
+                else {
+                    l.deleteObject(objMeta.obj());
+                    this.objectsCreated.splice(i, 1);
+                }
+            }
+            if (this.current().getUserShouldBeStill() != genericStatus.notSet) {
+                this._keepUserStill = (this.current().getUserShouldBeStill() == genericStatus.true) ? true : false;
+            }
+            this.current().play(user, l);
+        };
+        actionContainer.prototype.stop = function () {
+            this.stopped = true;
+        };
+        actionContainer.prototype.hasEnded = function () {
+            return this.stopped || this.isCurrentCompleted();
+        };
+        actionContainer.prototype.queryAttack = function () {
+            this.current().queryAttack();
+        };
+        actionContainer.prototype.positionCreatedObject = function (user, createdObj) {
+            createdObj.obj().g.x = user.g.x + (user.g.width / 2) - (createdObj.obj().g.width / 2);
+            createdObj.obj().g.y = user.g.y + (user.g.height / 2) - (createdObj.obj().g.height / 2);
+            if (this.direction == movementDirection.right) {
+                createdObj.obj().g.x += createdObj.offsetX();
+                createdObj.obj().g.y += createdObj.offsetY();
+            }
+            else if (this.direction == movementDirection.left) {
+                createdObj.obj().g.x -= createdObj.offsetX();
+                createdObj.obj().g.y += createdObj.offsetY();
+            }
+            else if (this.direction == movementDirection.up) {
+                createdObj.obj().g.x += createdObj.offsetX();
+                createdObj.obj().g.y -= createdObj.offsetY();
+            }
+            else if (this.direction == movementDirection.down) {
+                createdObj.obj().g.x += createdObj.offsetX();
+                createdObj.obj().g.y += createdObj.offsetY();
+            }
+        };
+        actionContainer.prototype.getDirection = function () {
+            return this.direction;
+        };
+        actionContainer.prototype.getUserShouldBeStill = function () {
+            return this._keepUserStill;
+        };
+        actionContainer.prototype.isCurrentCompleted = function () {
+            return this.current().isCompleted();
+        };
+        actionContainer.prototype.cleanup = function (l) {
+            if (this.current().isCompleted() || this.stopped) {
+                this.removeAllCreatedObjects(l);
+            }
+            this._keepUserStill = false;
+        };
+        actionContainer.prototype.removeAllCreatedObjects = function (l) {
+            for (var i = this.objectsCreated.length - 1; i >= 0; i--) {
+                var objMeta = this.objectsCreated[i];
+                l.deleteObject(objMeta.obj());
+                this.objectsCreated.splice(i, 1);
+            }
+        };
+        actionContainer.prototype.current = function () {
+            if (this.actionSeries[this.currentIndex] == undefined) {
+                console.log("Can't get ", this.currentIndex, " from ", this.actionSeries);
+                return new actionEmpty();
+            }
+            return this.actionSeries[this.currentIndex];
+        };
+        actionContainer.prototype.next = function () {
+            this.currentIndex += 1;
+            if (this.currentIndex > this.actionSeries.length - 1) {
+                this.currentIndex = 0;
+                return false;
+            }
+            return true;
+        };
+        actionContainer.prototype.add = function (action) {
+            this.actionSeries.push(action);
+            return this;
+        };
+        actionContainer.prototype.newAction = function () {
+            var newAction = action.new(this);
+            this.actionSeries.push(newAction);
+            return newAction;
+        };
+        return actionContainer;
+    }());
+
+    var baseAttack = /** @class */ (function () {
+        function baseAttack(creator, direction) {
+            this.attackSeries = new actionContainer();
+            //private movementInformationPlayer: actionPlayer = new actionPlayer();
+            this.done = false;
+            this.attackDirection = movementDirection.right;
+            this.attackDirection = direction;
+            this.creator = creator;
+        }
+        baseAttack.prototype.isDone = function () {
+            return this.done;
+        };
+        baseAttack.prototype.userShouldBeStill = function () {
+            return this.attackSeries.getUserShouldBeStill();
+        };
+        baseAttack.prototype.queryAttack = function () {
+            this.attackSeries.queryAttack();
+        };
+        baseAttack.prototype.tickAttack = function (l) {
+            if (this.attackSeries.hasEnded() == false) {
+                this.attackSeries.playCurrent(this.creator, l, this.attackDirection);
+                if (this.attackSeries.isCurrentCompleted()) {
+                    this.attackSeries.next();
+                }
+            }
+            else {
+                this.attackSeries.cleanup(l);
+                this.done = true;
+            }
+        };
+        return baseAttack;
+    }());
+
+    var threeHitNormal = /** @class */ (function (_super) {
+        __extends(threeHitNormal, _super);
+        function threeHitNormal(creator, direction) {
+            var _this = _super.call(this, creator, direction) || this;
+            var returnUserFacing = function () {
+                return creator.facingRight;
+            };
+            var collision = [dummySandbag.objectName];
+            _this.attackSeries
+                .newAction().vector(0, 1).userStill(true)
+                .create(function () { return hitbox.new([18, 12], 87, 1, collision, returnUserFacing); }).objOffset([16, -5]).objLife(3)
+                .startupWait(3)
+                .newAction().vector(0, 1).userStill(true).continueWindow(15).removePrevObjsOnCreate()
+                .create(function () { return hitbox.new([18, 12], 40, 5, collision, returnUserFacing); }).objOffset([16, -5]).objLife(5)
+                .startupWait(5)
+                .newAction().vector(60, 4).userStill(true).continueWindow(19)
+                .startupWait(5)
+                .endWait(16)
+                .newAction().userStill(true).removePrevObjsOnCreate()
+                .create(function () { return hitbox.new([27, 32], 40, 5, collision, returnUserFacing); }).objOffset([16, 8]).objLife(12)
+                .startupWait(0)
+                .endWait(10);
+            return _this;
+        }
+        return threeHitNormal;
+    }(baseAttack));
+
+    var baseAttackNull = /** @class */ (function () {
+        function baseAttackNull() {
+        }
+        baseAttackNull.prototype.isDone = function () {
+            return true;
+        };
+        baseAttackNull.prototype.userShouldBeStill = function () {
+            return false;
+        };
+        baseAttackNull.prototype.startAttack = function (creator) {
+        };
+        baseAttackNull.prototype.queryAttack = function () {
+        };
+        baseAttackNull.prototype.tickAttack = function (l) {
+        };
+        return baseAttackNull;
+    }());
+
+    var slideKick = /** @class */ (function (_super) {
+        __extends(slideKick, _super);
+        function slideKick(creator, direction) {
+            var _this = _super.call(this, creator, direction) || this;
+            var returnUserFacing = function () {
+                return creator.facingRight;
+            };
+            var collision = [dummySandbag.objectName];
+            _this.attackSeries
+                .newAction().vector(0, 16).userStill(true)
+                .create(function () { return hitbox.new([18, 12], 20, 3, collision, returnUserFacing); }).objOffset([16, 5]).objLife(10)
+                .startupWait(6)
+                .endWait(20).userFriction(1)
+                .newAction().vector(40, 12) //.continueWindow(19)
+                .create(function () { return hitbox.new([20, 20], 80, 7, collision, returnUserFacing); }).objOffset([8, -10]).objLife(20)
+                .startupWait(0)
+                .endWait(3);
+            return _this;
+            /*.newAction().vector(300, 4)
+            .startupWait(20)
+            .endWait(30);*/
+        }
+        return slideKick;
+    }(baseAttack));
+
+    var forwardAir = /** @class */ (function (_super) {
+        __extends(forwardAir, _super);
+        function forwardAir(creator, direction) {
+            var _this = _super.call(this, creator, direction) || this;
+            var returnUserFacing = function () {
+                return creator.facingRight;
+            };
+            var collision = [dummySandbag.objectName];
+            _this.attackSeries
+                .newAction().vector(90, 1).resetGravity()
+                .startupWait(3)
+                .endWait(3)
+                .newAction().resetGravity().removePrevObjsOnCreate()
+                .create(function () { return hitbox.new([20, 48], 280, 3, collision, returnUserFacing); }).objOffset([16, 5]).objLife(4)
+                .startupWait(2).repeat(2)
+                .endWait(8)
+                .newAction().resetGravity().removePrevObjsOnCreate()
+                .create(function () { return hitbox.new([32, 48], 10, 4, collision, returnUserFacing); }).objOffset([16, 5]).objLife(10)
+                .startupWait(6)
+                .endWait(10);
+            return _this;
+        }
+        return forwardAir;
+    }(baseAttack));
+
+    var downAir = /** @class */ (function (_super) {
+        __extends(downAir, _super);
+        function downAir(creator, direction) {
+            var _this = _super.call(this, creator, direction) || this;
+            var returnUserFacing = function () {
+                return creator.facingRight;
+            };
+            var collision = [dummySandbag.objectName];
+            _this.attackSeries
+                .newAction().vector(90, 2).resetGravity()
+                .startupWait(2)
+                .endWait(6)
+                .newAction().vector(270, 18).resetGravity()
+                .create(function () { return hitbox.new([82, 32], 80, 8.5, collision, returnUserFacing); }).objOffset([0, 5]).objLife(60)
+                .startupWait(3)
+                .endWait(10);
+            return _this;
+        }
+        return downAir;
+    }(baseAttack));
+
+    var neutralAir = /** @class */ (function (_super) {
+        __extends(neutralAir, _super);
+        function neutralAir(creator, direction) {
+            var _this = _super.call(this, creator, direction) || this;
+            var returnUserFacing = function () {
+                return creator.facingRight;
+            };
+            var collision = [dummySandbag.objectName];
+            _this.attackSeries
+                .newAction().resetGravity()
+                .create(function () { return hitbox.new([32, 24], 10, 4, collision, returnUserFacing); }).objOffset([16, 0]).objLife(8)
+                .startupWait(2)
+                .endWait(4)
+                .newAction().resetGravity()
+                .create(function () { return hitbox.new([20, 24], 170, 4, collision, returnUserFacing); }).objOffset([-16, 0]).objLife(8)
+                .startupWait(4)
+                .endWait(10);
+            return _this;
+        }
+        return neutralAir;
+    }(baseAttack));
+
+    var characterMoves = /** @class */ (function () {
+        function characterMoves(ladderObject, groundAttacks, airAttacks) {
+            if (ladderObject === void 0) { ladderObject = ""; }
+            if (groundAttacks === void 0) { groundAttacks = null; }
+            if (airAttacks === void 0) { airAttacks = null; }
+            this.maxRunSpeed = 6;
+            this.superRunSpeed = 11;
+            this.normalRunSpeed = 6;
+            this.jumpStrength = 8;
+            this.jumpButtonReleased = true;
+            //ladder part
+            this.ladderObject = "";
+            this.climbindLadder = false;
+            this.canJumpLadders = false;
+            this.atLadderTop = false;
+            this.releasedJumpKeyAtLadderTop = false;
+            this.hasJumpedFromLadder = false;
+            this.climbSpeed = 2;
+            this.climbDownSpeed = 3;
+            this.ladderTopJump = 3;
+            this.ladderSideJump = 3;
+            //attack
+            this.attack = new baseAttackNull();
+            this.attackButtonReleased = true;
+            this.airAttacks = null;
+            this.groundAttacks = null;
+            this.ladderObject = ladderObject;
+            this.airAttacks = airAttacks;
+            this.groundAttacks = groundAttacks;
+        }
+        characterMoves.prototype.move = function (l, character) {
+            this.movement(l, character);
+            this.climbingLadders(l, character);
+            this.handleAttacks(l, character);
+        };
+        characterMoves.prototype.movement = function (l, character) {
+            if (l.checkKeyHeld("Control")) {
+                this.maxRunSpeed = this.superRunSpeed;
+            }
+            else {
+                this.maxRunSpeed = this.normalRunSpeed;
+            }
+            if (l.checkKeyHeld("a") || l.checkKeyHeld("A")) {
+                if (character.verticalCollision > 0) {
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 13) * this.maxRunSpeed);
+                }
+                else {
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 64) * this.maxRunSpeed);
+                }
+            }
+            if (l.checkKeyHeld("d") || l.checkKeyHeld("D")) {
+                if (character.verticalCollision > 0) {
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 13) * this.maxRunSpeed);
+                }
+                else {
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 64) * this.maxRunSpeed);
+                }
+            }
+            if (this.jumpButtonReleased == true && (l.checkKeyHeld("w") || l.checkKeyHeld("W")) && (character.verticalCollision > 0 || character._isColliding_Special)) {
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength);
+                this.jumpButtonReleased = false;
+            }
+            if (l.checkKeyReleased("h")) {
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength);
+                character.gravity.magnitude = 0;
+            }
+            if (l.checkKeyHeld("w") || l.checkKeyHeld("W")) {
+                this.jumpButtonReleased = true;
+            }
+            character.force.limitHorizontalMagnitude(this.maxRunSpeed);
+        };
+        characterMoves.prototype.climbingLadders = function (l, character) {
+            if (this.ladderObject == "")
+                return;
+            var collisionWith = l.isCollidingWith(character, character.collisionBox, [this.ladderObject]);
+            if (collisionWith != null) {
+                if ((l.checkKeyHeld("w") || l.checkKeyHeld("s"))) {
+                    character.force.Dx = 0;
+                }
+                if ((l.checkKeyHeld("w") || l.checkKeyHeld("s")) && this.climbindLadder == false) {
+                    this.climbindLadder = true;
+                }
+                if (this.climbindLadder) {
+                    if (l.checkKeyHeld("a") == false && l.checkKeyHeld("d") == false) {
+                        this.canJumpLadders = true;
+                    }
+                    character.gravity.magnitude = 0;
+                    character.force.Dx *= 0.4;
+                    character.force.Dy *= 0.2;
+                    character.g.x = collisionWith.g.x + (collisionWith.g.width / 2) - (character.g.width / 2);
+                    if (l.checkKeyHeld("w")) {
+                        character.g.y -= this.climbSpeed;
+                        while (l.isCollidingWith(character, character.collisionBox, [this.ladderObject]) == null ||
+                            l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null) {
+                            character.g.y += 1;
+                            this.atLadderTop = true;
+                        }
+                    }
+                    if (l.checkKeyHeld("w") && this.atLadderTop == true && this.releasedJumpKeyAtLadderTop) {
+                        character.g.y -= 1;
+                        character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump);
+                    }
+                    console.log(l.checkKeyReleased("w"));
+                    if (l.checkKeyReleased("w") && this.atLadderTop == true) {
+                        this.releasedJumpKeyAtLadderTop = true;
+                        console.log("releasedJumpKeyAtLadderTop");
+                    }
+                    if (l.checkKeyHeld("s")) {
+                        character.g.y += this.climbDownSpeed;
+                        if (l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null) {
+                            character.g.y = collisionWith.g.y + (collisionWith.collisionBox.y / 2) + collisionWith.collisionBox.height / 2 - 1;
+                        }
+                    }
+                    var movedBetweenLadder = false;
+                    if (l.checkKeyReleased("d")) {
+                        this.canJumpLadders = true;
+                    }
+                    if (l.checkKeyReleased("a")) {
+                        this.canJumpLadders = true;
+                    }
+                    if (l.checkKeyHeld("a")) {
+                        if (this.canJumpLadders) {
+                            character.g.x -= character.collisionBox.width;
+                            movedBetweenLadder = true;
+                            if (l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null) {
+                                character.g.x += character.collisionBox.width;
+                                movedBetweenLadder = false;
+                            }
+                            if (movedBetweenLadder && l.checkKeyHeld("w")) {
+                                character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump);
+                                this.atLadderTop = false;
+                                this.canJumpLadders = false;
+                                this.climbindLadder = false;
+                                this.releasedJumpKeyAtLadderTop = false;
+                            }
+                            else if (movedBetweenLadder) {
+                                this.releasedJumpKeyAtLadderTop = false;
+                                this.canJumpLadders = false;
+                            }
+                        }
+                    }
+                    if (l.checkKeyHeld("d")) {
+                        if (this.canJumpLadders) {
+                            character.g.x += character.collisionBox.width;
+                            movedBetweenLadder = true;
+                            if (l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null) {
+                                character.g.x -= character.collisionBox.width;
+                                movedBetweenLadder = false;
+                            }
+                            if (movedBetweenLadder && l.checkKeyHeld("w")) {
+                                character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump);
+                                this.atLadderTop = false;
+                                this.canJumpLadders = false;
+                                this.climbindLadder = false;
+                                this.releasedJumpKeyAtLadderTop = false;
+                            }
+                            else if (movedBetweenLadder) {
+                                this.releasedJumpKeyAtLadderTop = false;
+                                this.canJumpLadders = false;
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                this.atLadderTop = false;
+                this.canJumpLadders = false;
+                this.climbindLadder = false;
+                this.releasedJumpKeyAtLadderTop = false;
+                if (l.checkKeyHeld("w") && Math.floor(character.gravity.magnitude) == 0
+                    && this.hasJumpedFromLadder == false) {
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump);
+                    this.hasJumpedFromLadder = true;
+                }
+            }
+        };
+        characterMoves.prototype.handleAttacks = function (l, character) {
+            this.attack.tickAttack(l);
+            if (l.checkKeyHeld(" ")) {
+                if (this.attackButtonReleased) {
+                    this.attackButtonReleased = false;
+                    this.attack.queryAttack();
+                    if (this.attack.isDone()) {
+                        if (character.verticalCollision > 0 || character._isColliding_Special) {
+                            if (this.groundAttacks != null) {
+                                this.attack = this.groundAttacks(l);
+                            }
+                        }
+                        else {
+                            if (this.airAttacks != null) {
+                                this.attack = this.airAttacks(l);
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                this.attackButtonReleased = true;
+            }
+        };
+        return characterMoves;
+    }());
+
+    var grassFilter = /** @class */ (function () {
+        function grassFilter(polygonPosGlslAdapted, spacingConst, grassPerLine, minGrassHeight, aspectRatio, filterAreaWidth, filterAreaHeight, filterAreaX, filterAreaY) {
+            this.grassShader = "\n    precision lowp float;\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n\n    uniform float yPolPos[{yPolPosArrayLength}];\n\n    uniform float time;\n    uniform float windWidth;\n    uniform float aspectRatio;\n    uniform float cameraPosition;\n    uniform float cameraSize;\n    \n\n    uniform float grassMaxHeight;\n\n    uniform vec2 collisionPoints[2];\n\n    const int grassPerLine = {grassPerLine};\n    const float SPACING = {spacing};\n    const float MINGRASSHEIGHT = {MINGRASSHEIGHT};\n    const float SPACEBETWEENEACHBLADE = {SPACEBETWEENEACHBLADE};\n\n    float randFromVec(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    float distSquared(vec2 A, vec2 B){\n        vec2 C = (A - B) * vec2(aspectRatio, 1.0);\n        return dot( C, C );\n    }\n\n    vec4 generateGrass(float polygonYPos, int lineIndex, float lineStart, float topYPos, float heightDifference){\n        \n        for(int b=0; b<grassPerLine; b++){\n            float grassBladeX = lineStart+(float(b)*SPACEBETWEENEACHBLADE);\n            if(vTextureCoord.x > grassBladeX-grassMaxHeight && vTextureCoord.x < grassBladeX+grassMaxHeight){\n                float grassBladeRandomVal = randFromVec(vec2(lineIndex, b));\n                float randomBladePosition = grassBladeRandomVal * SPACEBETWEENEACHBLADE;\n                grassBladeX += randomBladePosition;\n\n                float relativePosition = (grassBladeX - (float(lineIndex)*SPACING))/SPACING;\n                float grassBladeY = polygonYPos + (relativePosition*heightDifference);\n                \n                float collisionForce = 0.0;\n                for(int i=0; i<2; i++){\n                    \n                    float distanceFromGrassBladeToCollider = abs(grassBladeX - collisionPoints[i].x);\n                    \n                    //Alternative WIP formula for collision(go to desmos.com): 1-(cos(log((x+0.008)^3)*1)*0.5)-0.5\n                    if(distanceFromGrassBladeToCollider < grassMaxHeight/3.5){\n                        float distancePercentage = (distanceFromGrassBladeToCollider/(grassMaxHeight/3.5));\n                        float distanceToCollider = grassBladeX - collisionPoints[i].x;\n\n                        float distanceToColliderY = abs(grassBladeY - collisionPoints[i].y);\n                        float distanceToColliderYPercentage = 0.0;\n                        if(distanceToColliderY < 0.02){\n                            distanceToColliderYPercentage =  1.0-(distanceToColliderY / (0.02));\n                        }\n\n                        if(distanceToCollider < 0.0){\n                            collisionForce = -2.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }else{\n                            collisionForce = 1.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }\n                        collisionForce = collisionForce * distanceToColliderYPercentage;\n                        break;\n                    }\n                }\n                \n                \n                float grassBladeHeight = grassMaxHeight * grassBladeRandomVal;\n                if(grassBladeHeight < MINGRASSHEIGHT){\n                    grassBladeHeight += 0.01;\n                }\n                float grassHeightStrengthModify = grassBladeHeight/grassMaxHeight;\n                float grassTop = polygonYPos - grassBladeHeight + topYPos;\n    \n                \n                float yPosOfGras = ((vTextureCoord.y - grassTop)/(grassBladeHeight));\n                \n                //Apply wind effect\n                //Wave from top to right\n                float windStrength = collisionForce + pow(cos(time), 2.0);\n                float steepSlopeSwayLimit = 1.0;\n                if(heightDifference > 0.01){\n                    steepSlopeSwayLimit = 0.3;\n                }\n                float offsetCurve = (1.0-yPosOfGras) * 0.00085 * (0.9+windStrength);\n\n\n                \n                vec2 grassBladePoint = vec2(grassBladeX, grassBladeY);\n                    \n                float distanceToBladeStartSquared = distSquared(grassBladePoint, vec2(vTextureCoord.x, vTextureCoord.y));\n                float extraCurve = (distanceToBladeStartSquared/(grassBladeHeight*grassBladeHeight)) * 0.0015 * windStrength *  grassHeightStrengthModify * steepSlopeSwayLimit;\n                \n\n                float bladeWidthMoon = 0.0002;\n                \n                float bladePosition = lineStart+(float(b)*SPACEBETWEENEACHBLADE) + randomBladePosition;\n\n                float grassBladeLeftSideStart = bladePosition + offsetCurve + extraCurve;\n                float grassBladeRightSideStart = bladePosition + offsetCurve + extraCurve;\n\n                float alpha = 0.0;\n                \n                if((vTextureCoord.x) > grassBladeLeftSideStart - bladeWidthMoon\n                && (vTextureCoord.x) < grassBladeRightSideStart + bladeWidthMoon\n                && distanceToBladeStartSquared < (grassBladeHeight*grassBladeHeight)){\n                    alpha = 1.0;\n                }\n\n\n                if(alpha != 0.0){\n                    if(grassBladeRandomVal < 0.2){\n                        return vec4(0.12, 0.42, 0.01568627, alpha);\n                    }else if(grassBladeRandomVal < 0.4){\n                        return vec4(0.4196, 0.6078, 0.1176, alpha);\n                    }else if(grassBladeRandomVal < 0.6){\n                        return vec4(0.5529, 0.749, 0.2235, alpha);\n                    }else if(grassBladeRandomVal < 0.8){\n                        return vec4(0.448, 0.5509, 0.2019, alpha);\n                    }else if(grassBladeRandomVal <= 1.0){\n                        return vec4(0.425, 0.6509, 0.1019, alpha);\n                    }\n                }\n\n                /*if(distanceToBladeStartSquared < 0.000001){\n                    return vec4(0.0, 0.0, 1.0, 1.0);\n                }*/\n                \n            }\n            \n            \n        }\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n    void main(void)\n    {\n        /*float distToPlayer = distSquared(vTextureCoord, collisionPoints[0]);\n        if(distToPlayer < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer2 = distSquared(vTextureCoord, collisionPoints[1]);\n        if(distToPlayer2 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer3 = distSquared(vTextureCoord, collisionPoints[2]);\n        if(distToPlayer3 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }*/\n\n        float distanceToCamera = abs(vTextureCoord.x - cameraPosition);\n        if(distanceToCamera < cameraSize){\n            for (int lineIndex = 0; lineIndex < {yPolPosArrayLength}; ++lineIndex){\n\n            \n                float heightDifference = yPolPos[lineIndex+1] - yPolPos[lineIndex];\n    \n                float relativePosition = (vTextureCoord.x - (float(lineIndex)*SPACING))/SPACING;\n    \n                float topYPos = (relativePosition*heightDifference);\n    \n                float grassTop = yPolPos[lineIndex] - grassMaxHeight*1.0;\n                float groundY = yPolPos[lineIndex] + topYPos;\n                if(vTextureCoord.y > grassTop\n                && vTextureCoord.y < groundY){\n\n                    float lineStart = float(lineIndex)*SPACING;\n                    \n                    if(vTextureCoord.x > lineStart - SPACING && vTextureCoord.x < lineStart+SPACING*2.0){\n                        vec4 grassResult = generateGrass(yPolPos[lineIndex], lineIndex, lineStart, topYPos, heightDifference);\n\n                    \n                        if(grassResult != vec4(0.0, 0.0, 0.0, 0.0)){\n                            gl_FragColor = grassResult;\n                        }else{\n                            //gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);\n                        }\n                    }\n                    \n                }\n\n            }\n        }\n        \n        //gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);\n    }";
+            this.grassFragment = { yPolPos: [1, 2, 3, 4], time: 1.0, windWidth: 0.4,
+                aspectRatio: 4.0, cameraPosition: 0.0, cameraSize: 0.06,
+                grassMaxHeight: 0.02,
+                collisionPoints: [
+                    -2, -2,
+                    -2, -2
+                ]
+            };
+            this.filterAreaX = 0;
+            this.filterAreaY = 0;
+            this.filterAreaWidth = 0;
+            this.filterAreaHeight = 0;
+            this.mainCharacterFollow = [0, 0];
+            this.mainCharacterFollow2 = [0, 0];
+            this.polygonPosGlslAdapted = polygonPosGlslAdapted;
+            this.filterAreaWidth = filterAreaWidth;
+            this.filterAreaHeight = filterAreaHeight;
+            this.filterAreaX = filterAreaX;
+            this.filterAreaY = filterAreaY;
+            var movingGrassFragShaderParamsFixed = this.grassShader.replace(/{yPolPosArrayLength}/g, "" + polygonPosGlslAdapted.length);
+            movingGrassFragShaderParamsFixed = movingGrassFragShaderParamsFixed.replace(/{spacing}/g, spacingConst + "");
+            movingGrassFragShaderParamsFixed = movingGrassFragShaderParamsFixed.replace(/{grassPerLine}/g, grassPerLine + "");
+            movingGrassFragShaderParamsFixed = movingGrassFragShaderParamsFixed.replace(/{MINGRASSHEIGHT}/g, minGrassHeight);
+            movingGrassFragShaderParamsFixed = movingGrassFragShaderParamsFixed.replace(/{SPACEBETWEENEACHBLADE}/g, "" + (spacingConst / grassPerLine));
+            //Moving grass
+            this.grassFragment.yPolPos = polygonPosGlslAdapted;
+            this.grassFragment.time = 0.0;
+            this.grassFragment.aspectRatio = aspectRatio;
+            this.grassFragment.cameraSize = 0.078; //0.08;
+            this.grassFragment.grassMaxHeight = 0.0225;
+            console.log("movingGrassFragShaderParamsFixed: ", movingGrassFragShaderParamsFixed);
+            console.log("grassFragment: ", this.grassFragment);
+            this.myFilter = new PIXI.Filter(undefined, movingGrassFragShaderParamsFixed, this.grassFragment);
+            this.myFilter.resolution = 0.5;
+            this.myFilter.autoFit = false;
+        }
+        grassFilter.prototype.filter = function () {
+            return this.myFilter;
+        };
+        grassFilter.prototype.updateCollisionPositions = function (l) {
+            var currentTime = this.grassFragment.time;
+            currentTime += 0.015;
+            var pInShader = (l.getCameraX() - this.filterAreaX) / this.filterAreaWidth;
+            this.grassFragment.cameraPosition = pInShader;
+            this.grassFragment.time = currentTime;
+            var primaryColliderX = grassFilter.primaryCollider.g.x + grassFilter.primaryCollider.collisionBox.x + (grassFilter.primaryCollider.collisionBox.width / 2);
+            var primaryColliderY = grassFilter.primaryCollider.g.y + grassFilter.primaryCollider.collisionBox.y + (grassFilter.primaryCollider.collisionBox.height);
+            this.grassFragment.collisionPoints[0] = (primaryColliderX - this.filterAreaX) / this.filterAreaWidth;
+            this.grassFragment.collisionPoints[1] = 1.0 - (((this.filterAreaY - primaryColliderY) / this.filterAreaHeight));
+            //delayed follow
+            if (this.mainCharacterFollow[0] == 0 && this.mainCharacterFollow[1] == 0) {
+                this.mainCharacterFollow[0] = grassFilter.primaryCollider.g.x;
+                this.mainCharacterFollow[1] = grassFilter.primaryCollider.g.y;
+            }
+            else {
+                var distanceToTarget = calculations.distanceBetweenPoints(this.mainCharacterFollow[0], this.mainCharacterFollow[1], grassFilter.primaryCollider.g.x, grassFilter.primaryCollider.g.y);
+                var angleToTarget = calculations.angleBetweenPoints(this.mainCharacterFollow[0] - grassFilter.primaryCollider.g.x, this.mainCharacterFollow[1] - grassFilter.primaryCollider.g.y);
+                this.mainCharacterFollow[0] += Math.cos(angleToTarget) * (distanceToTarget * 0.148);
+                this.mainCharacterFollow[1] += Math.sin(angleToTarget) * (distanceToTarget * 0.148);
+            }
+            var primaryColliderXDelayed = this.mainCharacterFollow[0] + grassFilter.primaryCollider.collisionBox.x + (grassFilter.primaryCollider.collisionBox.width / 2);
+            var primaryColliderYDelayed = this.mainCharacterFollow[1] + grassFilter.primaryCollider.collisionBox.y + (grassFilter.primaryCollider.collisionBox.height);
+            this.grassFragment.collisionPoints[2] = (primaryColliderXDelayed - this.filterAreaX) / this.filterAreaWidth;
+            this.grassFragment.collisionPoints[3] = 1.0 - (((this.filterAreaY - primaryColliderYDelayed) / this.filterAreaHeight));
+            //delayed follow 2
+            /*if(this.mainCharacterFollow2[0] == 0 && this.mainCharacterFollow2[1] == 0){
+                this.mainCharacterFollow2[0] = grassFilter.primaryCollider.g.x;
+                this.mainCharacterFollow2[1] = grassFilter.primaryCollider.g.y;
+            }else{
+                let distanceToTarget = calculations.distanceBetweenPoints(this.mainCharacterFollow2[0], this.mainCharacterFollow2[1], grassFilter.primaryCollider.g.x, grassFilter.primaryCollider.g.y);
+                let angleToTarget = calculations.angleBetweenPoints(this.mainCharacterFollow2[0] - grassFilter.primaryCollider.g.x, this.mainCharacterFollow2[1] - grassFilter.primaryCollider.g.y);
+                this.mainCharacterFollow2[0] += Math.cos(angleToTarget) *  (distanceToTarget*0.085);
+                this.mainCharacterFollow2[1] += Math.sin(angleToTarget) *  (distanceToTarget*0.085);
+            }
+            let primaryColliderXDelayed2 = this.mainCharacterFollow2[0] + grassFilter.primaryCollider.collisionBox.x + (grassFilter.primaryCollider.collisionBox.width/2);
+            let primaryColliderYDelayed2 = this.mainCharacterFollow2[1] + grassFilter.primaryCollider.collisionBox.y + (grassFilter.primaryCollider.collisionBox.height);
+
+            this.grassFragment.collisionPoints[4] = (primaryColliderXDelayed2 - this.filterAreaX)/this.filterAreaWidth;
+            this.grassFragment.collisionPoints[5] = 1.0-(((this.filterAreaY-primaryColliderYDelayed2)/this.filterAreaHeight));*/
+        };
+        grassFilter.primaryCollider = new nulliObject(0, 0);
+        return grassFilter;
+    }());
+
     var player = /** @class */ (function (_super) {
         __extends(player, _super);
         function player(xp, yp, input) {
             var _this = _super.call(this, xp, yp, player.objectName) || this;
-            _this.airFriction = 0.98;
-            _this.friction = 0.8;
+            _this.airFriction = 0.99;
+            _this.friction = 0.7;
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
-            _this.weight = 0.06;
-            _this.maxRunSpeed = 4;
-            _this.normalRunSpeed = 4;
-            _this.superRunSpeed = 7;
+            _this.weight = 0.05;
             _this.currentSprite = "warriorIdle";
             _this.currentSpriteObj = new spriteContainer();
-            _this.shakeCameraForce = 0;
-            _this.airbornTimer = 0;
+            _this.collidesWithPolygonGeometry = true;
             _this.facingRight = true;
-            _this.falling = false;
-            _this.hasJumped = false;
-            _this.climbindLadder = false;
-            _this.canJumpLadders = false;
-            _this.atLadderTop = false;
-            _this.releasedJumpKeyAtLadderTop = false;
-            _this.constantForce = 0;
-            _this.attacking = false;
-            _this.actionWait = 0;
-            _this.attack = null;
-            _this.playFootstepTimer = 0;
-            _super.prototype.setCollision.call(_this, 0, 0, 24, 32);
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 98);
             //console.log(input);
+            grassFilter.primaryCollider = _this;
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI.Graphics();
                 newGraphics.beginFill(0xFF3e50);
-                newGraphics.drawRect(0, 0, 24, 32);
+                newGraphics.drawRect(0, 0, 64, 98);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
                 g.calculateBounds();
                 return g;
             });
             _this.g.filters = [];
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, dummySandbag.objectName, tinyBlock32.objectName, wideBlock.objectName);
+            _super.prototype.addCollisionTarget.call(_this, block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, "dummySandbag", tinyBlock32.objectName, wideBlock.objectName);
             _this.updateCurrentSprite();
+            _this.characterMoveBase = new characterMoves(ladder.objectName, function (l) {
+                //Ground attacks
+                if (l.checkKeyHeld("s")) {
+                    return new slideKick(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                }
+                else {
+                    return new threeHitNormal(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                }
+            }, function (l) {
+                //air attacks
+                if (l.checkKeyHeld("d") || l.checkKeyHeld("a")) {
+                    return new forwardAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                }
+                else if (l.checkKeyHeld("s")) {
+                    return new downAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                }
+                else if (!l.checkKeyHeld("d") && !l.checkKeyHeld("d") && !l.checkKeyHeld("d") && !l.checkKeyHeld("d")) {
+                    return new neutralAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                }
+                return new baseAttackNull();
+            });
             return _this;
-            //console.log("width: ",this.g.width);
-            //console.log("height: ",this.g.height);
         }
         player.prototype.init = function (roomEvents) {
             var _this = this;
@@ -1826,297 +2604,26 @@
         };
         player.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
-            console.log(Math.round(this.gravity.magnitude));
-            if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
-                this.hasJumped = false;
-            }
-            if (Math.floor(this.force.Dy) == 0 && Math.round(this.gravity.magnitude) == 0) {
-                this.falling = false;
-            }
-            if (l.checkKeyHeld("Control")) {
-                this.maxRunSpeed = this.superRunSpeed;
-            }
-            else {
-                this.maxRunSpeed = this.normalRunSpeed;
-            }
-            var collisionWith = l.isCollidingWith(this, this.collisionBox, [ladder.objectName]);
-            if (collisionWith != null) {
-                if ((l.checkKeyHeld("w") || l.checkKeyHeld("s"))) {
-                    this.force.Dx = 0;
-                }
-                if ((l.checkKeyHeld("w") || l.checkKeyHeld("s")) && this.climbindLadder == false) {
-                    this.climbindLadder = true;
-                    if (l.checkKeyHeld("a") == false && l.checkKeyHeld("d") == false) {
-                        this.canJumpLadders = true;
-                    }
-                }
-                if (this.climbindLadder) {
-                    this.gravity.magnitude = 0;
-                    this.force.Dx *= 0.4;
-                    this.force.Dy *= 0.2;
-                    this.g.x = collisionWith.g.x;
-                    if (l.checkKeyHeld("w")) {
-                        this.g.y -= 5;
-                        while (l.isCollidingWith(this, this.collisionBox, [ladder.objectName]) == null ||
-                            l.isCollidingWith(this, this.collisionBox, this.collisionTargets) != null) {
-                            this.g.y += 1;
-                            this.atLadderTop = true;
-                        }
-                    }
-                    if (l.checkKeyHeld("w") && this.atLadderTop == true && this.releasedJumpKeyAtLadderTop) {
-                        this.g.y -= 1;
-                        _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 6);
-                    }
-                    if (l.checkKeyReleased("w") && this.atLadderTop == true) {
-                        this.releasedJumpKeyAtLadderTop = true;
-                    }
-                    if (l.checkKeyHeld("s")) {
-                        this.g.y += 8;
-                        if (l.isCollidingWith(this, this.collisionBox, this.collisionTargets) != null) {
-                            this.g.y = collisionWith.g.y + (collisionWith.collisionBox.y / 2) + collisionWith.collisionBox.height / 2 - 1;
-                        }
-                    }
-                    var movedBetweenLadder = false;
-                    if (l.checkKeyReleased("d")) {
-                        this.canJumpLadders = true;
-                    }
-                    if (l.checkKeyReleased("a")) {
-                        this.canJumpLadders = true;
-                    }
-                    if (l.checkKeyHeld("a")) {
-                        if (this.canJumpLadders) {
-                            this.g.x -= this.collisionBox.width;
-                            movedBetweenLadder = true;
-                            if (l.isCollidingWith(this, this.collisionBox, this.collisionTargets) != null) {
-                                this.g.x += this.collisionBox.width;
-                                movedBetweenLadder = false;
-                            }
-                            if (movedBetweenLadder && l.checkKeyHeld("w")) {
-                                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(135), 11);
-                                this.atLadderTop = false;
-                                this.canJumpLadders = false;
-                                this.climbindLadder = false;
-                                this.releasedJumpKeyAtLadderTop = false;
-                            }
-                            else if (movedBetweenLadder) {
-                                this.releasedJumpKeyAtLadderTop = false;
-                                this.canJumpLadders = false;
-                            }
-                        }
-                    }
-                    if (l.checkKeyHeld("d")) {
-                        if (this.canJumpLadders) {
-                            this.g.x += this.collisionBox.width;
-                            movedBetweenLadder = true;
-                            if (l.isCollidingWith(this, this.collisionBox, this.collisionTargets) != null) {
-                                this.g.x -= this.collisionBox.width;
-                                movedBetweenLadder = false;
-                            }
-                            if (movedBetweenLadder && l.checkKeyHeld("w")) {
-                                _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(45), 11);
-                                this.atLadderTop = false;
-                                this.canJumpLadders = false;
-                                this.climbindLadder = false;
-                                this.releasedJumpKeyAtLadderTop = false;
-                            }
-                            else if (movedBetweenLadder) {
-                                this.releasedJumpKeyAtLadderTop = false;
-                                this.canJumpLadders = false;
-                            }
-                        }
-                    }
-                }
-            }
-            else {
-                this.atLadderTop = false;
-                this.canJumpLadders = false;
-                this.climbindLadder = false;
-                this.releasedJumpKeyAtLadderTop = false;
-                if (this.falling == false && this.hasJumped == false && l.checkKeyHeld("w") && Math.floor(this.gravity.magnitude) == 0 && this.actionWait == 0) {
-                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(90), 6);
-                    this.hasJumped = true;
-                }
-            }
-            if (this.climbindLadder == false) {
-                if (l.checkKeyHeld("a") && this.actionWait == 0) {
-                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(180), (1 / 13) * this.maxRunSpeed);
-                }
-                if (l.checkKeyHeld("d") && this.actionWait == 0) {
-                    _super.prototype.addForceAngleMagnitude.call(this, calculations.degreesToRadians(0), (1 / 13) * this.maxRunSpeed);
-                }
-            }
-            this.force.limitHorizontalMagnitude(this.maxRunSpeed);
-            if (this.attacking == false) {
-                if (this.force.Dy <= -9 && this.gravity.magnitude > 0) {
-                    this.currentSprite = "warriorJump";
-                }
-                else if (this.force.Dy > -9 && this.force.Dy < 9 && this.gravity.magnitude > 0) {
-                    this.currentSprite = "warriorJump";
-                }
-                else if (this.force.Dy > 9 && this.gravity.magnitude > 0) {
-                    this.currentSprite = "warriorFall";
-                }
-                if (Math.abs(this.force.Dy) < 1) {
-                    if (Math.abs(this.force.Dx) <= 1) {
-                        this.currentSprite = "warriorIdle";
-                    }
-                    else if (this.force.Dx != 0) {
-                        this.currentSprite = "warriorRun";
-                    }
-                }
-            }
-            if (_super.prototype.hasSprite.call(this, this.currentSprite) == false) {
-                this.updateCurrentSprite();
-            }
-            if (this.currentSprite == "warriorRun") {
-                var animWithSpeed_1 = 0.3 * Math.abs(this.force.Dx) / this.superRunSpeed;
-                if (animWithSpeed_1 < 0.01)
-                    animWithSpeed_1 = 0.01;
-                this.currentSpriteObj.update(function (x) { return x.animationSpeed = animWithSpeed_1; });
-            }
-            else if (this.currentSprite == "warriorIdle") {
-                this.currentSpriteObj.update(function (x) { return x.animationSpeed = 0.155; });
-            }
-            if (Math.abs(Math.floor(this.force.Dx)) != 0) {
-                if (this.force.Dx > 0) {
-                    _super.prototype.scaleXSprites.call(this, 4);
-                    this.facingRight = true;
-                }
-                else if (this.force.Dx < 0) {
-                    _super.prototype.scaleXSprites.call(this, -4);
-                    this.facingRight = false;
-                }
-                if (this.facingRight == true) {
-                    this.currentSpriteObj.update(function (x) { return x.pivot.set(3, 15); });
-                }
-                else {
-                    this.currentSpriteObj.update(function (x) { return x.pivot.set(-12, 15); });
-                }
-            }
-            if (Math.round(this.gravity.magnitude) == 0 && Math.round(this.force.Dy) == 0 && Math.abs(this.force.Dx) > 2 &&
-                l.checkKeyHeld("w") == false &&
-                (l.checkKeyHeld("a") || l.checkKeyHeld("d"))) {
-                if (this.playFootstepTimer <= 0) {
-                    this.playFootstepSounds();
-                    //console.log((this.maxRunSpeed/Math.abs(this.force.Dx)));
-                    this.playFootstepTimer = 17 * (this.normalRunSpeed / this.maxRunSpeed);
-                }
-                else {
-                    this.playFootstepTimer--;
-                }
-            }
-            if (this.climbindLadder && this.currentSpriteObj != null) {
-                this.currentSpriteObj.update(function (x) { return x.pivot.set(3, 15); });
-            }
-            if (Math.abs(Math.floor(this.force.Dx)) >= 5) {
-                l.setCameraMoveSpeedX(0.07);
-            }
-            else {
-                l.setCameraMoveSpeedX(0.04);
-            }
-            if (this.climbindLadder == false) {
-                if (this.force.Dy >= 1) {
-                    this.airbornTimer++;
-                }
-                else {
-                    if (this.airbornTimer > 25) {
-                        this.shakeCameraForce = this.airbornTimer * 0.7;
-                        if (this.shakeCameraForce > 40) {
-                            this.shakeCameraForce = 40;
-                        }
-                    }
-                    this.airbornTimer = 0;
-                }
-            }
-            else {
-                this.airbornTimer = 0;
-            }
-            var collisionInteraction = l.isCollidingWith(this, this.collisionBox, [textPrompt.objectName]);
-            if (l.checkKeyPressed(" ") && collisionInteraction != null) {
-                collisionInteraction.logic(l);
-            }
-            else {
-                this.handleAttacks(l);
-            }
-            if (this.shakeCameraForce > 0) {
-                l.setCameraOffsetX(-this.shakeCameraForce + Math.random() * this.shakeCameraForce);
-                l.setCameraOffsetY(-this.shakeCameraForce + Math.random() * this.shakeCameraForce);
-                this.shakeCameraForce--;
-            }
-            else {
-                l.setCameraOffsetX(0);
-                l.setCameraOffsetY(0);
-            }
-            var spaceToAdd = 128;
-            if (Math.abs(this.force.Dx) > 2) {
-                spaceToAdd = 256;
-            }
-            var addCamSpace = spaceToAdd;
-            if (this.facingRight == false) {
-                addCamSpace = -spaceToAdd;
-            }
-            var addCamSpaceY = 0;
-            if (Math.floor(this.force.Dy) > 30) {
-                addCamSpaceY = 600;
-            }
-            l.setCameraTarget(this.g.x + addCamSpace + 24, this.g.y + addCamSpaceY);
+            //l.queryKey();
+            this.characterMoveBase.move(l, this);
+            l.setCameraTarget(this.g.x + this.collisionBox.x + (this.collisionBox.width / 2), this.g.y);
+            //console.log(this.force.Dy);
+            //console.log("Grav mag", this.gravity.magnitude);
             /*if(l.checkKeyReleased("p") && this.attacking == false){
                 l.deleteObject(this);
                 l.addObject(new mio(this.g.x, this.g.y-32, ""), this.onLayer);
             }*/
+            if (this.verticalCollision > 0) {
+                if (this.force.Dx > 0) {
+                    this.facingRight = true;
+                }
+                else if (this.force.Dx < 0) {
+                    this.facingRight = false;
+                }
+            }
         };
         player.prototype.playFootstepSounds = function () {
             resourcesHand.playRandomAudio(["footstepDirt1.wav", "footstepDirt2.wav", "footstepDirt3.wav", "footstepDirt4.wav"]);
-        };
-        player.prototype.handleAttacks = function (l) {
-            if (this.attack != null) {
-                this.attack.tickAttack(l, this);
-            }
-            if (l.checkKeyPressed(" ") && this.actionWait == 0 && this.climbindLadder == false) {
-                if (Math.floor(this.gravity.magnitude) != 0) {
-                    //resourcesHand.playAudioVolume("bladeDraw.ogg", 0.2);
-                    //Air attack
-                    //this.currentSprite = "warriorAttack";
-                    //this.currentSpriteObj.update(x => x.animationSpeed = 0.4);
-                    this.attack = new threeHitNormal(-1, -1, "");
-                }
-                else {
-                    //ground attack
-                    this.currentSprite = "warriorDashAttack";
-                    this.currentSpriteObj.update(function (x) { return x.animationSpeed = 0.21; });
-                    this.attacking = true;
-                    this.constantForce = 3;
-                    this.actionWait = 35;
-                    this.force.Dy = 0;
-                    /*this.hitboxToCreate = [tools.createHitbox({
-                        startupTime: 16,
-                        x: this.g.x,
-                        y: this.g.y,
-                        creator: this,
-                        life: 7,
-                        size: [48, 24],
-                        offset: [32, -2],
-                        hitboxDirection: new vectorFixedDelta(calculations.degreesToRadians(32), 4),
-                        aerial: false,
-                        type: "sword"
-                    })];*/
-                }
-            }
-            /*if(this.facingRight){
-                super.addForceAngleMagnitude(calculations.degreesToRadians(350), this.constantForce);
-            }else{
-                super.addForceAngleMagnitude(calculations.degreesToRadians(190), this.constantForce);
-            }
-            
-            if(this.constantForce > 0){
-                this.constantForce -= 1;
-            }
-
-            if(this.actionWait > 0){
-                this.actionWait --;
-            }else{
-                this.attacking = false;
-            }*/
         };
         player.prototype.updateCurrentSprite = function () {
             _super.prototype.removeAllSprites.call(this);
@@ -2351,17 +2858,19 @@
                 addCamSpaceY = 600;
             }
             l.setCameraTarget(this.g.x + addCamSpace + 64, this.g.y + addCamSpaceY);
-            if (this.hitboxToCreate != null) {
-                if (this.hitboxToCreate[0] > 0) {
+            /*if(this.hitboxToCreate != null){
+                if(this.hitboxToCreate[0] > 0){
                     this.hitboxToCreate[0]--;
-                    if (this.hitboxToCreate[0] == 0) {
+                    if(this.hitboxToCreate[0] == 0){
                         l.addObject(this.hitboxToCreate[1], this.onLayer);
                     }
+                    
                 }
-                if (this.hitboxToCreate != null && this.hitboxToCreate[1].aerial && (this.climbing || Math.round(this.gravity.Dy) == 0)) {
+
+                if(this.hitboxToCreate != null && this.hitboxToCreate[1].aerial && (this.climbing || Math.round(this.gravity.Dy) == 0)){
                     this.hitboxToCreate[1].life *= 0.8;
                 }
-            }
+            }*/
             if (l.checkKeyReleased("p") && this.attacking == false) {
                 l.deleteObject(this);
                 l.addObject(new player(this.g.x, this.g.y - 32, ""), this.onLayer);
@@ -2509,16 +3018,15 @@
             var newTargets = l.isCollidingWithMultiple(this, this.collisionBox, [player.objectName, mio.objectName, dummySandbag.objectName]);
             for (var _b = 0, newTargets_1 = newTargets; _b < newTargets_1.length; _b++) {
                 var target = newTargets_1[_b];
-                for (var _c = 0, _d = this.previousTargets; _c < _d.length; _c++) {
-                    var prevTarget = _d[_c];
-                    if (target.ID == prevTarget.ID) {
+                /*for(var prevTarget of this.previousTargets){
+                    if(target.ID == prevTarget.ID){
                         this.previousTargets.splice(this.previousTargets.indexOf(prevTarget), 1);
                     }
-                }
-                if (target.force.Dy > 0) {
-                    var index = (target.g.x + target.collisionBox.x + (target.collisionBox.width / 2)) - this.g.x;
-                    if (target.force.Dx < -1) ;
-                    var spaceFromTop = this.getYFromLine(index);
+                }*/
+                var index = (target.g.x + target.collisionBox.x + (target.collisionBox.width / 2)) - this.g.x;
+                if (target.force.Dx < -1) ;
+                var spaceFromTop = this.getYFromLine(index);
+                if (Math.round(target.force.Dy) >= 0) {
                     if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + (spaceFromTop / 2)) {
                         target.gravity.magnitude = 0;
                         target.force.Dy = 0;
@@ -2530,11 +3038,33 @@
                         target._isColliding_Special = false;
                     }
                 }
-                else if (target.force.Dy <= 0) {
+                else if (Math.round(target.force.Dy) < 0) {
                     target._isColliding_Special = false;
                 }
-                this.previousTargets = newTargets;
+                /*if(target.force.Dy >= 0){
+                    let index =  (target.g.x + target.collisionBox.x + (target.collisionBox.width/2)) - this.g.x;
+        
+                    let extraCheckTop = 0;
+        
+                    if(target.force.Dx < -1){
+                        extraCheckTop = 16;
+                    }
+                    let spaceFromTop = this.getYFromLine(index);
+                    if(target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + (spaceFromTop/2)){
+                        target.gravity.magnitude = 0;
+                        target.force.Dy = 0;
+                        target.force.Dx *= 0.916;
+                        
+                        target.g.y = this.g.y - target.collisionBox.y - target.collisionBox.height + spaceFromTop;// - target.collisionBox.y - (target.collisionBox.height) + 6 + (6*(1-ratio));
+                        target._isColliding_Special = true;
+                    }else{
+                        //target._isColliding_Special = false;
+                    }
+                }else if(target.force.Dy <= 0){
+                    //target._isColliding_Special = false;
+                }*/
             }
+            this.previousTargets = newTargets;
         };
         collisionPolygon.objectName = "collisionPolygon";
         return collisionPolygon;
@@ -2566,84 +3096,115 @@
         return collisionSlopeRight;
     }(collisionPolygon));
 
-    //import anime from 'animejs';
     var grass = /** @class */ (function (_super) {
         __extends(grass, _super);
         function grass(xp, yp, input) {
             var _this = _super.call(this, xp, yp, grass.objectName) || this;
             _this.switch = false;
-            _this.friction = 0.0;
-            _this.life = 1000;
-            _this.grass = null;
-            _this.grassAngle = calculations.degreesToRadians(270);
-            _this.wind = 0;
-            _super.prototype.setCollision.call(_this, 0, 0, 0, 0);
+            _this.friction = 0.986;
+            _this.myShaderFrag = "\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n\n\n    float rand(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n\n    void main(void)\n    {\n\n        gl_FragColor = vec4(1.0, 0.3, 1.0, 1.0);\n\n        \n    }\n    ";
+            //uniform mediump vec4 time;
+            _this.customVertexShader = "\n    attribute vec2 aVertexPosition;\n    attribute vec2 aTextureCoord;\n    uniform mat3 projectionMatrix;\n    uniform float time;\n    uniform float collisionX;\n\n    varying vec2 vTextureCoord;\n    void main(void)\n    {\n        vec4 offset = vec4(0.0);\n        \n        vec4 tempPos = vec4((projectionMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0);\n\n        if (aTextureCoord.y < 0.5) {\n            tempPos.x += 0.01 * sin(time);\n\n            tempPos.x -= (collisionX) * 0.10;\n        }\n        \n        gl_Position = tempPos;\n        \n        vTextureCoord = aTextureCoord;\n    }";
+            _this.vertexUniform = {
+                time: 0.0,
+                collisionX: 0.0
+            };
+            _this.targetCollisionX = 0.0;
+            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0xFF3e50);
-                newGraphics.drawRect(0, 0, 128, 128);
-                newGraphics.endFill();
+                /*newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 32, 32);
+                newGraphics.endFill();*/
+                //g.addChild(newGraphics);
+                var grass = resourcesHand.getStaticTile("grass1");
+                console.log("grass: ", grass);
+                var simpleShader = new PIXI.Filter(_this.customVertexShader, undefined, _this.vertexUniform);
+                grass.filters = [simpleShader];
+                newGraphics.addChild(grass);
+                //var uniforms = { uSampler2:PIXI.Texture.from('required/assets/SceneRotate.jpg') };
                 g.addChild(newGraphics);
-                _this.grass = new PIXI.Graphics();
-                _this.grass.lineStyle(2, 0x00FF00, 1, 1);
-                _this.grass.x = 16;
-                _this.grass.y = 0;
-                _this.grass.moveTo(0, 128);
-                _this.grass.lineTo(0, 64);
-                g.addChild(_this.grass);
-                g.calculateBounds();
                 return g;
             });
             return _this;
-            /*anime({
-                targets: battery,
-                charged: '100%',
-                cycles: 130,
-                round: 1,
-                easing: 'linear',
-                elasticity: 600,
-                update: function() {
-                  console.log(JSON.stringify(battery));
-                }
-            });*/
         }
         grass.prototype.logic = function (l) {
-            this.grassAngle + calculations.degreesToRadians(-20 + Math.random() * 20);
-            if (calculations.radiansToDegrees(this.grassAngle) > 270) {
-                this.grassAngle *= 0.99;
+            _super.prototype.logic.call(this, l);
+            var newTargets = l.isCollidingWithMultiple(this, this.collisionBox, [player.objectName]);
+            if (newTargets.length > 0) {
+                var xInCollision = (newTargets[0].g.x + newTargets[0].collisionBox.x + (newTargets[0].collisionBox.width / 2)) - (this.g.x);
+                var collisionPosVec = xInCollision / this.collisionBox.width;
+                if (collisionPosVec < 0) {
+                    collisionPosVec = 0;
+                }
+                else if (collisionPosVec > 1) {
+                    collisionPosVec = 1;
+                }
+                this.targetCollisionX = (collisionPosVec - 0.5) * 2;
+                if (this.targetCollisionX > 0.0) {
+                    this.targetCollisionX = (1 - this.targetCollisionX);
+                    //this.targetCollisionX = Math.sin(1.0-this.targetCollisionX);
+                }
+                else if (this.targetCollisionX < 0.0) {
+                    this.targetCollisionX = -(1 + this.targetCollisionX);
+                    //this.targetCollisionX = Math.sin(-1.0+this.targetCollisionX);
+                }
+                console.log("this.targetCollisionX: ", this.targetCollisionX);
             }
-            else if (calculations.radiansToDegrees(this.grassAngle) < 270) {
-                this.grassAngle *= 1.01;
-            }
-            if (this.grass != null) {
-                this.grass.clear();
-                this.grass.lineStyle(2, 0x00FF00, 1, 1);
-                this.grass.x = 16;
-                this.grass.y = 0;
-                this.grass.moveTo(Math.cos(this.grassAngle) * 32, 32 + Math.sin(this.grassAngle) * 32);
-                this.grass.lineTo(0, 32);
-            }
-            if (l.checkKeyHeld("a")) {
-                this.wind = 12;
-            }
-            if (this.wind > 0) {
-                this.grassAngle += calculations.degreesToRadians(this.wind);
-                this.wind *= 0.9;
-                if (this.wind <= 0.01) {
-                    this.wind = 0;
+            if (this.vertexUniform.collisionX < this.targetCollisionX - 0.05) {
+                if (this.vertexUniform.collisionX < 0) {
+                    this.vertexUniform.collisionX += (1 - Math.abs(this.vertexUniform.collisionX)) * 0.03;
+                }
+                else {
+                    this.vertexUniform.collisionX += (1 - Math.abs(this.vertexUniform.collisionX)) * 0.2;
                 }
             }
+            else if (this.vertexUniform.collisionX > this.targetCollisionX + 0.05) {
+                if (this.vertexUniform.collisionX > 0) {
+                    this.vertexUniform.collisionX -= (1 - Math.abs(this.vertexUniform.collisionX)) * 0.03;
+                }
+                else {
+                    this.vertexUniform.collisionX -= (1 - Math.abs(this.vertexUniform.collisionX)) * 0.2;
+                }
+            }
+            this.vertexUniform.time += 0.01;
         };
         grass.objectName = "grass";
         return grass;
     }(objectBase));
 
-    var scene_home_Forest1 = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALnVQBsSAacaeJNLbATUOLMslgRQxwHUBLTABcAFs1IUqHWt2wAJGHwDmwwWNYgARhDABrRXDqYAwshLI4hEAGIYADjt2QlEhACe8ACIRBEQgG1QWB8AeQ0AKxgwQWwASXQAGTd4f1A+dAAHVEEAZUE4NMVLJxBBPhIYNQk+bBMoDTTvPmR0YIAzABUymGxCVogSbBhKATbcxrBO8tr69EbmouHsAAUIOEE26YbS+YI+gaGQAA9CAEYTgCZKV0IAZlsAFkpZ2EsNM10ANnvDm-OQAF9yKkMllcvl0IUCCBiqVypVFptZtsWh0uj1dv1BsNMKMfKUJl1EXN0AsQNUVmsNsg6lsmiSMftKMcCCcAOwfK63B5Paivd46L4-P6A4GZHJ5Aqk2EVIjiBHUmbEtqTbq9TEHEatMb4lVE5Gk8mrdatPV0tWMo6Ec73AAMnIId0eIGeMs0-MFvwBQLJIPF4Mh0Mo0vhZJqCtpzWVaPNWLJOK1eL4BKm4aRZqhxUNlJNqeJMYOzJuNqd1wd3OdvKhb2Qn2+npFPrFYMlGaDXRD1VNkdR5XRe1jmu1Sd1uf1rdDFONXfp-YLhHutntjp5Lyr7rrwu9aSbEohUvbsvUndHdKjvfz2Nx4xHNLTO0DE6NVNveYZseZAFoThyQKXlxXVzdGsBQ3L1RVBXcAxhA8WCqMMX2RM9VTfDV4yHZMYGnA1lifHMEPTWcmUID9bDtX8uSdF0+WAj1N3Av0WwfYNDzg6ckL7dVLwTa9CRPe9Mxw7MsJQoiCC-C4lxuH8qLXYDfkOL4wMbCD-X3OEWPlfDuxVDiLUHRMMOEh8synPiZ04y0xLOS5yIIc4AFZpMrIDdHkxSG23FTGOg9TYM0xVEJ7ZDCLjK8dV4rT6WMwTTMii9LPEmzS3OVkbJklydDc+4lM8hi93HZi-NDNigt0gc0IMm8AvTaLJ2faqdhCz9rPtFK0uc6tXPOBTso831m3ypiYLlYqzPY+L9J4lM4vHEz6ojcyLWaiTbLaldXU6zLuvcrd+sgtSZSK49IvGkTQu48LpoaqKBLqvDrvi5akqtVL1uorqepyvbVIK4aj3g67TpCybLswszsLu4SmuIlrVtegCNv5LKvp3H6ht8kbjsB0qJoqqawZm2rcKhiynta+H0s25G+tR7y2wx-6Sp03GwuHCKHtmmL5rvRb3xhlbkopjqke23rdtpwafMOzGAYWoGLJBtmroWiHifBs6ybh9rAKp0WUa8yX6elxmxpxs7FcM9WiaE9XoasgWXu1xG5L1mmDago2O1lnn5b0vHQaM261Zmu3EvJp33q2z63byj2Sj+1jTeZ83-aVgmOet2KOdD2HBYj2SPp2+iBrjwqZaZ6MU9Zy3CaDm2Q9J-nnrsoWdZF6Pxfdg6vYr88q4utPA8WSHbcb+3m7WhHI+pzvY+7jTRpOs3gdTmuM7rrOVY1pvw7eguo6L5S59+hnE6X5OV+rqqt8z7nXxzh2WQATnzjKZ+L-aT+Ns-sYvhXV+vjzVW9ds5jzDrZC4i4p773fkfEu88jreyVMvf+V92Y3w3nfMcdspJQL-OWSm64hT62Pujb+-k5YoL9mg5WQDOYjwbktecvxJJOTbi7DuH80ZSx7knSul8B5rwwcPYOoCmEEHuCwrWe836u1nvAr+vDz78NQYIwBr5b73S3nbSRE9W7O0LmLLhdN46nwoT7Kh5UaHp2EY+EB2ix66NajaKBhCOGH1ygoshSjf4qOoWo9BdDNEk3EU41aLiZG604XAz+3iF5Y0oX-fx6F1FjmCaPUJUjSwnHuJRYW7ijExO4Z7eJSDApJKsQE2hGjMFaLoTorJhBSKRPbh476Jiy4m2UX3ARKTAk1JEfY+pYDc6ECfmwgxIFiExy8Tw0pvdgqqL6dUtJtSQl83HvacZLSaKgRmbEuZiCFllVQtYoedjN7DPER+BcWyJmR1oiQ2ZJSjl8J6Usyq-TVmDMuffMe347k7NrNM+RByXnlzeYs5JnyVk1TWRkjZzTbLbOgRlR5+zimmPIYvXx7zoX43OXNOpfzxFItLCitxwL6ygsxZ0n+iS-GVOWTYoJ8LGEbJySWMZ9z97oppR0hO5jkEVNOVUllAyLlYIIv83JgLUWbT5cYw2WKfEMrxUymF4rvmSuJdgmVXKCAUvyVSuiRSBVmJxWqqFGqCVWzZWIjlsrkU8rRXs-lyq6VCvKYy0VzLCVc11dK8RnK5WUqmdSpVpdBWWosSKrifq7U-KlY1fVobjXhtNZ4sFKr5mQpOfGzV-qGEOrnCyD4ZFyUuoVW6yNCCIXdOtb6wtiadXrNLd+Ct3KgUZqedmz1MbhU+oLba2uSbA0puDeWtN7CTW9tpdGhJsah3nQTaO1tCL21Tudd2xVZqPULrKaeSxTaR3rzHW20SHbp2TN3Vm+dFrF2DvVSegOLaiUXssmyH8lad01r3VGh9h7tLLotqkuF56N2XvZNeh5f673muxY+71z7h2vrXe+yDn7oPbvlUQiN-661dNxY21Dg830Bo-cyE4L8YO8rg+0-dgHjkszFUW0RDjg00Zw2G29DGAOIaAyiONK7m3oYo5hqjXGf24d2SC2tijc0NvzSJ09tiMPsvbVJrtMnZ0YoQ6qpdKGVNobPeujTolzgRO4+m3jEt+MGafSR4zZGxPFo4xsyzeDtM8fo3Zwj9LDNOdA188DZmS0Was9JnzcmCMKdeUpljq7TPqfC5ZTztHXUxfg4xgTzH+5JbU+J8zaXIveZs75rucX63EeU8F2F-EIPFeZOca0GXq1Zb4-5r1R7hN1a1aFlL7nS0tYNUamdPa9M5Yc8hoLACQsNbC0NizrXrPjds5VuJ8WauJdE8lorqXmsrai+VjrfmqtEatbVub9WbqNYO1aI7ZW1sVdIYc6rl2duqdZXdpbaXbRtbw5mzr52AuOau2c8jbmrkef+6tm9L3nk5q2x9-Lu3CtQ5JTDzthqq2A7nfpxT23UdfYlYN6Hw3YfHee6djbb2LuBfB6xyH7HycWcp09+HNPXvgvp2Dz7Jn0cs8xxT7HY3Of4ey-ZwnKPelo++4t1naXHIA9kxL4Hm33sM-5y5vbGO9XiIct+jnsGueI-7UhnrIHrv9YW2T4XFnldw5N2rs7GveczcZwV+Xdv9cecd1T8XQPXd09Bx77XQjvf7d+81-3xu6Om77QevLsuSfap90Gv3Ruce-oT-e3Lebw9gdt1HxXzX4YB+d0H2nPPQ+W6M31tjQz7dpfL3HzLLvq9I813z4nAvI964z8N1v2edMTfdVL5HWve868F0333Q-m5i8r-jqb0up8p776Tkvzey+L9x6rqv3Ou-u7r7NiHrmhfz4s8Ppf8eO9H-N4J32NrN9p+31ftLtgvMj+i-fs3SeC9p8I8t8B8J0PMv8VddNx8usB0w8gCi9bsFcd8rQICnc79D9-8mNACN8Z9+9L9B8LNUCK90CV8J9u84CcDgC39QDeZhsiC292s-9E8sCEt4D5tED08wC6Dv9b928MDmD89WDKCEDgFfkP9mt6Cf8TsmC89ptT9Pc5cQD8CuDCCeD98oD5M3da9gN69rdG8xCCDP81Cc8ZCCdJ8e9hD2DRDk1aDVDICx9NCQ9usdCz8mcL859DCJDjDR91sH8AChCPlU8Bt39PDbhix7DfDMDBCidLCbtrDx1bDLIixRt1CHDYstDnChMrdz9ddlDEjCxwi0C+DSCYCLcXCFCgji8aDHowiUiTD+DZC18LDAjX9gjqjt4HRCjiDijJsyCT9yjC8rD6E8iajOi6ifCEcBC5CBi2C4jhiPCVCkiuiGC8dejSin9j1SMqC2iRiOjkiIjJjGjzCKCWjcClCFj8jaiDjc8zDyD5DBi5j0kmsriijGCGjbj+isjdCcjZ8DDFiCjxjf93jV9jj7jZibcOCQj-iXjui3iSiQdMjn8X0zjqDdicFlipDqdTCQS7iZjYiIT4jKMYSViD94SMjYCwT8T9CbDRj9jXjVjoCESKS8TTjtiqi0Sx46TYSGTHCa9ETNjnM2TIT2j0TATpDgS+jtCvjXCvdzi-jLixjrjsTJT+Tes9DmcLjaSMTeC4S1imSyjpSKjWj2TNS9jtTUjIipimiTj8VjThSOTxEuSSSND0inDmTDSHiCT5j5StSxSsSJT1jk9WSRDvSaS9iPhvCgSyS3SDSkStiQynj7sy1scbh7JX50gXB3ALA9SQBgAAAdEoZAAsggAAAgLOwDABgHQBgAAH1hBqQYACzyAyyQBWgDAoBiyWyKyqzaz6zYAayAAxcwboQQE4JslsvoMAAoTsgs8oVoQQAs-4GMjYtUn4vA00nRG0FMtMmRAwakIwYQCACEZIf4AAXUoGEAEEwCrPikGEEFKAhHRFzPLLAAMDIGyHSBgBgEwFwE7JOGbJfLfJIA-K-MwAYD-KXOcCSDgAADlnJEgsySyThigAAvOIa85kG0M8-4IAA";
+    var textPrompt = /** @class */ (function (_super) {
+        __extends(textPrompt, _super);
+        function textPrompt(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, textPrompt.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.text = "[SPACE]";
+            _super.prototype.setCollision.call(_this, 0, 32, 64, 64);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x003eff);
+                newGraphics.drawRect(0, 32, 64, 64);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                var text = new PIXI.Text('[SPACE]', { fontFamily: 'Arial', fontSize: 24, fill: 0xff1010, align: 'center' });
+                g.addChild(text);
+                g.calculateBounds();
+                return g;
+            });
+            return _this;
+        }
+        textPrompt.prototype.logic = function (l) {
+            l.getInteractionObject().openText(this.text);
+        };
+        textPrompt.objectName = "textPrompt";
+        return textPrompt;
+    }(objectBase));
 
-    var scene_home = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALnVQBsSAacaeJNLbATUOLMslgRQxwHUBLTABcAFs1IUqHWt2wAJGHwDmwwWNYgARhDABrRXDqYAwshLI4hEAGIYADjt2QlEhACe8ACIRBEQgG1QWB8AeQ0AKxgwQWwASXQAGTd4f1A+dAAHVEEAZUE4NMVLJxBBPhIYNQk+bBMoDTTvPmR0YIAzABUymGxCVogSbBhKATbcxrBO8tr69EbmouHsAAUIOEE26YbS+YI+gaGQAA9CAGYTgDZKV1Pz20pZ2Et0l3cLAF9yVIys3Pz0QoIIGKpXKlUWm1m2xaHS6PV2-UGw0wox8pQmXQhc3QCxA1RWaw2yDqWya2Ph+0oxwIACYAKyXEDXAgAFgADKz7tRLBozLpzszDidqSAPl9Mjk8gUcSCKkRxOCiTMsW1Jt1egiDiNWmM0arMVCcXjVutWvrSeqKUdTtSOYzCGzbQ9ZZpeTp+YLhaLcd8JX8AUDKDKwbiaoqSc0VbCLYjccjtai+OipmHIebAcUjQTTSmsdGDlSTrZmVd7ezOY9ATzkHyBUKRZ9veLflL04GusHqmaIzDynC9jGtTrE3qcwbWyH8Sau2T+-n7cy7naWWWQE7ua73XWvWkm5L-tL23L1J3R6TI7280iUeMR8TUzsAxPjYS77nyTGqQBGACc1JLy8dLlKw3WtPQbHcfj3f1gUPFgqlDV8oXPNV301OMhyTGBp0NZZn2zRC01nSlCE-alFyZB1y2dKsaw9esxUgv0D1BI94OnZC+w1K94xvDFTwfDNcKzbDUOIghaVI-9KNXICXWrN1QPoxtGJbR8g1YhUCO7VVOMtQcE0wkTH0zKd+JnLirXEgB2BkmQuRc10BMBTBIapSWyMx0hgeIYFaVRtx9Zt93HdS4M0pUkJ7FCiNja9dT4rSyWMoTTMSy9LP5W07KLKj13kzcwIY31VJgliwpDdiot0gd0IM28IrTZLJxfBqdhiqkrNZYsl0LbrHLk2it3AwKoOY2VypPRKOPS-TeOTNLxxMlrw3My0Oq6-9ety4D8sUgLdyYkLYPlCqzOm0TYp4+L5tapLBOa-DbvSjrbk2nKZIrAaFLo-aVOCtTjuPBDbvOmLZuurCzJwh6RPawhbCFTbXo+51nLINzmg85AvIAJSUFQlIg4r-tK8aTsmkGqpm2q5shhamrw2GLKpWxv1s0tAM+mjvqGoqgugtsyvJ4GVtBizweHBKnsWlLlvvVaP0INmso57avoKwmRsOgGhaByqdOpuLJZulbocZqGLq-VlqW6iiV367mNd+4mBZKQG2LOqmLolwyLYZ4SLbhghP1ZWxyNVlG8sGwrlJdsaOxF+Wxb0mmIaM+7zYWoPP0-Wk-yXaSHZAn7hoOkrBbJvXPYN73U+Nunpf91Lpez6lP3ZgC1cdvbS7+13QuF-Wo1ro3ffpjOA6z5nCH5KT7dk7uS750ajt1j2pq9sG67HxuJ+b03LcIFXO8jnbo81suSYrhOh4vEervr9PFhhwPp4IABaWeC-nrni952P+bxw0qdDeNct6j3qgfJucs3xB3fmzTaecu6uiFIcfkF8+5AImonZUm9xbb0gfLM2k8W5v3gR3MiDkF4oOpGg5kGC46r0ruvSmYD8EQKllAveMCxxwIQUuakNtkHyVQeg52gCmE32rsPcBD8d5cOfpnUha1CDkP-O3Tm1EaF0IYRInWzDwqizwSnDhJsiEyxflPFRwcyLHxOEg0+X1RH0PESvfRUjQEyPYXIwhb5oGPQPq3Wwx9KHCN0M43RbjSYeNYV4kxPjOHmP8UzaxpFgn-kEX1ahIjaFiN7ow9xwCKZGLYfEjCvixzJNfqk2xGShGOO5hE1x2tolFJwZFUpNVTENwUU+EhgS35pOPhosJOgmn5L0a07Bt9orePKYkvx3CAnmKCcffhRcck6OaeXN2a9DFJ2MV0hJZjFmKP6SswZtSer5w2eE3JLiJlROvm0mZ1U0LdKfn0-eFyant02jc7J59tlX12QYkBsS76yPmScypSyUmK2DrnfOdkAW-12kvABTzQUxJKXEo50KelJLhdUhFIcw7-NGU7R5LTnnTOkZCuZdUFmwrOd82BZD+FMnWYCsZ9zIk0uxS8+lsyylMphY1YlViEVqOuaM8Zy8BUDyrp4hloraafKWss9l1jP622tJSnuCqdlKpYbi1V+KxWEtOV8nhhEyFfxRQajFRNJm0sHsKt53ECUatllq3hb87Goq0ei-+LqsUmv2bgzp7zjlWpZTav1drrEOv1Q0v+Mcw2KvdpGjpeKY3er9pK5RCKhTH2ZAuUZ-LjXZvBWakVFr1WFtZbatqb97HIvnFQtFugq3-WAAAHRKMgQdBAAAEg7sBgBgOgGAAB9YQRI50ADFzDdEEJ+Qd5Bx0gFaAYKAI7t2TunXOhdsBN3br6GAAoB7B35GUIIQdbwpnupVfW-NlqfWWOLXOD+KaCD2TVgYIkRhhAQH+MkN4ABdSgwgBCYGnelQYghSj-DhCAAdIBJ0GDINkLyMBMC4APZ+LdE6wDYZILhmA+GGBEafc4JIcAAByslEivFHZ+YoAAvOI8GqSsig28IAA";
+    var scene_home = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALgFoAOAJgAYAacaeJNLbATUKLIEYLrbYEUMOAOoBLTABcAFoQDsMyjUh8Gg7AAkYIgOaTxhMgDYArDwBGEMAGstcRpgDCyADbI4hEAGIYJb95A0nCABPeAARCHEIQgBtUFhIgHlTACsYMHFsAEl0ABlg+BjQcREnGEJ0VCcnGhFsRyhTEXQIkWR0BIAzABUSmGxCDognbBgazE6AZUjisB7S+sbm4rb3fxBagAUIOHFOhaaWlYJB4dGQcSCABzKCHibL1HEpuCatVZotGGQoDeQmjJiAF0aFBathXpkoBBPoRgABfGgAD0IHHkJBoQTYZCMBhozVg7mwliCiAs1lsghAcOBIE+3xg4hefWyeRCbgI0RpkjEmBg6AGQxGNBG4mK6C0-QIIGAAB0QNgwLYqhNrjBMLg5QQAAQcKhauUKpVOFUwNXMTU6uFrQJsgBydHc5isNjsawAXtlecjbgi4gyIElUuksrl8uzYudeuVKtV1nVvotDu1ur1JSchetxh0pi1Zr19ktWvypWtNttdh0C0mBacaBdroQ7ugHk9Ga93rSvj8-ugARyaaDsODxZDoTd4Uj9BwAJxkDFsDhkdEgfE3ECXG0FX2R0rRqo1eMNA7LZNzPo1jNiSbTER5+YJ49FjtlnZ7B+Fo7ps71m5NlvPdsSw+Ltfn+SVORBMEIShGECAnEBvQ4cgABZ5wIZDl1XdwxRJFwrAAZjIKkqCKKMCAqfc4yrE9OjPNNBTOK9sxvO8YGop8gLjLZX0rd9q2OBi6yuX8ambR4APFDs6W7MCgUgodoLHWEEQQwgDBIbg0KIGc5xXB0pRwxA8MsQjiNI3dyJjA92LaWjUwvRisxzGYzxs4sQFLbBuIrNyHKEhtblE-820kzjpNA3twIHKCRxg8cVO9Mh8JIVCQExdDMP0844FNABxPkqRpaSGSZENWQKDlQG9UgMLQoxZ2A75RAkaQCBIHTGpkyKYg4AwOHwqgOHq1ChunXFRo4AA6acxuGmaTGQ-CBqGmQDEmih8IMZDjGxAwyAwkaDAoGRppxeRkJkJaSGSw6KGQybkK4CgyFnTbCJIIxBqMchJqMMgZCG-DFyMIwOF1QGjEm8hQenGdpxMPbwaMfCTpnEg5GnCh0f65C5yG5Dp1+vqKD22GjBkchlpxKbXvw7aZGQxn8IoT7epZqGKf6zbMcuv6vpm9auDRpKNpkPmhr+ybmcpmQKBm2ctq+vrpqSumDAZpmWa+5LfvkTa+pkWcSaplHJrRjGsYBum8dByGyE4ZLqfw6dyEGi61tWuWLo2+rjGW7b8PW7Fjr6ob9vF5Dnt+9H9sjraQ7x53CZS7gDBdw3p0I-2o8WjbuGR56DCBwbNtRo65d6gnnfG5LCcWo7+ruinkuWlG1sZ1FsRxIxHpRkucSDh25ZMVECZL-DIaO7E3rpzOa4w36xsp9rLr6kv+qlww+qrrbM-RfqN8Igxt7nqv98IqakMNzm7tmxOl2m+H4ZRpb5HkdfA+S7hnvdyhNsGl6kN2qUHJkDDgGEXYAI0mbMaXAjrIzGuNYO01eozg1qHABUcwZFwJqtHB05MEUDNltCe316pDRIONVERCSApUZvIUGzN7aDXAYHEGfsu7GzXlwMak1ZaUIpnIDSxhxrHUDkuC6oMSCwwpiTQaJNIbuzkHtIuFAkL7w2vdWO6MUYXWnO-IWJBJp7WkfbAmd0MKs24FNEmcs5CEVAZ9MaZAg48Nhu1BWqFpwLwngDR611Rp0yoJjRR-V-rfUupHZ2wShpm0uuHSOmccRUHRvdJC-VLoT2uuTFJzt1rIR7tdZ6piGoeL4XTFeM0lxITnHIe65NZGzjJouVCq0bHM1lsfdqi5jpUDFmtW2+d2py0xrqBmRCAb53+sYZGxdV4wMWlI+GkdsR9NiTotO18XZDSoOpIxGMCbhMxkDGQuzlbqT+ujZGKF2pnKmhcpcYtkr7VucfNalA5a0MjtdCmuItpTU2gHTa9tj53V2cdB6S85Byy6WDKg5MjHgIwpwRmWNCKoWRidYZ-U-qr0NvC+2m9HqeJwZ9cx61aHGHoe9RWBMAV-Q6c7Xqcg5y4N+ttdSjNcbEwZlQDCRiu5g0pYjDafLaGTUFeo4+nBRX8olSDIVlCRUDTZT3LpXLDBcF5XKyVwqZUqvFbqpV+qxUCoVVK5VfLYZSwZWI2G6t346vNXqrgBqzWgwtSa1VHK6Hcq1ahOlNqRaXXtSyq19Lg1Moday7xD0CYE3IX4x2Vr7qM28U-VErCPqmvlR6l1srrUT0jaGx1H0zbk0zpo469cDUuNsQzdJuL1YYo2nwx6JNwFJKZgSxRDtukA26eiTFUMhZFrxQQ5G90AYvXpsixcuo-ouPRTpLapL4XcGMYtGOS9jqrRVRTaaRcQbvW2Wovlx9dZ6PcYbRaYq61HQbe1Jt2rKF3vWg+-xYdVravhm++tn7n0Btfci991bG3TJfbqED-7wPfqA1Bn6MGn0QaAwag1CGMN8opmKqD2GLronw1hgjq0iNYdxBdANeGSOEfdqRmjVHiOMbI3R6jeHXZ6KwwQi6pyOO8duRhXDPH8Xcc46JvjuGuPCbFlhslUmhNCck4psTwn+PXStQNEwc5QZaYUMjT6PcNNHXhYrb61B6qfSOgQvq6ITG7LHsYKz6ldnYbTtQPZuyUoeb+TNNZYzOB9MIn0xmfTkZ9PVn06TFNWkNUNrU7xfTX2G2oLjVmXTynJTkBTV6DVerqXS+jIR2W8ZpcyQVrLSUcslaupl0xztit5dKzVorg0qsZcKxV+r+zqvtbqy1hr3Xyu9b40YQE1IaDckwLyYsX5hQMjFBKdwsp5SKmcMaVU6oLS6n1Mto0JozSbatAEMM9oCRSnKnAHU7pPQwEQtueIAYUhpAyCyMMclOz0jbMyUMbI3sTam35eUc3XiSmlAaFbyp1sakIDqPUYPdvrfNNDjgh2QCbjgCdtcNgIBDiu1gG7+hqRwiAA";
 
     var roomIndex = {
-        "scene_home_Forest1": scene_home_Forest1, "scene_home": scene_home,
+        "scene_home": scene_home,
     };
 
     var roomChanger = /** @class */ (function (_super) {
@@ -2681,8 +3242,179 @@
         return roomChanger;
     }(objectBase));
 
-=======
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
+    var skyBackground = /** @class */ (function (_super) {
+        __extends(skyBackground, _super);
+        function skyBackground(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, skyBackground.objectName) || this;
+            _this.skyFilter = "\n    precision lowp float;\n    varying vec2 vTextureCoord;\n\n    const vec2 star = vec2(0.5, 0.5);\n\n    uniform int timeOfDay;\n    uniform float starBrightness;\n\n    float randFromVec(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    void main(void)\n    {\n\n        //Dawn 07:17  -  0\n        vec3 dawnColor1 = vec3(0.36784,0.33843,0.5545);\n        vec3 dawnColor2 = vec3(0.78117,0.592,0.5447);\n\n\n        //Sunrise 08:04  -  1\n        vec3 sunriseColor1 = vec3(0.4219,0.6047,0.8945);\n        vec3 sunriseColor2 = vec3(0.8649,0.86392,0.54235);\n\n        //Morning 10:00  -  2\n        vec3 morningColor1 = vec3(0.45019,0.6929,0.97804);\n        vec3 morningColor2 = vec3(0.6494,0.82745,0.98745);\n\n        //Afternoon 14:00  -  3\n        vec3 afternoonColor1 = vec3(0.3145,0.563529,0.8643);\n        vec3 afternoonColor2 = vec3(0.56588,0.770196,0.92941);\n\n        //Sunset 17:00  -  4\n        vec3 sunsetColor1 = vec3(0.5309,0.378,0.53098);\n        vec3 sunsetColor2 = vec3(0.92588,0.66549,0.238039);\n\n        //Dusk 17:54  -  5\n        vec3 duskColor1 = vec3(0.2549,0.29568,0.5545);\n        vec3 duskColor2 = vec3(0.8827,0.5494,0.2988);\n\n        //Night 19:00  -  6\n        vec3 nightColor1 = vec3(0.0023137,0.061568,0.138823);\n        vec3 nightColor2 = vec3(0.14667,0.28783,0.4847);\n\n\n        float nightSkyHeight = 0.5;\n        vec3 color = mix(dawnColor1,dawnColor2, vTextureCoord.y);\n\n        if(timeOfDay == 1){\n            color = mix(sunriseColor1,sunriseColor2, vTextureCoord.y);\n        }else if(timeOfDay == 2){\n            color = mix(morningColor1,morningColor2, vTextureCoord.y);\n        }else if(timeOfDay == 3){\n            color = mix(afternoonColor1,afternoonColor2, vTextureCoord.y);\n        }else if(timeOfDay == 4){\n            color = mix(sunsetColor1,sunsetColor2, vTextureCoord.y);\n        }else if(timeOfDay == 5){\n            color = mix(duskColor1,duskColor2, vTextureCoord.y);\n        }else if(timeOfDay == 6){\n            color = mix(nightColor1,nightColor2, vTextureCoord.y);\n        }\n\n        float randNum = randFromVec(vTextureCoord);\n\n        if(vTextureCoord.y < 0.5){\n            float closeToTopOfStarPart = (vTextureCoord.y/0.5) * 1.4;\n            if(randNum < 0.001 * starBrightness){\n                gl_FragColor = mix(vec4(1.0, 1.0, 1.0, 1.0), vec4(color,1.0), closeToTopOfStarPart);\n            }else{\n                gl_FragColor = vec4(color,1.0);\n            }\n        }else{\n            gl_FragColor = vec4(color,1.0);\n        }\n        \n        \n    }";
+            _this.skyUniform = {
+                'timeOfDay': 0,
+                'starBrightness': 1
+            };
+            _this.timeOfDay = 2;
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000, 1); // use an alpha value of 1 to make it visible
+                newGraphics.drawRect(-1280, -360, 1280 * 2, 720);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.cacheAsBitmap = true;
+                return g;
+            });
+            return _this;
+        }
+        skyBackground.prototype.init = function (roomEvents) {
+            this.skyUniform.timeOfDay = this.timeOfDay;
+            if (this.timeOfDay == 0) { //dawn
+                this.skyUniform.starBrightness = 0.5;
+            }
+            else if (this.timeOfDay == 1) { //Sunrise
+                this.skyUniform.starBrightness = 0.4;
+            }
+            else if (this.timeOfDay == 2) { //Morning
+                this.skyUniform.starBrightness = 0.1;
+            }
+            else if (this.timeOfDay == 3) { //afternoon
+                this.skyUniform.starBrightness = 0.1;
+            }
+            else if (this.timeOfDay == 4) { //Sunset
+                this.skyUniform.starBrightness = 0.2;
+            }
+            else if (this.timeOfDay == 5) { //Dusk
+                this.skyUniform.starBrightness = 0.4;
+            }
+            else if (this.timeOfDay == 6) { //night
+                this.skyUniform.starBrightness = 1.0;
+            }
+            var filterSky = new PIXI.Filter(undefined, this.skyFilter, this.skyUniform);
+            filterSky.autoFit = false;
+            this.g.filters = [filterSky];
+            this.g.cacheAsBitmap = true;
+            roomEvents.getRenderer().render(this.g);
+            this.g.filters = [];
+            if (this.timeOfDay == 0) { //dawn
+                //vec3(0.36784,0.33843,0.5545);
+                //vec3(0.78117,0.592,0.5447);
+                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
+                        red: 0.57,
+                        green: 0.48,
+                        blue: 0.545,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 1) { //Sunrise
+                /*vec3 sunriseColor1 = vec3(0.4219,0.6047,0.8945);
+                vec3 sunriseColor2 = vec3(0.8649,0.86392,0.54235);*/
+                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
+                        red: 0.64,
+                        green: 0.72,
+                        blue: 0.714,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 2) { //Morning
+                //vec3 morningColor1 = vec3(0.45019,0.6929,0.97804);
+                //vec3 morningColor2 = vec3(0.6494,0.82745,0.98745);
+                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
+                        red: 0.645,
+                        green: 0.855,
+                        blue: 0.995,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 3) { //afternoon
+                //vec3 afternoonColor1 = vec3(0.3145,0.563529,0.8643);
+                //vec3 afternoonColor2 = vec3(0.56588,0.770196,0.92941);
+                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
+                        red: 0.535,
+                        green: 0.765,
+                        blue: 0.99,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 4) { //Sunset
+                //vec3 sunsetColor1 = vec3(0.5309,0.378,0.53098);
+                //vec3 sunsetColor2 = vec3(0.92588,0.66549,0.238039);
+                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
+                        red: 0.725,
+                        green: 0.515,
+                        blue: 0.38,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 5) { //Dusk
+                //vec3 duskColor1 = vec3(0.2549,0.29568,0.5545);
+                //vec3 duskColor2 = vec3(0.8827,0.5494,0.2988);
+                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
+                        red: 0.5688,
+                        green: 0.415,
+                        blue: 0.4244,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 6) {
+                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
+                        red: 0.25,
+                        green: 0.25,
+                        blue: 1.25,
+                        contrast: 1.2,
+                        brightness: 1.2,
+                    })]);
+            }
+        };
+        skyBackground.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            var panPercentage = (l.getCameraX() - l.getCameraBounds()[0]) / l.getCameraBounds()[2];
+            this.g.x = l.getCameraX() - (640 * panPercentage);
+            this.g.y = l.getCameraY();
+            //console.log("panPercentage: ",panPercentage);
+        };
+        skyBackground.objectName = "skyBackground";
+        return skyBackground;
+    }(objectBase));
+
+    var treeGen = /** @class */ (function (_super) {
+        __extends(treeGen, _super);
+        function treeGen(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, treeGen.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _this.myShaderFrag = "\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n    const float treeSeed = 0.0;\n\n    uniform float aspectRatio;\n\n\n    float distSquared(vec2 A, vec2 B){\n        vec2 C = (A - B) * vec2(aspectRatio, 1.0);\n        return dot( C, C );\n    }\n\n    float rand(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    float det(vec2 a, vec2 b) { return a.x*b.y-b.x*a.y; }\n\n    vec2 closestPointInSegment( vec2 a, vec2 b )\n    {\n        vec2 ba = b - a;\n        return a + ba*clamp( -dot(a,ba)/dot(ba,ba), 0.0, 1.0 );\n    }\n\n    float getBezierT(vec2 b0, vec2 b1, vec2 b2) {\n            \n        float a=det(b0,b2), b=2.0*det(b1,b0), d=2.0*det(b2,b1); // \uD835\uDEFC,\uD835\uDEFD,\uD835\uDEFF(\uD835\uDC5D)\n        \n        //if( abs(2.0*a+b+d) < 1000.0 ) return closestPointInSegment(b0,b2);\n            \n        float f=b*d-a*a; // \uD835\uDC53(\uD835\uDC5D)\n        vec2 d21=b2-b1, d10=b1-b0, d20=b2-b0;\n        vec2 gf=2.0*(b*d21+d*d10+a*d20);\n        gf=vec2(gf.y,-gf.x); // \u2207\uD835\uDC53(\uD835\uDC5D)\n        vec2 pp=-f*gf/dot(gf,gf); // \uD835\uDC5D\u2032\n        vec2 d0p=b0-pp; // \uD835\uDC5D\u2032 to origin\n        float ap=det(d0p,d20), bp=2.0*det(d10,d0p); // \uD835\uDEFC,\uD835\uDEFD(\uD835\uDC5D\u2032)\n        // (note that 2*ap+bp+dp=2*a+b+d=4*area(b0,b1,b2))\n        float t=clamp((ap+bp)/(2.0*a+b+d), 0.0 ,1.0);\n\n        return t;\n    }\n\n\n    vec4 treeTrunk(float trunkLean, float trunkCenter){\n        vec4 trunkColor = vec4(0.06117, 0.227, 0.1949, 1.0);\n        \n        float trunkThickness = clamp(rand(vec2(treeSeed, treeSeed)), 0.1, 0.4);\n        \n\n        float leftTrunkFootWidth = clamp(rand(vec2(treeSeed+0.2, treeSeed+0.2)),0.1, 0.3);\n        float leftTrunkFootHeight = clamp(rand(vec2(treeSeed+0.25, treeSeed+0.25)),0.1, 0.2);\n\n        float rightTrunkFootWidth = clamp(rand(vec2(treeSeed+0.69, treeSeed+0.69)),0.1, 0.3);\n        float rightTrunkFootHeight = clamp(rand(vec2(treeSeed+0.5, treeSeed-0.5)),0.1, 0.2);\n\n        float height = rand(vec2(treeSeed+0.3, treeSeed+0.3));\n\n        trunkThickness = trunkThickness * (vTextureCoord.y);\n\n        float leanFix = trunkLean * (1.0 - vTextureCoord.y);\n\n        if(vTextureCoord.x > trunkCenter - trunkThickness + leanFix && vTextureCoord.x < trunkCenter + trunkThickness + leanFix\n            && vTextureCoord.y > 0.15){\n            return trunkColor;\n        }\n\n        float removeFooterEnd = 0.18;\n\n        //Left side trunk foot\n        float leftFootXStart = trunkCenter - trunkThickness - leftTrunkFootWidth;\n        float xInLeftFootPercentage = 0.0;\n        if(vTextureCoord.x > leftFootXStart+removeFooterEnd && vTextureCoord.x < leftFootXStart+leftTrunkFootWidth){\n            xInLeftFootPercentage = (vTextureCoord.x - leftFootXStart)/leftTrunkFootWidth;\n            xInLeftFootPercentage = pow(xInLeftFootPercentage, 6.0);\n            if(vTextureCoord.y > 1.0-(xInLeftFootPercentage*leftTrunkFootHeight)){\n                return trunkColor;\n            }\n        }\n\n        //right side trunk foot\n        float rightFootXStart = trunkCenter + trunkThickness;\n        if(vTextureCoord.x > rightFootXStart && vTextureCoord.x < rightFootXStart+rightTrunkFootWidth-removeFooterEnd){\n            float xInFootPercentage = 1.0-(vTextureCoord.x - rightFootXStart)/rightTrunkFootWidth;\n            xInFootPercentage = pow(xInFootPercentage, 6.0);\n            if(vTextureCoord.y > 1.0-(xInFootPercentage*rightTrunkFootHeight)){\n                return trunkColor;\n            }\n        }\n\n        //Fill space between feet right\n        if(vTextureCoord.x >= trunkCenter\n            && vTextureCoord.x <= rightFootXStart\n            && vTextureCoord.y > (1.0-rightTrunkFootHeight)){\n                return trunkColor;\n        }\n        //Fill space between feet left\n        if(vTextureCoord.x <= trunkCenter\n            && vTextureCoord.x >= leftFootXStart+leftTrunkFootWidth\n            && vTextureCoord.y > (1.0-leftTrunkFootHeight)){\n                return trunkColor;\n        }\n\n\n\n        //branches\n        float numberOfBranches = 3.0;\n        /*float bezierT = getBezierT(grassBladePoint-textureCoordAspect.xy, \n            grassForcePoint-textureCoordAspect.xy, \n            grassBladeEndPoint-textureCoordAspect.xy);*/\n\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n    vec4 leaf(vec2 position){\n\n        if(distSquared(vTextureCoord.xy, position) < 0.001){\n            float grassBladeRandomVal = rand(position);\n            if(grassBladeRandomVal < 0.2){\n                return vec4(0.12, 0.42, 0.01568627, 1.0);\n            }else if(grassBladeRandomVal < 0.4){\n                return vec4(0.4196, 0.6078, 0.1176, 1.0);\n            }else if(grassBladeRandomVal < 0.6){\n                return vec4(0.5529, 0.749, 0.2235, 1.0);\n            }else if(grassBladeRandomVal < 0.8){\n                return vec4(0.448, 0.5509, 0.2019, 1.0);\n            }else if(grassBladeRandomVal <= 1.0){\n                return vec4(0.425, 0.6509, 0.1019, 1.0);\n            }\n        }\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n\n    vec4 generateLeavesGroup(vec2 leavGroupOrigin, float groupSize){\n        float angleOfShadow = 0.785398163; //45 degrees\n        \n\n\n        if(distSquared(vTextureCoord, leavGroupOrigin) < groupSize*groupSize){\n            float randNumb = rand(vTextureCoord);\n\n\n            float darkSpotStartX = leavGroupOrigin.x + cos(angleOfShadow) * (groupSize*groupSize)*2.0;\n            float darkSpotStartY = leavGroupOrigin.y + sin(angleOfShadow) * (groupSize*groupSize)*2.0;\n\n            vec2 darkSpot = vec2(darkSpotStartX, darkSpotStartY);\n            float percentageToDarkSpotCenter = distSquared(vTextureCoord, darkSpot)/(groupSize*groupSize);\n            if(randNumb < 0.10*percentageToDarkSpotCenter){\n                return vec4(0.00039215686, 0.06039215686, 0.06392, 1.0);\n            }\n\n            \n            float percentageToCenter = distSquared(vTextureCoord, leavGroupOrigin)/(groupSize*groupSize);\n            if(randNumb < 0.07*percentageToCenter){\n                return vec4(0.996078, 0.996078, 0.965882, 1.0);\n            }else if(randNumb < 0.2*percentageToCenter){\n                return vec4(0.39, 0.49725, 0.452549, 1.0);\n            }else if(randNumb < 0.3*percentageToCenter){\n                return vec4(0.06117, 0.227, 0.19, 1.0);\n            }\n            return vec4(0.00039215686, 0.06039215686, 0.06392, 1.0);\n        }\n        \n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n\n    \n\n\n    void main(void)\n    {\n\n        float trunkCenter = 0.5;\n        float trunkLean = (clamp(rand(vec2(treeSeed+2.1, treeSeed+1.53)), 0.0, 1.0) - 0.5)*0.25;\n        vec4 trunk = treeTrunk(trunkLean, trunkCenter);\n\n\n        if(trunk != vec4(0.0, 0.0, 0.0, 0.0)){\n            gl_FragColor = trunk;\n        }\n\n        float leavesGroupX = trunkLean * (1.0 - 0.13);\n        vec4 topLeaves = generateLeavesGroup(vec2(trunkCenter + leavesGroupX, 0.13), 0.2);\n        if(topLeaves != vec4(0.0, 0.0, 0.0, 0.0)){\n            gl_FragColor = topLeaves;\n        }\n\n\n    }\n    ";
+            _this.treeUniforms = {
+                aspectRatio: 1.0
+            };
+            //super.setCollision(0, 0, 256, 256);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, -512, 512, 512);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        treeGen.prototype.init = function (roomEvents) {
+            this.treeUniforms.aspectRatio = this.g.width / this.g.height;
+            var myFilter = new PIXI.Filter(undefined, this.myShaderFrag, this.treeUniforms);
+            this.g.filters = [myFilter];
+            this.g.cacheAsBitmap = true;
+            roomEvents.getRenderer().render(this.g);
+            this.g.filters = [];
+        };
+        treeGen.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        treeGen.objectName = "treeGen";
+        return treeGen;
+    }(objectBase));
+
     var tileMetaObj = /** @class */ (function (_super) {
         __extends(tileMetaObj, _super);
         function tileMetaObj(xp, yp) {
@@ -2735,13 +3467,9 @@
     var objectGenerator = /** @class */ (function () {
         function objectGenerator() {
             this.availibleObjects = [
-<<<<<<< HEAD
                 //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
-                function (xp, yp, input) { return new baseAttack(xp, yp, input); },
-                function (xp, yp, input) { return new threeHitNormal(xp, yp, input); },
                 function (xp, yp, input) { return new movingBlockHori(xp, yp, input); },
                 function (xp, yp, input) { return new movingBlockVert(xp, yp, input); },
-                function (xp, yp, input) { return new collisionPolygon(xp, yp, input); },
                 function (xp, yp, input) { return new collisionSlopeLeft(xp, yp, input); },
                 function (xp, yp, input) { return new collisionSlopeRight(xp, yp, input); },
                 function (xp, yp, input) { return new block(xp, yp, input); },
@@ -2749,18 +3477,15 @@
                 function (xp, yp, input) { return new block64x32(xp, yp, input); },
                 function (xp, yp, input) { return new tinyBlock32(xp, yp, input); },
                 function (xp, yp, input) { return new wideBlock(xp, yp, input); },
-                function (xp, yp, input) { return new grass(xp, yp, input); },
                 function (xp, yp, input) { return new dummySandbag(xp, yp, input); },
+                function (xp, yp, input) { return new grass(xp, yp, input); },
                 function (xp, yp, input) { return new ladder(xp, yp, input); },
                 function (xp, yp, input) { return new textPrompt(xp, yp, input); },
                 function (xp, yp, input) { return new roomChanger(xp, yp, input); },
+                function (xp, yp, input) { return new skyBackground(xp, yp, input); },
+                function (xp, yp, input) { return new treeGen(xp, yp, input); },
                 function (xp, yp, input) { return new mio(xp, yp, input); },
                 function (xp, yp, input) { return new player(xp, yp, input); },
-=======
-                //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populareObjectGenerator.js)
-                function (xp, yp) { return new block(xp, yp); },
-                function (xp, yp) { return new player(xp, yp); },
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
@@ -2784,7 +3509,6 @@
                     return newTile;
                 }
             }
-            console.log("Can't generate object for: " + objectName);
             throw new Error("Can't generate object for: " + objectName);
         };
         return objectGenerator;
@@ -2960,7 +3684,6 @@
         return fileSystemHandlerObjects;
     }());
 
-<<<<<<< HEAD
     var subTileMeta = /** @class */ (function () {
         function subTileMeta(resourceName, startX, startY, width, height) {
             this.tileName = "";
@@ -2969,17 +3692,6 @@
             this.startY = startY;
             this.width = width;
             this.height = height;
-=======
-    var layer = /** @class */ (function () {
-        function layer(layerName, zIndex) {
-            this.metaObjectsInLayer = [];
-            this.hidden = false;
-            this.scrollSpeedX = 1;
-            this.scrollSpeedY = 1;
-            this.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1, \"blur\": 0}";
-            this.layerName = layerName;
-            this.zIndex = zIndex;
->>>>>>> bc6e1b0e13dee7017578478d125ff488a2bd69ac
         }
         subTileMeta.prototype.clone = function () {
             return new subTileMeta(this.resourceName, this.startX, this.startY, this.width, this.height);
@@ -3654,63 +4366,66 @@
             var dataToInsertIntoFileSystem = [];
             var idCounter = 0;
             roomData.forEach(function (roomMeta) {
-                var roomSrc = roomMeta[0];
-                var roomData = roomMeta[1];
-                var roomDirParts = roomSrc.split("/");
-                var currentFolder = null;
-                roomDirParts.forEach(function (item) {
-                    if (item != "..") {
-                        var newEntry = void 0;
-                        if (item.indexOf(".ts") != -1) {
-                            //It's a file
-                            newEntry = new fileSystemEntry("file", item, [], idCounter, [roomSrc, roomData]);
-                            if (currentFolder == null) {
-                                dataToInsertIntoFileSystem.push(newEntry);
-                            }
-                            else {
-                                currentFolder.contains.push(newEntry);
-                            }
-                        }
-                        else {
-                            //It's a folder
-                            //Check if folder already exists
-                            var foundFolder = false;
-                            if (currentFolder == null) {
-                                for (var _i = 0, dataToInsertIntoFileSystem_1 = dataToInsertIntoFileSystem; _i < dataToInsertIntoFileSystem_1.length; _i++) {
-                                    var elem = dataToInsertIntoFileSystem_1[_i];
-                                    if (elem.type == "folder" && elem.name == item) {
-                                        currentFolder = elem;
-                                        foundFolder = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            else {
-                                for (var _a = 0, _b = currentFolder.contains; _a < _b.length; _a++) {
-                                    var elem = _b[_a];
-                                    if (elem.type == "folder" && elem.name == item) {
-                                        currentFolder = elem;
-                                        foundFolder = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (foundFolder == false) {
-                                newEntry = new fileSystemEntry("folder", item, [], idCounter, undefined);
-                                if (currentFolder == null) {
+                console.log("roomMeta: ", roomMeta);
+                if (roomMeta[0] != 'scenes/scene_index.ts') {
+                    var roomSrc_1 = roomMeta[0];
+                    var roomData_1 = roomMeta[1];
+                    var roomDirParts = roomSrc_1.split("/");
+                    var currentFolder_1 = null;
+                    roomDirParts.forEach(function (item) {
+                        if (item != "..") {
+                            var newEntry = void 0;
+                            if (item.indexOf(".ts") != -1) {
+                                //It's a file
+                                newEntry = new fileSystemEntry("file", item, [], idCounter, [roomSrc_1, roomData_1]);
+                                if (currentFolder_1 == null) {
                                     dataToInsertIntoFileSystem.push(newEntry);
                                 }
                                 else {
-                                    currentFolder.contains.push(newEntry);
+                                    currentFolder_1.contains.push(newEntry);
                                 }
-                                currentFolder = newEntry;
                             }
+                            else {
+                                //It's a folder
+                                //Check if folder already exists
+                                var foundFolder = false;
+                                if (currentFolder_1 == null) {
+                                    for (var _i = 0, dataToInsertIntoFileSystem_1 = dataToInsertIntoFileSystem; _i < dataToInsertIntoFileSystem_1.length; _i++) {
+                                        var elem = dataToInsertIntoFileSystem_1[_i];
+                                        if (elem.type == "folder" && elem.name == item) {
+                                            currentFolder_1 = elem;
+                                            foundFolder = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                else {
+                                    for (var _a = 0, _b = currentFolder_1.contains; _a < _b.length; _a++) {
+                                        var elem = _b[_a];
+                                        if (elem.type == "folder" && elem.name == item) {
+                                            currentFolder_1 = elem;
+                                            foundFolder = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (foundFolder == false) {
+                                    newEntry = new fileSystemEntry("folder", item, [], idCounter, undefined);
+                                    if (currentFolder_1 == null) {
+                                        dataToInsertIntoFileSystem.push(newEntry);
+                                    }
+                                    else {
+                                        currentFolder_1.contains.push(newEntry);
+                                    }
+                                    currentFolder_1 = newEntry;
+                                }
+                            }
+                            //let newFolderId = this.system.createFolder(item);
+                            //console.log(newFolderId);
+                            idCounter++;
                         }
-                        //let newFolderId = this.system.createFolder(item);
-                        //console.log(newFolderId);
-                        idCounter++;
-                    }
-                });
+                    });
+                }
             });
             this.system.insertData(JSON.stringify(dataToInsertIntoFileSystem));
         };
@@ -3748,26 +4463,10 @@
         return fileSystemHandlerRooms;
     }());
 
-    var objectMetaData = /** @class */ (function () {
-        function objectMetaData(x, y, name, tile) {
-            this.inputString = "";
-            this.tile = null;
-            this.isCombinationOfTiles = false;
-            this.idOfStaticTileCombination = "";
-            this.isPartOfCombination = false;
-            this.x = x;
-            this.y = y;
-            this.name = name;
-            if (tile != null) {
-                this.tile = tileAnimation.initFromJsonGeneratedObj(tile);
-            }
-        }
-        return objectMetaData;
-    }());
-
     var layer = /** @class */ (function () {
         function layer(layerName, zIndex) {
             this.metaObjectsInLayer = [];
+            this.geometriesInLayer = [];
             this.hidden = false;
             this.settings = "{\"scrollSpeedX\": 1, \"scrollSpeedY\": 1}";
             this.layerName = layerName;
@@ -3786,6 +4485,116 @@
             this.layerData = layerData;
         }
         return roomData;
+    }());
+
+    var objectTypes;
+    (function (objectTypes) {
+        objectTypes[objectTypes["userObject"] = 0] = "userObject";
+        objectTypes[objectTypes["geometry"] = 1] = "geometry";
+    })(objectTypes || (objectTypes = {}));
+
+    var userObject = /** @class */ (function () {
+        function userObject(x, y, name, tile) {
+            this.tile = null;
+            this.isCombinationOfTiles = false;
+            this.idOfStaticTileCombination = "";
+            this.isPartOfCombination = false;
+            this.type = objectTypes.userObject;
+            this.inputString = "";
+            this.geomPoints = [];
+            this.missingImage = new Image();
+            this.missingImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAZQTFRF/wDj////hdfaxwAAAA5JREFUeJxjCGVYxYCEAR6cA/1tfYfmAAAAAElFTkSuQmCC";
+            this.x = x;
+            this.y = y;
+            this.name = name;
+            if (tile != null) {
+                this.tile = tileAnimation.initFromJsonGeneratedObj(tile);
+            }
+        }
+        userObject.prototype.isMouseInside = function (mouseX, mouseY, layerHandler) {
+            var width = -1;
+            var height = -1;
+            if (this.tile != null) {
+                width = this.tile.get(0).width;
+                height = this.tile.get(0).height;
+            }
+            else {
+                if (fileSystemHandlerObjects.classAndImage[this.name] != null) {
+                    width = fileSystemHandlerObjects.classAndImage[this.name].width;
+                    height = fileSystemHandlerObjects.classAndImage[this.name].height;
+                }
+                else {
+                    width = 98;
+                    height = 98;
+                }
+            }
+            if (mouseX - layerHandler.gridXOffset >= this.x &&
+                mouseX - layerHandler.gridXOffset < this.x + width &&
+                mouseY - layerHandler.gridYOffset >= this.y &&
+                mouseY - layerHandler.gridYOffset < this.y + height) {
+                return true;
+            }
+            return false;
+        };
+        userObject.prototype.drawMouseOverSelection = function (mouseX, mouseY, layerHandler, context) {
+            if (this.isMouseInside(mouseX, mouseY, layerHandler)
+                && this.isCombinationOfTiles == false) {
+                var width = -1;
+                var height = -1;
+                if (this.tile != null) {
+                    width = this.tile.get(0).width;
+                    height = this.tile.get(0).height;
+                }
+                else {
+                    if (fileSystemHandlerObjects.classAndImage[this.name] != null) {
+                        width = fileSystemHandlerObjects.classAndImage[this.name].width;
+                        height = fileSystemHandlerObjects.classAndImage[this.name].height;
+                    }
+                    else {
+                        width = 98;
+                        height = 98;
+                    }
+                }
+                context.strokeStyle = 'red';
+                context.lineWidth = 5;
+                context.beginPath();
+                context.rect(this.x + layerHandler.gridXOffset - 2.5, this.y + layerHandler.gridYOffset - 2.5, width + 5, height + 5);
+                context.closePath();
+                context.stroke();
+                return true;
+            }
+            return false;
+        };
+        userObject.prototype.interact = function (mouseX, mouseY) {
+        };
+        userObject.prototype.interactClick = function (mouseX, mouseY) {
+        };
+        userObject.prototype.render = function (xoffset, yoffset, tileCounter, context) {
+            if (this.tile == null) {
+                if (fileSystemHandlerObjects.classAndImage[this.name] != null) {
+                    if (fileSystemHandlerObjects.classAndImage[this.name].complete) {
+                        context.drawImage(fileSystemHandlerObjects.classAndImage[this.name], this.x + xoffset, this.y + yoffset);
+                    }
+                }
+                else {
+                    if (this.missingImage.complete) {
+                        context.drawImage(this.missingImage, 0, 0, 8, 8, this.x + xoffset, this.y + yoffset, 98, 98);
+                    }
+                }
+            }
+            else {
+                var tileToDraw = this.tile.get(tileCounter);
+                if (resourcesTiles.resourceNameAndImage[tileToDraw.resourceName] != null) {
+                    context.drawImage(resourcesTiles.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, this.x + xoffset, this.y + yoffset, tileToDraw.width, tileToDraw.height);
+                }
+                else {
+                    if (this.missingImage.complete) {
+                        context.drawImage(this.missingImage, tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, this.x + xoffset, this.y + yoffset, tileToDraw.width, tileToDraw.height);
+                    }
+                }
+            }
+        };
+        return userObject;
     }());
 
     var layerCompressor = /** @class */ (function () {
@@ -3817,11 +4626,15 @@
             compressedLayer.settings = l.settings;
             for (var _i = 0, _a = l.metaObjectsInLayer; _i < _a.length; _i++) {
                 var d = _a[_i];
-                if (d.tile != null) {
-                    d.isPartOfCombination = false;
+                if (d.type == objectTypes.userObject) {
+                    if (d.tile != null) {
+                        d.isPartOfCombination = false;
+                    }
                 }
             }
-            var staticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length == 1; });
+            var staticTiles = l.metaObjectsInLayer.filter(function (t) { return t.type == objectTypes.userObject
+                && t.tile != null
+                && t.tile.tiles.length == 1; });
             if (staticTiles.length > 0) {
                 var combinedStaticTiles_1 = layerCompressor.combineStaticTilesIntoOne(staticTiles, roomName);
                 compressedLayer.metaObjectsInLayer.push(combinedStaticTiles_1);
@@ -3835,17 +4648,25 @@
                     compressedLayer.metaObjectsInLayer.push(tile);
                 });
             }
-            var nonStaticTiles = l.metaObjectsInLayer.filter(function (t) { return t.tile != null && t.tile.tiles.length > 1; });
+            var nonStaticTiles = l.metaObjectsInLayer.filter(function (t) { return t.type == objectTypes.userObject
+                && t.tile != null && t.tile.tiles.length > 1; });
             for (var _c = 0, nonStaticTiles_1 = nonStaticTiles; _c < nonStaticTiles_1.length; _c++) {
                 var t = nonStaticTiles_1[_c];
                 compressedLayer.metaObjectsInLayer.push(t);
             }
             //add rest of the objects to the layer
             l.metaObjectsInLayer.forEach(function (obj) {
-                if (obj.tile == null) {
+                if (obj.type == objectTypes.userObject && obj.tile == null) {
                     compressedLayer.metaObjectsInLayer.push(obj);
                 }
             });
+            //add geometries
+            var layerGeometries = l.metaObjectsInLayer.filter(function (t) { return t.type == objectTypes.geometry; });
+            var geomDataOnly = [];
+            layerGeometries.forEach(function (geom) {
+                geomDataOnly.push(geom.getDataObject());
+            });
+            compressedLayer.geometriesInLayer = geomDataOnly;
             return compressedLayer;
         };
         layerCompressor.combineStaticTilesIntoOne = function (staticTiles, roomName) {
@@ -3901,11 +4722,229 @@
             });
             var newTile = new subTileMeta(generatedName, xStart, yStart, width, height);
             var combinedTiles = new tileAnimation([newTile]);
-            var compressetMeta = new objectMetaData(xStart, yStart, generatedName, combinedTiles);
+            var compressetMeta = new userObject(xStart, yStart, generatedName, combinedTiles);
             compressetMeta.isCombinationOfTiles = true;
             return compressetMeta;
         };
         return layerCompressor;
+    }());
+
+    var geomObjData = /** @class */ (function () {
+        function geomObjData() {
+            this.x = 0;
+            this.y = 0;
+            this.geomWidth = 128;
+            this.geomPoints = [];
+        }
+        return geomObjData;
+    }());
+
+    var geometryObject = /** @class */ (function () {
+        function geometryObject(x, y) {
+            this.name = "Geometry";
+            this.inputString = "";
+            this.geomWidth = 128;
+            //geomHeight: number = 128;
+            this.geomPoints = [32, 32, 32];
+            this.type = objectTypes.geometry;
+            this.tile = null;
+            this.isCombinationOfTiles = false;
+            this.idOfStaticTileCombination = "";
+            this.isPartOfCombination = false;
+            this.mouseInteractX = -100000;
+            this.mouseInteractY = -100000;
+            this.selectedEdgeIndex = -1;
+            this.mouseHoverOver = false;
+            this._lineWidth = 1;
+            this.x = x;
+            this.y = y;
+        }
+        geometryObject.prototype.getDataObject = function () {
+            var dataObj = new geomObjData();
+            dataObj.x = this.x;
+            dataObj.y = this.y;
+            dataObj.geomWidth = this.geomWidth;
+            dataObj.geomPoints = this.geomPoints;
+            return dataObj;
+        };
+        geometryObject.prototype.isMouseInside = function (mouseX, mouseY, layerHandler) {
+            var highestPoint = Math.max.apply(Math, this.geomPoints);
+            var lowestPoint = Math.min.apply(Math, this.geomPoints);
+            if (mouseX - layerHandler.gridXOffset >= this.x - 10 &&
+                mouseX - layerHandler.gridXOffset < this.x + this.geomWidth + 10 &&
+                mouseY - layerHandler.gridYOffset <= this.y + 10 + Math.abs(lowestPoint) &&
+                mouseY - layerHandler.gridYOffset > this.y - highestPoint - 10) {
+                return true;
+            }
+            return false;
+        };
+        geometryObject.prototype.drawMouseOverSelection = function (mouseX, mouseY, layerHandler, context) {
+            if (this.isMouseInside(mouseX, mouseY, layerHandler)) {
+                this.mouseHoverOver = true;
+                this._lineWidth = 5;
+                this.render(layerHandler.gridXOffset, layerHandler.gridYOffset, 0, context);
+                this._lineWidth = 1;
+            }
+            this.mouseHoverOver = false;
+            return false;
+        };
+        geometryObject.prototype.interact = function (mouseX, mouseY, allGeometries) {
+            var _this = this;
+            this.mouseInteractX = mouseX;
+            this.mouseInteractY = mouseY;
+            var pointSpacing = this.geomWidth / (this.geomPoints.length - 1);
+            if (this.selectedEdgeIndex >= 0) {
+                this.geomPoints[this.selectedEdgeIndex] = Math.round(this.y - this.mouseInteractY);
+                var _loop_1 = function () {
+                    var geomCast = geom;
+                    var index = 0;
+                    geomCast.geomPoints.forEach(function (point) {
+                        var thisGeomSpacing = geom.geomWidth / (geom.geomPoints.length - 1);
+                        if (geom.x + (thisGeomSpacing * index) == _this.x + (pointSpacing * _this.selectedEdgeIndex)) {
+                            geom.geomPoints[index] = _this.geomPoints[_this.selectedEdgeIndex];
+                        }
+                        index++;
+                    });
+                };
+                for (var _i = 0, allGeometries_1 = allGeometries; _i < allGeometries_1.length; _i++) {
+                    var geom = allGeometries_1[_i];
+                    _loop_1();
+                }
+            }
+            else if (this.selectedEdgeIndex == -2) {
+                this.geomWidth = Math.abs(this.x - mouseX);
+            }
+        };
+        geometryObject.prototype.closestPowerOf2 = function (numToRound) {
+            var testNumber = 0;
+            while (Math.pow(2, testNumber) < numToRound) {
+                testNumber++;
+            }
+            return Math.pow(2, testNumber);
+        };
+        geometryObject.prototype.interactClick = function (mouseX, mouseY) {
+            var _this = this;
+            this.geomWidth = this.closestPowerOf2(this.geomWidth);
+            if (this.selectedEdgeIndex == -1) {
+                var pointSpacing = this.geomWidth / (this.geomPoints.length - 1);
+                var edgesPoints = [];
+                for (var i = 0; i < this.geomPoints.length; i++) {
+                    var pointY = this.geomPoints[i];
+                    edgesPoints.push([this.x + (i * pointSpacing), this.y - pointY]);
+                }
+                var circlePoints = this.getPointsAndMouseStatus(edgesPoints, mouseX, mouseY);
+                var selectedPoints = circlePoints.filter(function (x) { return x[1][0]; });
+                selectedPoints.forEach(function (sPoint) {
+                    _this.selectedEdgeIndex = sPoint[1][1];
+                });
+                if (this.selectedEdgeIndex == -1) {
+                    var lineMiddlePoints = [];
+                    for (var i = 0; i < edgesPoints.length; i++) {
+                        if (i + 1 < edgesPoints.length - 1) {
+                            var point1 = edgesPoints[i];
+                            var point2 = edgesPoints[i + 1];
+                            var yDiff = point2[1] - point1[1];
+                            var boxX = point1[0] + (pointSpacing / 2);
+                            var boxY = point1[1] + (yDiff / 2);
+                            lineMiddlePoints.push([boxX, boxY]);
+                        }
+                    }
+                    var rectPoint = this.getPointsAndMouseStatus(lineMiddlePoints, mouseX, mouseY);
+                    rectPoint.forEach(function (rect) {
+                        if (rect[1][0]) {
+                            var highestPoint = Math.max.apply(Math, _this.geomPoints);
+                            _this.geomPoints.splice(rect[1][1] + 1, 0, highestPoint);
+                        }
+                    });
+                    //Check drag width point
+                    var widthDragPoint = [];
+                    widthDragPoint.push([this.x + ((this.geomPoints.length - 1) * pointSpacing), this.y]);
+                    var widthDragPointStatus = this.getPointsAndMouseStatus(widthDragPoint, this.mouseInteractX, this.mouseInteractY);
+                    widthDragPointStatus.forEach(function (point) {
+                        if (point[1][0] == true) {
+                            _this.selectedEdgeIndex = -2;
+                        }
+                    });
+                }
+            }
+            else {
+                this.selectedEdgeIndex = -1;
+            }
+        };
+        geometryObject.prototype.render = function (xOffset, yOffset, tileCounter, ctx) {
+            var pointSpacing = this.geomWidth / (this.geomPoints.length - 1);
+            var edgesPoints = [];
+            //Draw lines
+            ctx.beginPath();
+            ctx.lineWidth = this._lineWidth;
+            ctx.moveTo(this.x + xOffset, this.y + yOffset);
+            //ctx.lineTo(this.x + xOffset, this.y + yOffset + this.geomHeight);
+            for (var i = 0; i < this.geomPoints.length; i++) {
+                var pointY = this.geomPoints[i];
+                edgesPoints.push([this.x + xOffset + (i * pointSpacing), this.y + yOffset - pointY]);
+                ctx.lineTo(this.x + xOffset + (i * pointSpacing), this.y + yOffset - pointY);
+            }
+            ctx.lineTo(this.x + xOffset + ((this.geomPoints.length - 1) * pointSpacing), this.y + yOffset);
+            ctx.closePath();
+            ctx.lineWidth = this._lineWidth;
+            ctx.strokeStyle = '#f00';
+            ctx.fillStyle = 'rgba(0, 0, 200, 0.1)';
+            ctx.fill();
+            ctx.stroke();
+            //calculate rects between points coords
+            var lineMiddlePoints = [];
+            for (var i = 0; i < edgesPoints.length; i++) {
+                if (i + 1 < edgesPoints.length - 1) {
+                    var point1 = edgesPoints[i];
+                    var point2 = edgesPoints[i + 1];
+                    var yDiff = point2[1] - point1[1];
+                    var boxX = point1[0] + (pointSpacing / 2);
+                    var boxY = point1[1] + (yDiff / 2);
+                    lineMiddlePoints.push([boxX, boxY]);
+                }
+            }
+            //draw rects
+            var lineMiddlePointsStatus = this.getPointsAndMouseStatus(lineMiddlePoints, this.mouseInteractX + xOffset, this.mouseInteractY + yOffset);
+            lineMiddlePointsStatus.forEach(function (lineMiddle) {
+                if (lineMiddle[1][0]) {
+                    ctx.fillStyle = 'rgba(0, 90, 200, 1)';
+                }
+                else {
+                    ctx.fillStyle = 'rgba(0, 200, 0, 0.8)';
+                }
+                ctx.fillRect(lineMiddle[0][0] - 3, lineMiddle[0][1] - 3, 6, 6);
+            });
+            //draw circles
+            edgesPoints.push([this.x + xOffset + ((this.geomPoints.length - 1) * pointSpacing), this.y + yOffset]);
+            var edgePointsStatus = this.getPointsAndMouseStatus(edgesPoints, this.mouseInteractX + xOffset, this.mouseInteractY + yOffset);
+            edgePointsStatus.forEach(function (point) {
+                ctx.beginPath();
+                if (point[1][0] == true) {
+                    ctx.strokeStyle = '#f0f';
+                }
+                else {
+                    ctx.strokeStyle = '#00f';
+                }
+                ctx.arc(point[0][0], point[0][1], 3, 0, 2 * Math.PI);
+                ctx.stroke();
+            });
+        };
+        geometryObject.prototype.getPointsAndMouseStatus = function (points, mouseX, mouseY) {
+            var pointsAndStatus = [];
+            var index = 0;
+            points.forEach(function (point) {
+                if (mouseX > point[0] - 8 && mouseX < point[0] + 8
+                    && mouseY > point[1] - 16 && mouseY < point[1] + 16) {
+                    pointsAndStatus.push([point, [true, index]]);
+                }
+                else {
+                    pointsAndStatus.push([point, [false, index]]);
+                }
+                index++;
+            });
+            return pointsAndStatus;
+        };
+        return geometryObject;
     }());
 
     var layerContainer = /** @class */ (function () {
@@ -3922,7 +4961,7 @@
             this.currentRoom = clickedFile;
             var arayOfData = new roomData([]);
             if (jsonString != "") {
-                console.log("jsonString: ", jsonString);
+                //console.log("jsonString: ",jsonString);
                 arayOfData = JSON.parse(jsonString);
                 if (arayOfData.cameraBoundsX != undefined) {
                     document.getElementById("cameraBoundsX").value = arayOfData.cameraBoundsX.toString();
@@ -3969,12 +5008,22 @@
                 }
                 newLayer.settings = dataLayer.settings;
                 dataLayer.metaObjectsInLayer.forEach(function (obj) {
-                    if (obj.isCombinationOfTiles == false) {
-                        var newObj = new objectMetaData(obj.x, obj.y, obj.name, obj.tile);
-                        newObj.inputString = obj.inputString;
-                        newLayer.metaObjectsInLayer.push(newObj);
+                    if (obj.type == objectTypes.userObject) {
+                        if (obj.isCombinationOfTiles == false) {
+                            var newObj = new userObject(obj.x, obj.y, obj.name, obj.tile);
+                            newObj.inputString = obj.inputString;
+                            newLayer.metaObjectsInLayer.push(newObj);
+                        }
                     }
                 });
+                if (dataLayer.geometriesInLayer != undefined) {
+                    dataLayer.geometriesInLayer.forEach(function (geom) {
+                        var importedGeometry = new geometryObject(geom.x, geom.y);
+                        importedGeometry.geomPoints = geom.geomPoints;
+                        importedGeometry.geomWidth = geom.geomWidth;
+                        newLayer.metaObjectsInLayer.push(importedGeometry);
+                    });
+                }
                 this_1.storedLayers.push(newLayer);
             };
             var this_1 = this;
@@ -4127,47 +5176,44 @@
             }
             return false;
         };
-        layerContainer.prototype.getObjectAtPos = function (mouseTestX, mouseTestY) {
+        layerContainer.prototype.getObjectsAtPos = function (mouseTestX, mouseTestY, specificType) {
             var _a;
+            if (specificType === void 0) { specificType = null; }
+            var foundObjects = [];
             if (this.selectedLayer != null) {
                 for (var _i = 0, _b = (_a = this.selectedLayer) === null || _a === void 0 ? void 0 : _a.metaObjectsInLayer; _i < _b.length; _i++) {
                     var obj = _b[_i];
-                    if (this.isMouseInsideObject(obj, mouseTestX, mouseTestY)) {
-                        return obj;
+                    if (specificType == null) {
+                        if (obj.isMouseInside(mouseTestX, mouseTestY, this)) {
+                            foundObjects.push(obj);
+                        }
+                    }
+                    else {
+                        if (obj.type == specificType && obj.isMouseInside(mouseTestX, mouseTestY, this)) {
+                            foundObjects.push(obj);
+                        }
                     }
                 }
             }
-            return null;
+            return foundObjects;
+        };
+        layerContainer.prototype.getObjectsOfType = function (type) {
+            var _a;
+            var returnObjs = [];
+            if (this.selectedLayer != null) {
+                for (var _i = 0, _b = (_a = this.selectedLayer) === null || _a === void 0 ? void 0 : _a.metaObjectsInLayer; _i < _b.length; _i++) {
+                    var obj = _b[_i];
+                    if (obj.type == type) {
+                        returnObjs.push(obj);
+                    }
+                }
+            }
+            return returnObjs;
         };
         layerContainer.prototype.removeObject = function (targetObject) {
             if (targetObject != null && this.selectedLayer != null) {
                 this.selectedLayer.metaObjectsInLayer = this.selectedLayer.metaObjectsInLayer.filter(function (x) { return x != targetObject; });
             }
-        };
-        layerContainer.prototype.isMouseInsideObject = function (obj, mouseTestX, mouseTestY) {
-            var width = -1;
-            var height = -1;
-            if (obj.tile != null) {
-                width = obj.tile.get(0).width;
-                height = obj.tile.get(0).height;
-            }
-            else {
-                if (fileSystemHandlerObjects.classAndImage[obj.name] != null) {
-                    width = fileSystemHandlerObjects.classAndImage[obj.name].width;
-                    height = fileSystemHandlerObjects.classAndImage[obj.name].height;
-                }
-                else {
-                    width = 98;
-                    height = 98;
-                }
-            }
-            if (mouseTestX - this.gridXOffset >= obj.x &&
-                mouseTestX - this.gridXOffset < obj.x + width &&
-                mouseTestY - this.gridYOffset >= obj.y &&
-                mouseTestY - this.gridYOffset < obj.y + height) {
-                return true;
-            }
-            return false;
         };
         layerContainer.prototype.moveLayerUp = function (e) {
             var _a;
@@ -4263,15 +5309,18 @@
     var canvasRenderer = /** @class */ (function () {
         function canvasRenderer(canvasName) {
             var _this = this;
-            var _a, _b;
+            var _a, _b, _c, _d;
             this.gridXOffset = 0;
             this.gridYOffset = 0;
             this.canvasScaleX = 1;
             this.canvasScaleY = 1;
             this.layers = [];
+            this.displayCameraBounds = true;
             this.counter = 0;
             this.haveSelectedFromHover = false;
             this.missingImage = new Image();
+            this.geometryDummy = new geometryObject(0, 0);
+            this.renderGrid = true;
             this.missingImage.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAZQTFRF/wDj////hdfaxwAAAA5JREFUeJxjCGVYxYCEAR6cA/1tfYfmAAAAAElFTkSuQmCC";
             this.canvas = document.getElementById(canvasName);
             this.ctx = this.canvas.getContext("2d");
@@ -4283,6 +5332,7 @@
             this.buttonZoomIn.addEventListener("mouseup", this.zoomIn.bind(this));
             this.buttonZoomOut = document.getElementById("zoomOut");
             this.buttonZoomOut.addEventListener("mouseup", this.zoomOut.bind(this));
+            document.addEventListener("keypress", this.keysDown.bind(this));
             this.inputGridx = document.getElementById("gridXInput");
             this.inputGridx.value = this.gridWidth + "";
             this.inputGridy = document.getElementById("gridYInput");
@@ -4290,12 +5340,30 @@
             this.buttonSetSize.onclick = this.setCanvasWidth.bind(this);
             (_a = document.getElementById("gridXInput")) === null || _a === void 0 ? void 0 : _a.addEventListener("change", this.onGridSizeChange.bind(this));
             (_b = document.getElementById("gridYInput")) === null || _b === void 0 ? void 0 : _b.addEventListener("change", this.onGridSizeChange.bind(this));
+            this.cameraBoundButton = document.getElementById("toggleCameraBounds");
+            (_c = this.cameraBoundButton) === null || _c === void 0 ? void 0 : _c.addEventListener("click", this.toggleCameraBounds.bind(this));
+            this.toggleGridButton = document.getElementById("toggleGrid");
+            (_d = this.toggleGridButton) === null || _d === void 0 ? void 0 : _d.addEventListener("click", this.toggleGridRender.bind(this));
             this.container = document.getElementById("canvasAndFilesCon");
             window.onresize = this.windowResize.bind(this);
             setTimeout(function () {
                 _this.windowResize();
             }, 800);
         }
+        canvasRenderer.prototype.keysDown = function (e) {
+            if (e.key == "1") {
+                this.zoomIn();
+            }
+            else if (e.key == "2") {
+                this.zoomOut();
+            }
+            else if (e.key == "g") {
+                this.toggleGridRender();
+            }
+            else if (e.key == "c") {
+                this.toggleCameraBounds();
+            }
+        };
         canvasRenderer.prototype.updateCanvasOffset = function (dx, dy) {
             this.gridXOffset += dx;
             this.gridYOffset += dy;
@@ -4328,6 +5396,12 @@
             this.canvasScaleY *= 0.9;
             (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.setTransform(1, 0, 0, 1, 0, 0);
             (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.scale(this.canvasScaleX, this.canvasScaleY);
+        };
+        canvasRenderer.prototype.toggleCameraBounds = function () {
+            this.displayCameraBounds = !this.displayCameraBounds;
+        };
+        canvasRenderer.prototype.toggleGridRender = function () {
+            this.renderGrid = !this.renderGrid;
         };
         canvasRenderer.prototype.setCanvasWidth = function () {
             this.gridWidth = parseInt(this.inputGridx.value);
@@ -4363,71 +5437,18 @@
             this.layerHandler.storedLayers.forEach(function (layer) {
                 if (layer.hidden == false) {
                     layer.metaObjectsInLayer.forEach(function (meta) {
-                        var _a, _b, _c, _d;
-                        if (meta.tile == null) {
-                            if (fileSystemHandlerObjects.classAndImage[meta.name] != null) {
-                                if (fileSystemHandlerObjects.classAndImage[meta.name].complete) {
-                                    if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
-                                        _this.drawMouseOverSelection(meta, mouseX, mouseY);
-                                    }
-                                    (_a = _this.ctx) === null || _a === void 0 ? void 0 : _a.drawImage(fileSystemHandlerObjects.classAndImage[meta.name], meta.x + _this.gridXOffset, meta.y + _this.gridYOffset);
-                                }
-                            }
-                            else {
-                                if (_this.missingImage.complete) {
-                                    (_b = _this.ctx) === null || _b === void 0 ? void 0 : _b.drawImage(_this.missingImage, 0, 0, 8, 8, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, 98, 98);
-                                }
-                            }
+                        if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
+                            meta.drawMouseOverSelection(mouseX, mouseY, _this.layerHandler, _this.ctx);
                         }
-                        else {
-                            var tileToDraw = meta.tile.get(_this.counter);
-                            if (_this.layerHandler.selectedLayer.layerName == layer.layerName) {
-                                _this.drawMouseOverSelection(meta, mouseX, mouseY);
-                            }
-                            if (resourcesTiles.resourceNameAndImage[tileToDraw.resourceName] != null) {
-                                (_c = _this.ctx) === null || _c === void 0 ? void 0 : _c.drawImage(resourcesTiles.resourceNameAndImage[tileToDraw.resourceName], tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
-                            }
-                            else {
-                                if (_this.missingImage.complete) {
-                                    (_d = _this.ctx) === null || _d === void 0 ? void 0 : _d.drawImage(_this.missingImage, tileToDraw.startX, tileToDraw.startY, tileToDraw.width, tileToDraw.height, meta.x + _this.gridXOffset, meta.y + _this.gridYOffset, tileToDraw.width, tileToDraw.height);
-                                }
-                            }
-                        }
+                        meta.render(_this.gridXOffset, _this.gridYOffset, _this.counter, _this.ctx);
                     });
                 }
             });
         };
-        canvasRenderer.prototype.drawMouseOverSelection = function (obj, mouseX, mouseY) {
-            var _a, _b, _c;
-            if (this.layerHandler.isMouseInsideObject(obj, mouseX, mouseY)
-                && this.haveSelectedFromHover == false
-                && obj.isCombinationOfTiles == false) {
-                this.haveSelectedFromHover = true;
-                var width = -1;
-                var height = -1;
-                if (obj.tile != null) {
-                    width = obj.tile.get(this.counter).width;
-                    height = obj.tile.get(this.counter).height;
-                }
-                else {
-                    if (fileSystemHandlerObjects.classAndImage[obj.name] != null) {
-                        width = fileSystemHandlerObjects.classAndImage[obj.name].width;
-                        height = fileSystemHandlerObjects.classAndImage[obj.name].height;
-                    }
-                    else {
-                        width = 98;
-                        height = 98;
-                    }
-                }
-                this.ctx.strokeStyle = 'red';
-                this.ctx.lineWidth = 5;
-                (_a = this.ctx) === null || _a === void 0 ? void 0 : _a.beginPath();
-                (_b = this.ctx) === null || _b === void 0 ? void 0 : _b.rect(obj.x + this.gridXOffset - 2.5, obj.y + this.gridYOffset - 2.5, width + 5, height + 5);
-                (_c = this.ctx) === null || _c === void 0 ? void 0 : _c.stroke();
-            }
-        };
         canvasRenderer.prototype.drawGrid = function () {
             var _a, _b, _c, _d, _e, _f, _g, _h;
+            if (this.renderGrid == false)
+                return;
             this.ctx.lineWidth = 1;
             var drawGridWidth = this.gridWidth;
             var drawGridHeight = this.gridHeight;
@@ -4449,6 +5470,8 @@
             }
         };
         canvasRenderer.prototype.drawCameraBounds = function () {
+            if (this.displayCameraBounds == false)
+                return;
             var startXCam = parseInt(document.getElementById("cameraBoundsX").value);
             var startYCam = parseInt(document.getElementById("cameraBoundsY").value);
             var widthCam = parseInt(document.getElementById("cameraBoundsWidth").value);
@@ -4456,8 +5479,8 @@
             if (startXCam != null && startYCam != null && widthCam != null && heightCam != null) {
                 this.ctx.strokeStyle = "red";
                 this.ctx.lineWidth = 16;
-                this.ctx.rect(startXCam + this.gridXOffset, startYCam + this.gridYOffset, widthCam, heightCam);
-                this.ctx.stroke();
+                this.ctx.strokeRect(startXCam + this.gridXOffset, startYCam + this.gridYOffset, widthCam, heightCam);
+                this.ctx.lineWidth = 1;
             }
         };
         canvasRenderer.prototype.drawMouse = function (mouseX, mouseY, cursor) {
@@ -4496,6 +5519,9 @@
                     }
                 }
             }
+            else if (cursorData.cursorType == cursorType.geometry) {
+                this.geometryDummy.render(mouseGridX, mouseGridY, 0, this.ctx);
+            }
         };
         return canvasRenderer;
     }());
@@ -4511,6 +5537,8 @@
             this.mouseDown = false;
             this.genObj = new objectGenerator();
             this.currentRoomName = "";
+            this.prevClickedGeometry = [];
+            this.moveToggleDown = false;
             this.cursor = cursor;
             this.canvasRenderPart = new canvasRenderer(canvasName);
             this.layerCreateButton = document.getElementById("createLayerButton");
@@ -4558,10 +5586,17 @@
                     _this.noGridMouse = false;
                 }, 1200);
             }
+            if (e.key == "m") {
+                this.moveToggleDown = true;
+            }
         };
         handleCanvas.prototype.keysUp = function (e) {
+            if (e.key == "m") {
+                this.moveToggleDown = false;
+            }
         };
         handleCanvas.prototype.mouseListenerDown = function (e) {
+            var _this = this;
             var _a, _b;
             var targetElement = e.target;
             if (targetElement.tagName != "CANVAS" || targetElement.id != "game") {
@@ -4572,28 +5607,7 @@
             }
             var mouseGridX = (Math.floor(this.mouseXPosition / this.canvasRenderPart.gridWidth) * this.canvasRenderPart.gridWidth) + ((this.canvasRenderPart.gridXOffset) % this.canvasRenderPart.gridWidth);
             var mouseGridY = (Math.floor(this.mouseYPosition / this.canvasRenderPart.gridHeight) * this.canvasRenderPart.gridHeight) + ((this.canvasRenderPart.gridYOffset) % this.canvasRenderPart.gridHeight);
-            if (cursorData.cursorType == cursorType.pensil && this.canvasRenderPart.layerHandler.selectedLayer != null) {
-                if (this.cursor.objectSelected != null || this.cursor.currentSubTile != null) {
-                    var nameOfMetaObject = (_a = this.cursor.objectSelected) === null || _a === void 0 ? void 0 : _a.objectName;
-                    if (nameOfMetaObject == null) {
-                        nameOfMetaObject = (_b = this.cursor.currentSubTile) === null || _b === void 0 ? void 0 : _b.name;
-                    }
-                    if (this.noGridMouse) {
-                        this.canvasRenderPart.layerHandler.addToLayer(new objectMetaData(this.mouseXPosition - this.canvasRenderPart.gridXOffset, this.mouseYPosition - this.canvasRenderPart.gridYOffset, nameOfMetaObject, this.cursor.currentSubTile));
-                    }
-                    else {
-                        //check if there already is an item at the position
-                        if (this.canvasRenderPart.layerHandler.hasObjectPos(mouseGridX, mouseGridY) == false) {
-                            this.canvasRenderPart.layerHandler.addToLayer(new objectMetaData(mouseGridX - this.canvasRenderPart.gridXOffset, mouseGridY - this.canvasRenderPart.gridYOffset, nameOfMetaObject, this.cursor.currentSubTile));
-                        }
-                    }
-                }
-            }
-            else if (cursorData.cursorType == cursorType.eraser && this.canvasRenderPart.layerHandler.selectedLayer != null) {
-                var objTarget_1 = this.canvasRenderPart.layerHandler.getObjectAtPos(this.mouseXPosition, this.mouseYPosition);
-                this.canvasRenderPart.layerHandler.removeObject(objTarget_1);
-            }
-            else if (cursorData.cursorType == cursorType.grabber) {
+            if (cursorData.cursorType == cursorType.grabber || this.moveToggleDown) {
                 if (this.previousMouseX != -1 && this.previousMouseY != -1) {
                     var dX = this.mouseXPosition - this.previousMouseX;
                     var dY = this.mouseYPosition - this.previousMouseY;
@@ -4602,21 +5616,59 @@
                 this.previousMouseX = this.mouseXPosition;
                 this.previousMouseY = this.mouseYPosition;
             }
+            else if (cursorData.cursorType == cursorType.pensil && this.canvasRenderPart.layerHandler.selectedLayer != null) {
+                if (this.cursor.objectSelected != null || this.cursor.currentSubTile != null) {
+                    var nameOfMetaObject = (_a = this.cursor.objectSelected) === null || _a === void 0 ? void 0 : _a.objectName;
+                    if (nameOfMetaObject == null) {
+                        nameOfMetaObject = (_b = this.cursor.currentSubTile) === null || _b === void 0 ? void 0 : _b.name;
+                    }
+                    if (this.noGridMouse) {
+                        this.canvasRenderPart.layerHandler.addToLayer(new userObject(this.mouseXPosition - this.canvasRenderPart.gridXOffset, this.mouseYPosition - this.canvasRenderPart.gridYOffset, nameOfMetaObject, this.cursor.currentSubTile));
+                    }
+                    else {
+                        //check if there already is an item at the position
+                        if (this.canvasRenderPart.layerHandler.hasObjectPos(mouseGridX, mouseGridY) == false) {
+                            this.canvasRenderPart.layerHandler.addToLayer(new userObject(mouseGridX - this.canvasRenderPart.gridXOffset, mouseGridY - this.canvasRenderPart.gridYOffset, nameOfMetaObject, this.cursor.currentSubTile));
+                        }
+                    }
+                }
+            }
+            else if (cursorData.cursorType == cursorType.eraser && this.canvasRenderPart.layerHandler.selectedLayer != null) {
+                var objTarget_1 = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+                if (objTarget_1.length != 0 && objTarget_1[0].type != objectTypes.geometry) {
+                    this.canvasRenderPart.layerHandler.removeObject(objTarget_1[0]);
+                }
+            }
+            else if (cursorData.cursorType == cursorType.geometryRemove && this.canvasRenderPart.layerHandler.selectedLayer != null) {
+                var objTarget_2 = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+                if (objTarget_2.length != 0 && objTarget_2[0].type == objectTypes.geometry) {
+                    this.canvasRenderPart.layerHandler.removeObject(objTarget_2[0]);
+                }
+            }
             else if (cursorData.cursorType == cursorType.editor && this.canvasRenderPart.layerHandler.selectedLayer != null) {
-                var objTarget = this.canvasRenderPart.layerHandler.getObjectAtPos(this.mouseXPosition, this.mouseYPosition);
+                var objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
                 if (objTarget != null) {
-                    var inputTemplate = this.genObj.generateObject(objTarget.name, 0, 0, null, "").inputTemplate;
-                    var inputString = objTarget.inputString;
+                    var inputTemplate = this.genObj.generateObject(objTarget[0].name, 0, 0, null, "").inputTemplate;
+                    var inputString = objTarget[0].inputString;
                     if (inputString == "") {
                         inputString = inputTemplate;
                     }
                     window.node.promptDefaultText("Input string for object:", inputString, function (text) {
                         if (text != null) {
                             if (objTarget != null) {
-                                objTarget.inputString = text;
+                                objTarget[0].inputString = text;
                             }
                         }
                     });
+                }
+            }
+            else if (cursorData.cursorType == cursorType.geometryEdit) {
+                if (this.prevClickedGeometry.length == 0) {
+                    var objTargets = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition, objectTypes.geometry);
+                    objTargets.forEach(function (target) {
+                        target.interactClick(_this.mouseXPosition - _this.canvasRenderPart.gridXOffset, _this.mouseYPosition - _this.canvasRenderPart.gridYOffset);
+                    });
+                    this.prevClickedGeometry = objTargets;
                 }
             }
             this.mouseDown = true;
@@ -4629,16 +5681,42 @@
             return this.canvasRenderPart.layerHandler.exportRoom();
         };
         handleCanvas.prototype.mouseListenerUp = function (e) {
+            var _this = this;
             this.mouseDown = false;
             this.previousMouseX = -1;
             this.previousMouseY = -1;
+            var targetElement = e.target;
+            if (targetElement.tagName != "CANVAS" || targetElement.id != "game") {
+                return;
+            }
+            if (this.moveToggleDown == false) {
+                if (cursorData.cursorType == cursorType.geometry) {
+                    var mouseGridX = (Math.floor(this.mouseXPosition / this.canvasRenderPart.gridWidth) * this.canvasRenderPart.gridWidth) + ((this.canvasRenderPart.gridXOffset) % this.canvasRenderPart.gridWidth);
+                    var mouseGridY = (Math.floor(this.mouseYPosition / this.canvasRenderPart.gridHeight) * this.canvasRenderPart.gridHeight) + ((this.canvasRenderPart.gridYOffset) % this.canvasRenderPart.gridHeight);
+                    var newGeom = new geometryObject(mouseGridX - this.canvasRenderPart.gridXOffset, mouseGridY - this.canvasRenderPart.gridYOffset);
+                    this.canvasRenderPart.layerHandler.addToLayer(newGeom);
+                }
+                else if (cursorData.cursorType == cursorType.geometryEdit) {
+                    this.prevClickedGeometry.forEach(function (prevTarget) {
+                        prevTarget.interactClick(_this.mouseXPosition - _this.canvasRenderPart.gridXOffset, _this.mouseYPosition - _this.canvasRenderPart.gridYOffset);
+                    });
+                    this.prevClickedGeometry = [];
+                }
+            }
         };
         handleCanvas.prototype.mouseListenerMove = function (e) {
+            var _this = this;
             var mousePosition = this.canvasRenderPart.getCanvasMousePositions(e);
             this.mouseXPosition = mousePosition[0];
             this.mouseYPosition = mousePosition[1];
             if (this.mouseDown) {
                 this.mouseListenerDown(e);
+            }
+            if (cursorData.cursorType == cursorType.geometryEdit && this.moveToggleDown == false) {
+                var geometries_1 = this.canvasRenderPart.layerHandler.getObjectsOfType(objectTypes.geometry);
+                geometries_1.forEach(function (objTarget) {
+                    objTarget.interact(_this.mouseXPosition - _this.canvasRenderPart.gridXOffset, _this.mouseYPosition - _this.canvasRenderPart.gridYOffset, geometries_1);
+                });
             }
         };
         handleCanvas.prototype.render = function () {
@@ -4671,4 +5749,4 @@
         }, 16);
     }
 
-}(PIXI));
+}(PIXI, PIXI.filters));

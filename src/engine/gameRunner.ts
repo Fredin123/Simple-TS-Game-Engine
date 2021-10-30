@@ -1,20 +1,10 @@
 import * as PIXI from 'pixi.js'
 import { gameSettings } from "./gameSettings";
 import { roomEvent } from "./roomEvent";
-import { objectGenerator } from '../shared/objectGenerator';
-import { objectContainer } from './objectHandlers/objectContainer';
-import { objectBase } from './objectHandlers/objectBase';
-import { iObject } from './objectHandlers/iObject';
-import { tileMetaObj } from './Tile/tileMeteObj';
 import { task } from './tools/task';
-import { roomData } from '../shared/roomData';
-import {TiltShiftFilter} from '@pixi/filter-tilt-shift';
 import {GodrayFilter} from '@pixi/filter-godray';
-import {AdvancedBloomFilter} from '@pixi/filter-advanced-bloom';
-import {BloomFilter} from '@pixi/filter-bloom';
-import {AdjustmentFilter} from '@pixi/filter-adjustment';
-import {SimpleLightmapFilter} from '@pixi/filter-simple-lightmap';
 import { ticker } from './ticker';
+import { scene_home } from '../scenes/scene_home';
 
 declare var LZString: any;
 
@@ -37,28 +27,26 @@ export class gameRunner {
 
     constructor(gameContainer: string, gameProperties: gameSettings, app: PIXI.Application){
         this.gameContainerElement = document.getElementById(gameContainer) as HTMLElement;
-        this.app = new PIXI.Application({
-            antialias: false,
-            autoDensity: false
-        });
-        this.app.renderer.view.width = 806;
-        this.app.renderer.view.height = 504;
+        this.app = app;
+        this.app.renderer.view.width = 1280;
+        this.app.renderer.view.height = 720;
+        
 
-        this.app.renderer.view.style.width = 806 + "px";
-        this.app.renderer.view.style.height = 504 + "px"
+        this.app.renderer.view.style.width = 1280 + "px";
+        this.app.renderer.view.style.height = 720 + "px"
 
 
         
         //PIXI.settings.PRECISION_FRAGMENT = PIXI.PRECISION.HIGH;
         PIXI.settings.ROUND_PIXELS = true;
 
-        gameProperties.applySettings(this.app);
+        
         this.gameContainerElement.appendChild(this.app.view);
 
         //this.graphicsModule = new graphics(this.canvasContext);
         this.logicModule = new roomEvent(this.gameContainerElement, this.tasker, this.app);
 
-        this.app.ticker.add((delta: any) => {
+        var mainTicker = this.app.ticker.add((delta: any) => {
             if(this.fpsLimiter == 0){
                 this.logicModule.deltaTime = delta;
                 ticker.tick();
@@ -89,6 +77,7 @@ export class gameRunner {
             }
             
         });
+
 
         this.logicModule.loadRoom(scene_home, "");
     }

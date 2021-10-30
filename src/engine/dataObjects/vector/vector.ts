@@ -1,9 +1,7 @@
 import { calculations } from "../../calculations";
 import { iVector } from "./iVector";
-import { nullVector } from "./nullVector";
 
 export class vector implements iVector{
-    static null: iVector = new nullVector;
     Dx: number;
     Dy: number;
 
@@ -25,6 +23,11 @@ export class vector implements iVector{
 
     get magnitude(){
         return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
+    }
+
+    set magnitude(val: number){
+        this.Dx = Math.cos(this.delta)*val;
+        this.Dy = Math.sin(this.delta)*val;
     }
 
     increaseMagnitude(addValue: number){

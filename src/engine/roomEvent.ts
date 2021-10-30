@@ -1,17 +1,20 @@
 import { AdjustmentFilter } from '@pixi/filter-adjustment';
 import * as PIXI from 'pixi.js'
+import { objectTypes } from '../shared/objectTypes';
 import { objectGenerator } from '../shared/objectGenerator';
+import { roomData } from '../shared/roomData';
 import { gameCamera } from "./gameCamera";
 import { internalFunction } from "./internalFunctions";
 import { boxCollider } from "./objectHandlers/collision/boxCollider";
 import { iObject } from "./objectHandlers/iObject";
 import { objectBase } from "./objectHandlers/objectBase";
 import { objectContainer } from "./objectHandlers/objectContainer";
-import { objectGlobalData } from './objectHandlers/objectGlobalData';
 import { interaction } from "./text interaction/interaction";
 import { ticker } from './ticker';
 import { tileMetaObj } from './Tile/tileMeteObj';
 import { task } from "./tools/task";
+import { polygonCollisionX } from './objectHandlers/collision/polygonCollision/polygonCollisionX';
+import { Filter } from 'pixi.js';
 
 declare var LZString: any;
 
@@ -59,6 +62,17 @@ export class roomEvent {
 
     }
 
+    getRenderer(){
+        return this.app.renderer;
+    }
+
+    addStageFilter(addFilters: Filter[]){
+        this.app.stage.filters = addFilters;
+    }
+
+    getStageFilters(){
+        return this.app.stage.filters;
+    }
     
 
     queryKey(){
@@ -152,7 +166,7 @@ export class roomEvent {
     }
 
 
-    foreachObjectType(type: string, func: (arg0: objectBase)=>boolean): Array<iObject>{
+    foreachObjectType(type: string, func: (arg0: iObject)=>boolean): Array<iObject>{
         var returnResult: Array<iObject> = new Array<objectBase>();
         var specificObjects = this.objContainer.getSpecificObjects(type);
         if(specificObjects != null){
@@ -181,7 +195,7 @@ export class roomEvent {
     }*/
 
 
-    isCollidingWith(colSource: objectBase, colSourceCollisionBox: boxCollider, colTargetType: string[]): iObject | null{
+    isCollidingWith(colSource: iObject, colSourceCollisionBox: boxCollider, colTargetType: string[]): iObject | null{
         let colliding:iObject | null = null;
         this.objContainer.loopThroughObjectsUntilCondition(colTargetType, (obj: iObject) => {
             if(internalFunction.intersecting(colSource, colSourceCollisionBox, obj)){
@@ -194,7 +208,7 @@ export class roomEvent {
     }
 
 
-    isCollidingWithMultiple(colSource: objectBase, colSourceCollisionBox: boxCollider, colTargetType: string[]): iObject[]{
+    isCollidingWithMultiple(colSource: iObject, colSourceCollisionBox: boxCollider, colTargetType: string[]): iObject[]{
         let colliding:iObject[] = [];
         this.objContainer.loopThroughObjectsUntilCondition(colTargetType, (obj: iObject) => {
             if(internalFunction.intersecting(colSource, colSourceCollisionBox, obj)){
@@ -206,7 +220,7 @@ export class roomEvent {
     }
 
 
-    addObject(obj: objectBase, layerIndex:number){
+    addObject(obj: iObject, layerIndex:number){
         this.objContainer.addObject(obj, layerIndex);
     }
 
@@ -229,6 +243,10 @@ export class roomEvent {
 
     updateLayerOffsets(){
         this.objContainer.updateLayerOffsets(this.camera, this.app);
+    }
+
+    getCameraBounds(){
+        return this.cameraBounds;
     }
 
     moveCamera(){
@@ -289,7 +307,8 @@ export class roomEvent {
 
     loadRoom(loadRoomString: string, roomStartString: string){
         this.roomStartString = roomStartString;
-        let loadRoom = JSON.parse(LZString.decompressFromEncodedURIComponent(loadRoomString))
+        let loadRoom = (JSON.parse(LZString.decompressFromEncodedURIComponent(loadRoomString)) as roomData);
+        console.log("import room: ",loadRoom);
         this.objContainer.removeObjects();
 
         this.cameraBounds[0] = loadRoom.cameraBoundsX ?? 0;
@@ -307,28 +326,35 @@ export class roomEvent {
             let layerSettings = JSON.parse(layer.settings);
             this.objContainer.addContainerForLayer(pixiContainerLayer, layer.zIndex, layer.layerName, layerSettings.scrollSpeedX, layerSettings.scrollSpeedY);
             for(let objMeta of layer.metaObjectsInLayer){
-                if(objMeta.isPartOfCombination == false){
-                    //console.log("Import object: ",objMeta);
-                    let genObj:objectBase = this.generateObjects.generateObject(objMeta.name, Math.floor(objMeta.x), Math.floor(objMeta.y), objMeta.tile, objMeta.inputString);
-                    if(genObj != null){
-                        if(genObj.isTile == false){
-                            containsOnlyStaticTiles = false;
-                            this.objContainer.addObjectDirectly(genObj, layer.zIndex, layer.hidden);
-                        }else{
-                            if(objMeta.tile!.tiles.length > 1){
+                if(objMeta.type == objectTypes.userObject){
+                    if(objMeta.isPartOfCombination == false){
+                        let genObj:objectBase = this.generateObjects.generateObject(objMeta.name, Math.floor(objMeta.x), Math.floor(objMeta.y), objMeta.tile, objMeta.inputString);
+                        if(genObj != null){
+                            if(genObj.isTile == false){
                                 containsOnlyStaticTiles = false;
-                            }
-                            this.tileContainer.push(genObj);
-                            if(layer.hidden == false){
-                                objectsToAdd.push(genObj.g);
+                                this.objContainer.addObjectDirectly(genObj, layer.zIndex, layer.hidden);
+                            }else{
+                                if(objMeta.tile!.tiles.length > 1){
+                                    containsOnlyStaticTiles = false;
+                                }
+                                this.tileContainer.push(genObj);
+                                if(layer.hidden == false){
+                                    objectsToAdd.push(genObj.g);
+                                }
                             }
                         }
                     }
                 }
-                
             }
 
-            
+            for(let geom of layer.geometriesInLayer){
+                let newPolygon = new polygonCollisionX(geom.x, geom.y, "");
+                geom.geomPoints = geom.geomPoints.map(function(yPoint){
+                    return Number(Math.round(yPoint));
+                });
+                newPolygon.setPolygon(geom.geomPoints, Math.round(geom.geomWidth), this, this.app);
+                this.objContainer.addObjectDirectly(newPolygon, layer.zIndex, layer.hidden);
+            }
             
             if(parseFloat(layerSettings.blur) != 0 && false){
                 var blurFilter1 = new PIXI.filters.BlurFilter(50);

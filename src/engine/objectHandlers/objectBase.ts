@@ -1,19 +1,17 @@
 import { vector } from "../dataObjects/vector/vector";
 import { roomEvent } from "../roomEvent";
-import { resourceMeta } from "../preload sources/resourceMeta";
 import { boxCollider } from "./collision/boxCollider";
 import { uidGen } from "../tools/uidGen";
-import { objectContainer } from "./objectContainer";
-import { movementOperations } from "../movementOperations";
+import { movementOperations } from "../movementOperations/movementOperations";
 import { iObject } from "./iObject";
 import { iVector } from "../dataObjects/vector/iVector";
-import { nulliObject } from "./nulliObject";
 import { calculations } from "../calculations";
 import { resourcesHand } from "../preload sources/resourcesHand";
 import { animConfig } from "./animConfig";
 import { AnimatedSprite } from "pixi.js";
 import * as PIXI from 'pixi.js'
 import { objectGlobalData } from "./objectGlobalData";
+import { nullVector } from "../dataObjects/vector/nullVector";
 
 
 export class objectBase implements iObject{
@@ -31,15 +29,20 @@ export class objectBase implements iObject{
     stickyLeftSide: boolean = false;
     stickyRightSide: boolean = false;
 
-    gravity: iVector = vector.null;
+    gravity: iVector = nullVector.null;
     weight: number = 0.4;
     _hasBeenMoved_Tick: number = 0;
     _isColliding_Special: boolean = false;
+
+    collidesWithPolygonGeometry = false;
+    _hasCollidedWithPolygon = false;
 
     inputTemplate: string = "";
     outputString: string = "";
     onLayer: number = 0;
 
+    horizontalCollision: number = 0;
+    verticalCollision: number = 0;
 
     get g(){
         return this._g;
@@ -71,7 +74,7 @@ export class objectBase implements iObject{
     }
 
     init(roomEvents: roomEvent){
-
+        
     }
 
     addMoveCollisionTarget(...collNames:string[]){
@@ -233,6 +236,12 @@ export class objectBase implements iObject{
         this.collisionBox.y = ys;
         this.collisionBox.width = width;
         this.collisionBox.height = height;
+        if(ys < 0){
+            this.collisionBox.height += ys/-1;
+        }
+        if(xs < 0){
+            this.collisionBox.width += xs/-1;
+        }
     }
 
     

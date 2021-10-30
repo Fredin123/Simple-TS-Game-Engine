@@ -47,64 +47,70 @@ export class fileSystemHandlerRooms{
         let dataToInsertIntoFileSystem: fileSystemEntry[] = [];
         let idCounter: number = 0;
         roomData.forEach(roomMeta => {
-            let roomSrc = roomMeta[0];
-            let roomData = roomMeta[1];
+            console.log("roomMeta: ",roomMeta);
+            if(roomMeta[0] != 'scenes/scene_index.ts'){
+                let roomSrc = roomMeta[0];
+                let roomData = roomMeta[1];
+    
+                let roomDirParts = roomSrc.split("/");
+                
+                let currentFolder: fileSystemEntry | null = null;
 
-            let roomDirParts = roomSrc.split("/");
-            
-            let currentFolder: fileSystemEntry | null = null;
-
-            roomDirParts.forEach(item => {
-                if(item != ".."){
-                    let newEntry: fileSystemEntry;
-                    if(item.indexOf(".ts") != -1){
-                        //It's a file
-                        newEntry = new fileSystemEntry("file", item, [], idCounter, [roomSrc, roomData]);
-                        if(currentFolder == null){
-                            dataToInsertIntoFileSystem.push(newEntry);
-                        }else{
-                            currentFolder.contains.push(newEntry);
-                        }
-                    }else{
-                        //It's a folder
-
-                        //Check if folder already exists
-                        let foundFolder: boolean = false;
-                        if(currentFolder == null){
-                            for(let elem of dataToInsertIntoFileSystem){
-                                if(elem.type == "folder" && elem.name == item){
-                                    currentFolder = elem;
-                                    foundFolder = true;
-                                    break;
-                                }
-                            }
-                        }else{
-                            for(let elem of currentFolder.contains){
-                                if(elem.type == "folder" && elem.name == item){
-                                    currentFolder = elem;
-                                    foundFolder = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if(foundFolder == false){
-                            newEntry = new fileSystemEntry("folder", item, [], idCounter, undefined);
+                roomDirParts.forEach(item => {
+                    if(item != ".."){
+                        let newEntry: fileSystemEntry;
+                        if(item.indexOf(".ts") != -1){
+                            //It's a file
+                            newEntry = new fileSystemEntry("file", item, [], idCounter, [roomSrc, roomData]);
                             if(currentFolder == null){
                                 dataToInsertIntoFileSystem.push(newEntry);
                             }else{
                                 currentFolder.contains.push(newEntry);
                             }
-                            currentFolder = newEntry;
+                        }else{
+                            //It's a folder
+    
+                            //Check if folder already exists
+                            let foundFolder: boolean = false;
+                            if(currentFolder == null){
+                                for(let elem of dataToInsertIntoFileSystem){
+                                    if(elem.type == "folder" && elem.name == item){
+                                        currentFolder = elem;
+                                        foundFolder = true;
+                                        break;
+                                    }
+                                }
+                            }else{
+                                for(let elem of currentFolder.contains){
+                                    if(elem.type == "folder" && elem.name == item){
+                                        currentFolder = elem;
+                                        foundFolder = true;
+                                        break;
+                                    }
+                                }
+                            }
+    
+                            if(foundFolder == false){
+                                newEntry = new fileSystemEntry("folder", item, [], idCounter, undefined);
+                                if(currentFolder == null){
+                                    dataToInsertIntoFileSystem.push(newEntry);
+                                }else{
+                                    currentFolder.contains.push(newEntry);
+                                }
+                                currentFolder = newEntry;
+                            }
+                            
                         }
+                        //let newFolderId = this.system.createFolder(item);
+                        //console.log(newFolderId);
                         
+                        idCounter++;
                     }
-                    //let newFolderId = this.system.createFolder(item);
-                    //console.log(newFolderId);
-                    
-                    idCounter++;
-                }
-            });
+                });
+            }
+            
+
+            
         });
         this.system.insertData(JSON.stringify(dataToInsertIntoFileSystem));
     }

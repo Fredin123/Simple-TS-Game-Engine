@@ -8,16 +8,18 @@ import { layer } from "../../shared/layer";
 import { roomLayer } from "./roomLayer";
 import * as PIXI from 'pixi.js'
 import { objectGlobalData } from "./objectGlobalData";
+import { internalFunction } from "../internalFunctions";
+import { boxCollider } from "./collision/boxCollider";
 
 
 export class objectContainer{
-    private specificObjects: {[key: string]: Array<objectBase>};
+    private specificObjects: {[key: string]: Array<iObject>};
     private layers: {[key: number]: roomLayer};
     private layerNames: {[key: string]: number} = {};
 
     private layerKeysOrdered: Array<number> = [];
     private objectToRemoveBuffer: Array<iObject> = [];
-    private objectToAddBuffer: Array<[objectBase, number]> = [];
+    private objectToAddBuffer: Array<[iObject, number]> = [];
 
     constructor(){
         this.specificObjects = {};
@@ -44,7 +46,7 @@ export class objectContainer{
         }
     }
 
-    addObjectDirectly(obj: objectBase, targetlayer:number, hidden: boolean = false){
+    addObjectDirectly(obj: iObject, targetlayer:number, hidden: boolean = false){
         //Add specific classes
         obj.onLayer = targetlayer;
         let objName = tools.getClassNameFromConstructorName(obj.constructor.toString());
@@ -53,13 +55,16 @@ export class objectContainer{
         }
         this.specificObjects[objName].push(obj);
         
-        this.layers[targetlayer].objects.push(obj);
-        if(hidden == false){
-            this.layers[targetlayer].graphicsContainer.addChild(obj.g);
+        if(this.layers[targetlayer] != undefined){
+            this.layers[targetlayer].objects.push(obj);
+            if(hidden == false){
+                this.layers[targetlayer].graphicsContainer.addChild(obj.g);
+            }
         }
+        
     }
 
-    addObject(obj: objectBase, layerIndex:number){
+    addObject(obj: iObject, layerIndex:number){
         this.objectToAddBuffer.push([obj, layerIndex]);
     }
 
@@ -115,6 +120,20 @@ export class objectContainer{
         return objectGlobalData.null;
     }
 
+    filterObjects(targets: string[], func:(arg:iObject)=>boolean): iObject[]{
+        let foundObjects : iObject[] = [];
+        for(var i=0; i<targets.length; i++){
+            if(this.specificObjects[targets[i]] != null){
+                for(var j=0; j<this.specificObjects[targets[i]].length; j++){
+                    if(func(this.specificObjects[targets[i]][j])){
+                        foundObjects.push(this.specificObjects[targets[i]][j]);
+                    }
+                }
+            }
+        }
+        return foundObjects;
+    }
+
 
     getSpecificObjects(objName: string){
         return this.specificObjects[objName];
@@ -129,7 +148,7 @@ export class objectContainer{
         }
     }
 
-    forEveryObject(func: ((x:objectBase)=>void)){
+    forEveryObject(func: ((x:iObject)=>void)){
         for(let x = 0; x<this.layerKeysOrdered.length; x++){
             let key = this.layerKeysOrdered[x];
             for(var i=0; i<this.layers[key].objects.length; i++){
@@ -146,6 +165,16 @@ export class objectContainer{
             this.layers[this.layerKeysOrdered[x]].graphicsContainer.x = (-camera.getX() * (1-this.layers[this.layerKeysOrdered[x]].scrollSpeedX))/* - app.renderer.width/2*/;
             //this.layersContainer[this.layerKeysOrdered[x]].y = camera.getY();
         }
+    }
+
+
+    public boxIntersectionSpecific(initiator: iObject, boxData: boxCollider, targetObjects: string[]): iObject{
+        return this.loopThroughObjectsUntilCondition(targetObjects, (testCollisionWith: iObject)=>{
+            if(internalFunction.intersecting(initiator, boxData, testCollisionWith)){
+                return true;
+            }
+            return false;
+        });
     }
 
 

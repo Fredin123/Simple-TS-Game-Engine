@@ -11,7 +11,6 @@ export class internalFunction{
         let x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
         let y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
 
-
             
         return (
             x1 < x2 + collisionTarget.collisionBox.width &&

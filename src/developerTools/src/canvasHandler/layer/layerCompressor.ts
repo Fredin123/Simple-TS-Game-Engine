@@ -1,11 +1,13 @@
 import { uidGen } from "../../../../engine/tools/uidGen";
-import { objectMetaData } from "../../objectMetaData";
 import { subTileMeta } from "../../../../shared/tile/subTileMeta";
 import { tileAnimation } from "../../../../shared/tile/tileAnimation";
-import { tileSelector } from "../../tiles/tileSelector";
 import { layer } from "../../../../shared/layer";
 import { roomData } from "../../../../shared/roomData";
 import { resourcesTiles } from "../../tiles/resourcesTiles";
+import { objectTypes } from "../../../../shared/objectTypes";
+import { userObject } from "../../roomObjects/userObject";
+import { geomObjData } from "../../roomObjects/geomObjData";
+import { geometryObject } from "../../roomObjects/geometryObject";
 
 declare var window: any;
 
@@ -44,12 +46,16 @@ export class layerCompressor{
         compressedLayer.settings = l.settings;
 
         for(var d of l.metaObjectsInLayer){
-            if(d.tile != null){
-                d.isPartOfCombination = false;
+            if(d.type == objectTypes.userObject){
+                if((d as userObject).tile != null){
+                    (d as userObject).isPartOfCombination = false;
+                }
             }
         }
 
-        let staticTiles = l.metaObjectsInLayer.filter(t => t.tile != null && t.tile.tiles.length == 1);
+        let staticTiles = l.metaObjectsInLayer.filter(t => t.type == objectTypes.userObject 
+            && (t as userObject).tile != null 
+            && (t as userObject).tile!.tiles.length == 1) as userObject[];
         if(staticTiles.length > 0){
             let combinedStaticTiles = layerCompressor.combineStaticTilesIntoOne(staticTiles, roomName);
     
@@ -66,22 +72,31 @@ export class layerCompressor{
             });
         }
         
-        let nonStaticTiles = l.metaObjectsInLayer.filter(t => t.tile != null && t.tile.tiles.length > 1);
+        let nonStaticTiles = l.metaObjectsInLayer.filter(t => t.type == objectTypes.userObject 
+            && (t as userObject).tile != null && (t as userObject).tile!.tiles.length > 1);
         for(let t of nonStaticTiles){
             compressedLayer.metaObjectsInLayer.push(t);
         }
 
         //add rest of the objects to the layer
         l.metaObjectsInLayer.forEach(obj => {
-            if(obj.tile == null){
+            if(obj.type == objectTypes.userObject && (obj as userObject).tile == null){
                 compressedLayer.metaObjectsInLayer.push(obj);             
             }
         });
 
+        //add geometries
+        let layerGeometries = l.metaObjectsInLayer.filter(t => t.type == objectTypes.geometry) as geometryObject[];
+        let geomDataOnly:geomObjData[] = [];
+        layerGeometries.forEach(geom => {
+            geomDataOnly.push(geom.getDataObject());
+        });
+        compressedLayer.geometriesInLayer = geomDataOnly;
+
         return compressedLayer;
     }
 
-    private static combineStaticTilesIntoOne(staticTiles: objectMetaData[], roomName: string) : objectMetaData{
+    private static combineStaticTilesIntoOne(staticTiles: userObject[], roomName: string) : userObject{
         let canvas = document.createElement("canvas");
         let ctx = canvas.getContext("2d");
         let width = 0;
@@ -153,7 +168,7 @@ export class layerCompressor{
         let newTile = new subTileMeta(generatedName, xStart!, yStart!, width, height);
         let combinedTiles = new tileAnimation([newTile]);
 
-        let compressetMeta = new objectMetaData(xStart!, yStart!, generatedName, combinedTiles);
+        let compressetMeta = new userObject(xStart!, yStart!, generatedName, combinedTiles);
         compressetMeta.isCombinationOfTiles = true;
 
         return compressetMeta;

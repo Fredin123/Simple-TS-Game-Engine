@@ -5,4 +5,7 @@ export enum cursorType{
     eraser,
     grabber,
     editor,
+    geometry,
+    geometryEdit,
+    geometryRemove,
 }
