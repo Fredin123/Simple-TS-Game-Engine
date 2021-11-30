@@ -27,16 +27,18 @@ export class gameCamera{
         return this.cameraY;
     }
 
+    private angle = 0;
+    private distance = 0;
     public moveCamera(app: PIXI.Application, cameraBounds: number[]){
-        let angle = calculations.angleBetweenPoints((this.cameraX - this.targetX), (this.cameraY - this.targetY));
+        this.angle = calculations.angleBetweenPoints((this.cameraX - this.targetX), (this.cameraY - this.targetY));
             
-        let distance = calculations.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
+        this.distance = calculations.distanceBetweenPoints(this.cameraX, this.cameraY, this.targetX, this.targetY);
             
-        this.cameraX += Math.cos(angle) * distance * this.camMovementSpeedX;
-        this.cameraY += Math.sin(angle) * distance * this.camMovementSpeedY;
+        this.cameraX += Math.cos(this.angle) * this.distance * this.camMovementSpeedX;
+        this.cameraY += Math.sin(this.angle) * this.distance * this.camMovementSpeedY;
         
-        this.cameraX = Math.floor(this.cameraX);
-        this.cameraY = Math.floor(this.cameraY);
+        this.cameraX = Math.round(this.cameraX);
+        this.cameraY = Math.round(this.cameraY);
         
         
         if(cameraBounds[0] + cameraBounds[1] + cameraBounds[2] + cameraBounds[3] != 0){

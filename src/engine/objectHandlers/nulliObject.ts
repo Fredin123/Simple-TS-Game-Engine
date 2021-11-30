@@ -1,5 +1,5 @@
 import { objectBase } from "./objectBase";
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 import { iObject } from "./iObject";
 import { vector } from "../dataObjects/vector/vector";
 import { resourceMeta } from "../preload sources/resourceMeta";
@@ -27,7 +27,7 @@ export class nulliObject implements iObject{
     force: vector = new vector(0, 0);
     exportedString: string = "";
     _hasBeenMoved_Tick: number = 0;
-    _isColliding_Special: boolean = false;
+    _collidingWithPolygon: boolean = false;
     collidesWithPolygonGeometry = false;
     onLayer: number = 0;
     outputString: string = "";
@@ -37,6 +37,11 @@ export class nulliObject implements iObject{
     constructor(xp: number, yp: number) {
 
     }
+    afterInit(roomEvents: roomEvent): void {
+        
+    }
+    layerIndex: number = 0;
+    
     _hasCollidedWithPolygon: boolean = false;
 
         

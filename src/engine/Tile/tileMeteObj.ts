@@ -1,6 +1,6 @@
 import { objectBase } from "../objectHandlers/objectBase";
 import * as PIXI from 'pixi.js'
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 import { resourcesHand } from "../preload sources/resourcesHand";
 import { subTileMeta } from "../../shared/tile/subTileMeta";
 import { tileAnimation } from "../../shared/tile/tileAnimation";

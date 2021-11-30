@@ -2,25 +2,24 @@ import { boxCollider } from "./objectHandlers/collision/boxCollider";
 import { iObject } from "./objectHandlers/iObject";
 
 export class internalFunction{
-    
-    
-    static intersecting(initiator: iObject, initiadorCollisionBox: boxCollider, collisionTarget: iObject){
-        let x1 = initiator.g.x + initiadorCollisionBox.x;
-        let y1 = initiator.g.y + initiadorCollisionBox.y;
+    private static x1 = 0;
+    private static y1 = 0;
 
-        let x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
-        let y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
+    private static x2 = 0;
+    private static y2 = 0;
+    static intersecting(initiator: iObject, initiadorCollisionBox: boxCollider, collisionTarget: iObject){
+        this.x1 = initiator.g.x + initiadorCollisionBox.x;
+        this.y1 = initiator.g.y + initiadorCollisionBox.y;
+
+        this.x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
+        this.y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
 
             
         return (
-            x1 < x2 + collisionTarget.collisionBox.width &&
-            x1 + initiadorCollisionBox.width > x2 &&
-            y1 < y2 + collisionTarget.collisionBox.height &&
-            y1 + initiadorCollisionBox.height > y2
+            this.x1 < this.x2 + collisionTarget.collisionBox.width &&
+            this.x1 + initiadorCollisionBox.width > this.x2 &&
+            this.y1 < this.y2 + collisionTarget.collisionBox.height &&
+            this.y1 + initiadorCollisionBox.height > this.y2
           );
     }
-
-
-
-
 }

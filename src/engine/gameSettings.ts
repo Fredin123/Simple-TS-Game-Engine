@@ -10,7 +10,8 @@ export class gameSettings{
 
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
         PIXI.settings.PRECISION_FRAGMENT = PIXI.PRECISION.LOW;
-        PIXI.settings.TARGET_FPMS = 0.06;
+        PIXI.settings.ROUND_PIXELS = true;
+        //PIXI.settings.TARGET_FPMS = 0.06;
         
         /*if(this.stretchToWindow){
             this.windowStretchListener();

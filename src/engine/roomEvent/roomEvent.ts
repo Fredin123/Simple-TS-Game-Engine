@@ -1,20 +1,22 @@
 import { AdjustmentFilter } from '@pixi/filter-adjustment';
 import * as PIXI from 'pixi.js'
-import { objectTypes } from '../shared/objectTypes';
-import { objectGenerator } from '../shared/objectGenerator';
-import { roomData } from '../shared/roomData';
-import { gameCamera } from "./gameCamera";
-import { internalFunction } from "./internalFunctions";
-import { boxCollider } from "./objectHandlers/collision/boxCollider";
-import { iObject } from "./objectHandlers/iObject";
-import { objectBase } from "./objectHandlers/objectBase";
-import { objectContainer } from "./objectHandlers/objectContainer";
-import { interaction } from "./text interaction/interaction";
-import { ticker } from './ticker';
-import { tileMetaObj } from './Tile/tileMeteObj';
-import { task } from "./tools/task";
-import { polygonCollisionX } from './objectHandlers/collision/polygonCollision/polygonCollisionX';
+import { objectTypes } from '../../shared/objectTypes';
+import { objectGenerator } from '../../shared/objectGenerator';
+import { roomData } from '../../shared/roomData';
+import { gameCamera } from "../gameCamera";
+import { internalFunction } from "../internalFunctions";
+import { boxCollider } from "../objectHandlers/collision/boxCollider";
+import { iObject } from "../objectHandlers/iObject";
+import { objectBase } from "../objectHandlers/objectBase";
+import { objectContainer } from "../objectHandlers/objectContainer";
+import { ticker } from '../ticker';
+import { tileMetaObj } from '../Tile/tileMeteObj';
+import { task } from "../tools/task";
+import { polygonCollisionX } from '../objectHandlers/collision/polygonCollision/polygonCollisionX';
 import { Filter } from 'pixi.js';
+import { calculations } from '../calculations';
+import { layer } from '../../shared/layer';
+import { roomEventFlags } from './roomEventFlags';
 
 declare var LZString: any;
 
@@ -27,6 +29,7 @@ export class roomEvent {
     private keysDown: Record<string, boolean> = {};
     public objContainer: objectContainer;
      
+    private layerAndGraphicContainer: Record<string, PIXI.Container> = {};
 
     private gameKeysPressed: Record<string, boolean> = {};
     private gameKeysReleased: Record<string, boolean> = {};
@@ -38,28 +41,26 @@ export class roomEvent {
     private camera: gameCamera = new gameCamera();
     public tasker: task;
 
-    private interactionGraphics = new PIXI.Container();
-    private interaction: interaction;
 
     private generateObjects: objectGenerator = new objectGenerator();
     private tileContainer: iObject[] = [];
     private cameraBounds = [0, 0, 0, 0];
-    private roomStartString: string = "";
+    private roomStartString: string[] = [];
 
+    public flags: roomEventFlags = new roomEventFlags();
+
+    public storedTargetScene: [string, string[]] = ["", []];
 
     constructor(con: HTMLElement, tasker: task, app: PIXI.Application){
-        this.objContainer = new objectContainer();
+        this.objContainer = new objectContainer(this);
         this.container = con;
         this.tasker = tasker;
         this.keysDown = {};
         this.app = app;
-        this.interaction = new interaction(this.interactionGraphics);
 
         this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
         document.addEventListener("keydown", this.keyDownListener.bind(this), false);
         document.addEventListener("keyup", this.keyUpListener.bind(this), false);
-
-
     }
 
     getRenderer(){
@@ -70,52 +71,92 @@ export class roomEvent {
         this.app.stage.filters = addFilters;
     }
 
-    getStageFilters(){
-        return this.app.stage.filters;
-    }
-    
+    setLayerFilter(layerNames: string[], filters: Filter[]){
+        let keys = Object.keys(this.layerAndGraphicContainer);
+        let pixiContainerForFilter = new PIXI.Container();
 
-    queryKey(){
-        //Reset pressed keys
-        for(let key in this.gameKeysPressed){
-            if(this.gameKeysPressed.hasOwnProperty(key)){
-                this.gameKeysPressed[key] = false;
-            }
-        }
-
-        for(let key in this.gameKeysReleased){
-            if(this.gameKeysReleased.hasOwnProperty(key)){
-                this.gameKeysReleased[key] = false;
-            }
-        }
-
-        for(let key in this.keysDown){
-            if(this.keysDown.hasOwnProperty(key)){
-                if(this.keysDown[key] && (this.gameKeysPressed[key] == undefined || this.gameKeysPressed[key] == false) && (this.gameKeysHeld[key] == undefined || this.gameKeysHeld[key] == false)){
-                    this.gameKeysPressed[key] = true;
-                    this.gameKeysHeld[key] = true;
-                }else
-                if(this.keysDown[key] == false && this.gameKeysHeld[key] == true){
-                    this.gameKeysPressed[key] = false;
-                    this.gameKeysHeld[key] = false;
-                    this.gameKeysReleased[key] = true;
+        this.app.stage.removeChildren();
+        for(let key of keys){
+            //this.layerAndGraphicContainer[key].parent.removeChild(this.layerAndGraphicContainer[key]);
+            if(layerNames.length == 0 || layerNames.indexOf(key) == -1){
+                this.app.stage.addChild(this.layerAndGraphicContainer[key]);
+            }else{
+                pixiContainerForFilter.addChild(this.layerAndGraphicContainer[key]);
+                layerNames.splice(layerNames.indexOf(key), 1);
+                if(layerNames.length == 0){
+                    pixiContainerForFilter.filters = filters;
+                    this.app.stage.addChild(pixiContainerForFilter);
                 }
             }
         }
     }
 
+    setLayerFilterExclude(excludeLayer: string, filters: Filter[]){
+        let keys = Object.keys(this.layerAndGraphicContainer);
+        for(let key of keys){
+            if(excludeLayer != key){
+                this.layerAndGraphicContainer[key].filters = filters;
+            }
+        }
+    }
+
+    getStageFilters(){
+        return this.app.stage.filters;
+    }
+
+    getWindowWidth(){
+        return this.app.renderer.view.width;
+    }
+
+    getWindowHeight(){
+        return this.app.renderer.view.height;
+    }
+    
+
+    private key = "";
+    queryKey(){
+        //Reset pressed keys
+        for(this.key in this.gameKeysPressed){
+            if(this.gameKeysPressed.hasOwnProperty(this.key)){
+                this.gameKeysPressed[this.key] = false;
+            }
+        }
+
+        for(this.key in this.gameKeysReleased){
+            if(this.gameKeysReleased.hasOwnProperty(this.key)){
+                this.gameKeysReleased[this.key] = false;
+            }
+        }
+
+        for(this.key in this.keysDown){
+            if(this.keysDown.hasOwnProperty(this.key)){
+                if(this.keysDown[this.key] && (this.gameKeysPressed[this.key] == undefined || this.gameKeysPressed[this.key] == false) && (this.gameKeysHeld[this.key] == undefined || this.gameKeysHeld[this.key] == false)){
+                    this.gameKeysPressed[this.key] = true;
+                    this.gameKeysHeld[this.key] = true;
+                }else
+                if(this.keysDown[this.key] == false && this.gameKeysHeld[this.key] == true){
+                    this.gameKeysPressed[this.key] = false;
+                    this.gameKeysHeld[this.key] = false;
+                    this.gameKeysReleased[this.key] = true;
+                }
+            }
+        }
+    }
+
+    private mouseXPre = 0;
+    private mouseYPre = 0;
     mouseMoveListener(e: MouseEvent){
-        var x = e.clientX; //x position within the element.
-        var y = e.clientY;  //y position within the element.
+        this.mouseXPre = e.clientX; //x position within the element.
+        this.mouseYPre = e.clientY;  //y position within the element.
 
         if(e.target instanceof Element){
             var rect = e.target.getBoundingClientRect();
-            x -= rect.left;
-            y -= rect.top;
+            this.mouseXPre -= rect.left;
+            this.mouseYPre -= rect.top;
         }
 
-        this.mouseXPosition = x;
-        this.mouseYPosition = y;
+        this.mouseXPosition = this.mouseXPre;
+        this.mouseYPosition = this.mouseYPre;
     }
 
     keyDownListener(e: KeyboardEvent){
@@ -152,10 +193,21 @@ export class roomEvent {
         return this.mouseYPosition;
     }
 
+    keepObjectsWithinArea(objects: iObject[], originX: number, originY: number, radius: number){
+        let keptObjects: iObject[] = [];
+        for(var obj of objects){
+            if(calculations.distanceBetweenPoints(originX, originY, obj.g.x, obj.g.y) <= radius){
+                keptObjects.push(obj);
+            }
+        }
+        return keptObjects;
+    }
 
+
+    
     foreachObjectTypeBoolean(type: string, func: (arg0: iObject)=>boolean): boolean{
-        var specificObjects = this.objContainer.getSpecificObjects(type);
-        specificObjects.forEach(element => {
+        this.objContainer.getSpecificObjects(type)
+        .forEach(element => {
             if(element.objectName == type){
                 if(func(element)){
                     return true;
@@ -181,30 +233,25 @@ export class roomEvent {
         return returnResult;
     }
 
-    /*loopThroughObjectsUntilCondition(targets: string[], func:(arg:iObject)=>boolean): iObject{
-        for(var i=0; i<targets.length; i++){
-            if(this.objContainer.getSpecificObjects(targets[i]) != null){
-                for(var j=0; j<this.objContainer.getSpecificObjects(targets[i]).length; j++){
-                    if(func(this.objContainer.getSpecificObjects(targets[i])[j])){
-                        return this.objContainer.getSpecificObjects(targets[i])[j];
-                    }
-                }
-            }
-        }
-        return objectGlobalData.null;
+    /*sortLayer(layerNum: number, sortFunc: (a: iObject, b: iObject) => number){
+        this.objContainer.sortLayer(layerNum, sortFunc);
     }*/
 
+    getSpecificObjects(type:string){
+        return this.objContainer.getSpecificObjects(type);
+    }
 
+    private ICW_colliding: iObject | null = null;
     isCollidingWith(colSource: iObject, colSourceCollisionBox: boxCollider, colTargetType: string[]): iObject | null{
-        let colliding:iObject | null = null;
+        this.ICW_colliding = null;
         this.objContainer.loopThroughObjectsUntilCondition(colTargetType, (obj: iObject) => {
             if(internalFunction.intersecting(colSource, colSourceCollisionBox, obj)){
-                colliding = obj;
+                this.ICW_colliding = obj;
                 return true;
             }
             return false;
         });
-        return colliding;
+        return this.ICW_colliding;
     }
 
 
@@ -219,17 +266,24 @@ export class roomEvent {
         return colliding;
     }
 
+    addGraphicsDirectlyToLayer(graphic: PIXI.Graphics, layerName: string){
+        this.objContainer.addGraphicsDirectlyToLayer(graphic, layerName);
+    }
 
     addObject(obj: iObject, layerIndex:number){
         this.objContainer.addObject(obj, layerIndex);
+    }
+
+    addObjectLayerName(obj: iObject, layerString:string){
+        this.objContainer.addObjectLayerName(obj, layerString);
     }
 
     deleteObject(id:iObject){
         this.objContainer.deleteObject(id);
     }
 
-    goToRoom(roomName: string){
-
+    goToRoom(loadRoomString: string, roomStartString: string[]){
+        this.storedTargetScene = [loadRoomString, roomStartString];
     }
 
     handleObjectsEndStep(){
@@ -305,10 +359,10 @@ export class roomEvent {
         return this.roomStartString;
     }
 
-    loadRoom(loadRoomString: string, roomStartString: string){
+    loadRoom(loadRoomString: string, roomStartString: string[]){
         this.roomStartString = roomStartString;
         let loadRoom = (JSON.parse(LZString.decompressFromEncodedURIComponent(loadRoomString)) as roomData);
-        console.log("import room: ",loadRoom);
+        //console.log("import room: ",loadRoom);
         this.objContainer.removeObjects();
 
         this.cameraBounds[0] = loadRoom.cameraBoundsX ?? 0;
@@ -390,22 +444,24 @@ export class roomEvent {
                     blue: 0.9,
                     alpha: 1})
             ];
+            this.layerAndGraphicContainer[layer.layerName] = pixiContainerLayer;
             this.app.stage.addChild(pixiContainerLayer);
+            
         }
 
 
-        this.objContainer.forEveryObject((obj) => {
+        let allObjects = this.objContainer.getAllObjects();
+        allObjects.forEach(obj => {
             obj.init(this);
         });
 
+        allObjects.forEach(obj => {
+            obj.afterInit(this);
+        });
 
-        this.app.stage.addChild(this.interactionGraphics)
+
 
     }
 
-
-    getInteractionObject(){
-        return this.interaction;
-    }
 
 } 

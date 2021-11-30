@@ -26,6 +26,8 @@ const config = {
         '@pixi/constants': 'PIXI',
         '@pixi/display': 'PIXI',
         '@pixi/runner': 'PIXI',
+        'pixi-particles': 'PIXI.particles'
+        //'@pixi/particle-emitter': 'PIXI.particles'
       }
     },
     plugins: [babel({ babelHelpers: 'bundled' }), typescript()]

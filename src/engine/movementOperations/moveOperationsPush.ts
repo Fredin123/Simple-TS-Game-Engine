@@ -5,8 +5,9 @@ import { objectGlobalData } from "../objectHandlers/objectGlobalData";
 
 export class moveOperationsPush{
 
+    private static collided = false;
     public static pushObjectHorizontal(pusher: iObject, objectBeingPushed: iObject, sign: number, objContainer: objectContainer){
-        let collided = false;
+        this.collided = false;
         if(internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)){
             if(objectBeingPushed.collisionTargets.length == 0){
                 return pusher;
@@ -17,28 +18,28 @@ export class moveOperationsPush{
                     internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
                     && this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null){
                         objectBeingPushed.g.x += sign*-1;
-                        collided = true;
+                        this.collided = true;
                 }
                 return false;
             });
         }
-        if(collided){
+        if(this.collided){
             return objectBeingPushed;
         }
         return objectGlobalData.null;
     }
 
     public static pushObjectVertical(pusher: iObject, objectBeingPushed: iObject, sign: number, objContainer: objectContainer){
-        let collided = false;
+        this.collided = false;
         if(internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)){
             if(objectBeingPushed.collisionTargets.length == 0){
                 return pusher;
             }
             
             objectBeingPushed.g.y += sign;
-            if(objectBeingPushed._isColliding_Special){
+            if(objectBeingPushed._collidingWithPolygon){
                 objectBeingPushed.g.y += sign*-1;
-                collided = true;
+                this.collided = true;
                 return objectBeingPushed;
             }else{
                 objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
@@ -46,14 +47,14 @@ export class moveOperationsPush{
                         internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
                         && this.pushObjectVertical(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null){
                             objectBeingPushed.g.y += sign*-1;
-                            collided = true;
+                            this.collided = true;
                     }
                     return false;
                 });
             }
             
         }
-        if(collided){
+        if(this.collided){
             return objectBeingPushed;
         }
         return objectGlobalData.null;

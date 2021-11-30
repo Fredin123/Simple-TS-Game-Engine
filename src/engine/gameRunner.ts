@@ -1,10 +1,11 @@
 import * as PIXI from 'pixi.js'
 import { gameSettings } from "./gameSettings";
-import { roomEvent } from "./roomEvent";
+import { roomEvent } from "./roomEvent/roomEvent";
 import { task } from './tools/task';
 import {GodrayFilter} from '@pixi/filter-godray';
 import { ticker } from './ticker';
 import { scene_home } from '../scenes/scene_home';
+import { gameStartRoom } from '../scenes/gameStartRoom';
 
 declare var LZString: any;
 
@@ -14,9 +15,9 @@ export class gameRunner {
     private logicModule: roomEvent;
     private tasker: task = new task();
     private gameContainerElement: HTMLElement;
-    readonly targetFps: number = 60;
+    /*readonly targetFps: number = 60;
     private fpsLimiter: number = 0;
-    private frameDelay: number = 0;
+    private frameDelay: number = 0;*/
 
     godrayFilter = new GodrayFilter({
         lacunarity: 2.5,
@@ -32,13 +33,8 @@ export class gameRunner {
         this.app.renderer.view.height = 720;
         
 
-        this.app.renderer.view.style.width = 1280 + "px";
-        this.app.renderer.view.style.height = 720 + "px"
-
-
-        
-        //PIXI.settings.PRECISION_FRAGMENT = PIXI.PRECISION.HIGH;
-        PIXI.settings.ROUND_PIXELS = true;
+        /*this.app.renderer.view.style.width = 1280 + "px";
+        this.app.renderer.view.style.height = 720 + "px"*/
 
         
         this.gameContainerElement.appendChild(this.app.view);
@@ -47,14 +43,21 @@ export class gameRunner {
         this.logicModule = new roomEvent(this.gameContainerElement, this.tasker, this.app);
 
         var mainTicker = this.app.ticker.add((delta: any) => {
-            if(this.fpsLimiter == 0){
+            //if(this.fpsLimiter == 0){
                 this.logicModule.deltaTime = delta;
                 ticker.tick();
                 this.tasker.tick(this.logicModule);
+
+                if(this.logicModule.storedTargetScene[0] != ""){
+                    let roomName = this.logicModule.storedTargetScene[0];
+                    this.logicModule.storedTargetScene[0] = "";
+                    this.logicModule.loadRoom(roomName, this.logicModule.storedTargetScene[1]);
+                }
+
                 this.logicModule.queryKey();
                 this.logicModule.loopThrough();
                 this.logicModule.handleObjectsEndStep();
-                this.fpsLimiter = this.frameDelay;
+                //this.fpsLimiter = this.frameDelay;
 
                 if(this.logicModule.isCameraInUse()){
                     this.app.stage.pivot.x = Math.floor(this.logicModule.getCameraX() + this.logicModule.getCameraOffsetX());
@@ -70,16 +73,17 @@ export class gameRunner {
                 this.logicModule.moveCamera();
                 this.logicModule.updateLayerOffsets();
                 
+                
                 //this.godrayFilter.time += 0.005 * delta;
-            }
+            /*}
             if(this.fpsLimiter > 0){
                 this.fpsLimiter--;
-            }
+            }*/
             
         });
 
 
-        this.logicModule.loadRoom(scene_home, "");
+        this.logicModule.loadRoom(gameStartRoom, []);
     }
 
 

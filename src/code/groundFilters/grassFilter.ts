@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js'
 import { calculations } from '../../engine/calculations';
 import { iObject } from '../../engine/objectHandlers/iObject';
 import { nulliObject } from '../../engine/objectHandlers/nulliObject';
-import { roomEvent } from '../../engine/roomEvent';
+import { roomEvent } from '../../engine/roomEvent/roomEvent';
 
 export class grassFilter{
     public static primaryCollider: iObject = new nulliObject(0, 0);
@@ -31,6 +31,7 @@ export class grassFilter{
     const float SPACING = {spacing};
     const float MINGRASSHEIGHT = {MINGRASSHEIGHT};
     const float SPACEBETWEENEACHBLADE = {SPACEBETWEENEACHBLADE};
+    const float grassWidth = 0.00015;
 
     float randFromVec(vec2 co){
         return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
@@ -107,7 +108,7 @@ export class grassFilter{
                 float extraCurve = (distanceToBladeStartSquared/(grassBladeHeight*grassBladeHeight)) * 0.0015 * windStrength *  grassHeightStrengthModify * steepSlopeSwayLimit;
                 
 
-                float bladeWidthMoon = 0.0002;
+                
                 
                 float bladePosition = lineStart+(float(b)*SPACEBETWEENEACHBLADE) + randomBladePosition;
 
@@ -116,8 +117,8 @@ export class grassFilter{
 
                 float alpha = 0.0;
                 
-                if((vTextureCoord.x) > grassBladeLeftSideStart - bladeWidthMoon
-                && (vTextureCoord.x) < grassBladeRightSideStart + bladeWidthMoon
+                if((vTextureCoord.x) > grassBladeLeftSideStart - grassWidth
+                && (vTextureCoord.x) < grassBladeRightSideStart + grassWidth
                 && distanceToBladeStartSquared < (grassBladeHeight*grassBladeHeight)){
                     alpha = 1.0;
                 }
@@ -177,7 +178,7 @@ export class grassFilter{
     
                 float topYPos = (relativePosition*heightDifference);
     
-                float grassTop = yPolPos[lineIndex] - grassMaxHeight*1.0;
+                float grassTop = yPolPos[lineIndex] - grassMaxHeight - abs(heightDifference);
                 float groundY = yPolPos[lineIndex] + topYPos;
                 if(vTextureCoord.y > grassTop
                 && vTextureCoord.y < groundY){
@@ -249,11 +250,11 @@ export class grassFilter{
         this.grassFragment.cameraSize = 0.078;//0.08;
         this.grassFragment.grassMaxHeight = 0.0225;
 
-        console.log("movingGrassFragShaderParamsFixed: ",movingGrassFragShaderParamsFixed);
-        console.log("grassFragment: ", this.grassFragment);
+        /*console.log("movingGrassFragShaderParamsFixed: ",movingGrassFragShaderParamsFixed);
+        console.log("grassFragment: ", this.grassFragment);*/
         
         this.myFilter = new PIXI.Filter(undefined, movingGrassFragShaderParamsFixed, this.grassFragment);
-        this.myFilter.resolution = 0.5;
+        //this.myFilter.resolution = 0.5;
         this.myFilter.autoFit = false;
     }
 
@@ -293,7 +294,6 @@ export class grassFilter{
 
         this.grassFragment.collisionPoints[2] = (primaryColliderXDelayed - this.filterAreaX)/this.filterAreaWidth;
         this.grassFragment.collisionPoints[3] = 1.0-(((this.filterAreaY-primaryColliderYDelayed)/this.filterAreaHeight));
-
 
 
         //delayed follow 2

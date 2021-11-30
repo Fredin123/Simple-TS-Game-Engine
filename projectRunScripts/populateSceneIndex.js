@@ -18,7 +18,7 @@ getDirectories(path.join(__dirname, '../')+'src/scenes', function (err, res) {
   } else {
     res.forEach(dir => {
         objectDirsAndName.push(dir);
-        let exploded = dir.split("/");
+        let exploded = dir.split("/scenes");
         if(exploded[exploded.length-1].indexOf(".ts") != -1){
             sceneNames.push(exploded[exploded.length-1]);
         }
@@ -30,14 +30,15 @@ getDirectories(path.join(__dirname, '../')+'src/scenes', function (err, res) {
 
 
 function insertScenes(sceneNames){
-    console.log(sceneNames);
     var imports = "";
     var scriptBody = "";
     sceneNames.forEach(scene => {
         let sceneNoFileType = scene.substring(0, scene.indexOf(".ts"));
-        if(sceneNoFileType != "scene_index"){
-            imports += 'import { '+sceneNoFileType+' } from "./'+sceneNoFileType+'";\n';
-            scriptBody += '"'+sceneNoFileType+'": '+sceneNoFileType+',';
+        let splitUrl = sceneNoFileType.split("/");
+        let sceneNameOnly = splitUrl[splitUrl.length-1];
+        if(sceneNameOnly != "scene_index"){
+            imports += 'import { '+sceneNameOnly+' } from "./'+sceneNoFileType+'";\n';
+            scriptBody += '"'+sceneNameOnly+'": '+sceneNameOnly+',';
         }
         
     });

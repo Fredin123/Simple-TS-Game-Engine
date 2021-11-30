@@ -38,29 +38,16 @@ export class handleCanvas{
         this.layerDeleteButton = document.getElementById("removeLayerButton") as HTMLButtonElement;
         this.layerDeleteButton.addEventListener("mouseup", this.deleteLayer.bind(this));
 
-        
 
-        
-
-        
-
-        
 
         document.addEventListener("mousemove", this.mouseListenerMove.bind(this));
         document.addEventListener("mousedown", this.mouseListenerDown.bind(this));
         document.addEventListener("mouseup", this.mouseListenerUp.bind(this));
         document.addEventListener("keypress", this.keysDown.bind(this));
         document.addEventListener("keyup", this.keysUp.bind(this));
-
-
-
-        
-
         
 
         document.getElementById("pointer")?.addEventListener("mouseup", this.clickPointer.bind(this));
-
-        
     }
 
     createLayer() {
@@ -138,8 +125,10 @@ export class handleCanvas{
             this.previousMouseX = this.mouseXPosition;
             this.previousMouseY = this.mouseYPosition;
         }else if(cursorData.cursorType == cursorType.pensil && this.canvasRenderPart.layerHandler.selectedLayer != null){
+            console.log("this.cursor: ",this.cursor);
             if(this.cursor.objectSelected != null || this.cursor.currentSubTile != null){
                 let nameOfMetaObject: string | undefined = this.cursor.objectSelected?.objectName!;
+                console.log("Placing this object: ",nameOfMetaObject);
                 if(nameOfMetaObject == null){
                     nameOfMetaObject = this.cursor.currentSubTile?.name;
                 }
@@ -246,6 +235,13 @@ export class handleCanvas{
         this.mouseXPosition = mousePosition[0];
         this.mouseYPosition = mousePosition[1];
         
+        document.getElementById("mousePositionContainer")!.innerHTML = "x: "+(this.mouseXPosition-this.canvasRenderPart.gridXOffset)+"    y: "+(this.mouseYPosition-this.canvasRenderPart.gridYOffset);
+
+        let objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+        if(objTarget.length != 0 && objTarget[0].type != objectTypes.geometry){
+            document.getElementById("objectNameContainer")!.innerHTML = objTarget[0].name;
+        }
+
         if(this.mouseDown){
             this.mouseListenerDown(e);
         }

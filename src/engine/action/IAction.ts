@@ -1,6 +1,6 @@
 import { iVector } from "../dataObjects/vector/iVector";
 import { iObject } from "../objectHandlers/iObject";
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 import { movementDirection } from "./attackDirections";
 import { genericStatus } from "./genericStatus";
 

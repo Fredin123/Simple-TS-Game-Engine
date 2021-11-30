@@ -99,6 +99,15 @@ export class userObject implements IObjectMeta{
     }
 
     render(xoffset: number, yoffset: number, tileCounter:number, context: CanvasRenderingContext2D){
+        console.log("Draw userObject");
+        context.beginPath();
+        context.arc(this.x + xoffset+16, this.y + yoffset+16, 16, 0, 2 * Math.PI, false);
+        context.fillStyle = 'white';
+        context.fill();
+        context.lineWidth = 5;
+        context.strokeStyle = 'blue';
+        context.stroke();
+
         if(this.tile == null){
             if(fileSystemHandlerObjects.classAndImage[this.name] != null){
                 if(fileSystemHandlerObjects.classAndImage[this.name].complete){

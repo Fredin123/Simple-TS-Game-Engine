@@ -4,30 +4,35 @@ import { iVector } from "../dataObjects/vector/iVector";
 import { horizontalMovement } from "./horizontalMovement";
 import { verticalMovement } from "./verticalMovement/verticalMovement";
 import { polygonCollision } from "./polygonCollision";
+import { nullVector } from "../dataObjects/vector/nullVector";
 
 
 export class movementOperations{
 
 
+    private static xdiff = 0;
+    private static ydiff = 0;
+    private static polygonCollisionTest: [boolean, iVector] = [false, new nullVector()];
     static moveByForce(target: iObject, force: iVector, 
         collisionNames: string[], objContainer: objectContainer, deltaTime: number){
-        force.Dx = force.Dx * deltaTime;
-        force.Dy = force.Dy * deltaTime;
+        force.Dx = force.Dx;
+        force.Dy = force.Dy;
 
         force.Dx *= target.airFriction;
         force.Dy *= target.airFriction;
 
-        let xdiff = force.Dx;
-        let ydiff = force.Dy;
+        this.xdiff = force.Dx;
+        this.ydiff = force.Dy;
         
         target.gravity.increaseMagnitude(target.weight);
         
-        let polygonCollisionTest = polygonCollision.collisionTest(target, Math.round(xdiff), Math.round(ydiff), objContainer);
+        this.polygonCollisionTest = polygonCollision.collisionTest(target, Math.round(this.xdiff), Math.round(this.ydiff), 
+                                objContainer);
 
-        force.Dx += polygonCollisionTest[1].Dx;
-        force.Dy += polygonCollisionTest[1].Dy;
+        force.Dx += this.polygonCollisionTest[1].Dx;
+        force.Dy += this.polygonCollisionTest[1].Dy;
         
-        target.gravity.magnitude = polygonCollisionTest[1].magnitude;
+        target.gravity.magnitude = this.polygonCollisionTest[1].magnitude;
 
         
         /* if(target.gravity.magnitude < 1){
@@ -38,10 +43,10 @@ export class movementOperations{
 
         
 
-        horizontalMovement.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
+        horizontalMovement.moveForceHorizontal(Math.round(this.xdiff), target, collisionNames, objContainer);
         
-        if(polygonCollisionTest[0] == false){
-            verticalMovement.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
+        if(this.polygonCollisionTest[0] == false){
+            verticalMovement.moveForceVertical(Math.round(this.ydiff), target, collisionNames, objContainer);
         }
     }
 

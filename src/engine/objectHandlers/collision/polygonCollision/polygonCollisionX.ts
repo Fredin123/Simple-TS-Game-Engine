@@ -1,6 +1,6 @@
 import { objectBase } from "../../objectBase";
 import * as PIXI from 'pixi.js'
-import { roomEvent } from "../../../roomEvent";
+import { roomEvent } from "../../../roomEvent/roomEvent";
 import { iObject } from "../../iObject";
 import { vector } from "../../../dataObjects/vector/vector";
 import { nullVector } from "../../../dataObjects/vector/nullVector";
@@ -105,7 +105,7 @@ export class polygonCollisionX extends objectBase{
             //Moving grass
             let grassContainer = new PIXI.Container();
             
-            this.filterGrass = new grassFilter(polygonPosGlslAdapted, spacingConst, 9, "0.001", this.width/this.highestPoint,
+            this.filterGrass = new grassFilter(polygonPosGlslAdapted, spacingConst, 11, "0.001", this.width/this.highestPoint,
                 this.width, this.highestPoint, this.g.x, this.g.y);
             grassContainer.addChild(polygonGraphics);
             grassContainer.filters = [this.filterGrass.filter()];
@@ -118,11 +118,12 @@ export class polygonCollisionX extends objectBase{
         });
     }
 
+    private currentTime = 0;
     logic(l: roomEvent){
         super.logic(l);
 
-        let currentTime = this.filterGrass!.grassFragment.time;
-        currentTime += 0.015;
+        this.currentTime = this.filterGrass!.grassFragment.time;
+        this.currentTime += 0.015;
         this.filterGrass?.updateCollisionPositions(l);
         
 
@@ -131,22 +132,29 @@ export class polygonCollisionX extends objectBase{
     
 
 
+    private YFL_edgeIndex = 0;
+    private YFL_xFirst = 0;
+    private YFL_yFirst = 0;
+    private YFL_xLast = 0;
+    private YFL_yLast = 0;
+    private YFL_steps = 0;
+    private YFL_stepSize = 0;
     private getYFromLine(xIndex: number){
         
-        let edgeIndex = Math.floor((xIndex/this.pointSpacing))*2;
+        this.YFL_edgeIndex = Math.floor((xIndex/this.pointSpacing))*2;
 
-        let xFirst = this.edgesPoints[edgeIndex];
-        let yFirst = this.edgesPoints[edgeIndex+1];
-        let xLast = this.edgesPoints[edgeIndex+2];
-        let yLast = this.edgesPoints[edgeIndex+2+1];
+        this.YFL_xFirst = this.edgesPoints[this.YFL_edgeIndex];
+        this.YFL_yFirst = this.edgesPoints[this.YFL_edgeIndex+1];
+        this.YFL_xLast = this.edgesPoints[this.YFL_edgeIndex+2];
+        this.YFL_yLast = this.edgesPoints[this.YFL_edgeIndex+2+1];
 
-        if(xIndex >= xFirst && xIndex <= xLast){
-            if(yFirst == yLast){
-                return yFirst;
+        if(xIndex >= this.YFL_xFirst && xIndex <= this.YFL_xLast){
+            if(this.YFL_yFirst == this.YFL_yLast){
+                return this.YFL_yFirst;
             }else{
-                let steps = xLast - xFirst;
-                let stepSize = (yFirst-yLast)/steps;
-                return yFirst + (stepSize*(xFirst-xIndex));
+                this.YFL_steps = this.YFL_xLast - this.YFL_xFirst;
+                this.YFL_stepSize = (this.YFL_yFirst-this.YFL_yLast)/this.YFL_steps;
+                return this.YFL_yFirst + (this.YFL_stepSize*(this.YFL_xFirst-xIndex));
             }
         }
             
@@ -160,73 +168,89 @@ export class polygonCollisionX extends objectBase{
         return 32;
     }
 
+    private CV_pointSpacing = 0;
+    private CV_edgesPoints: number[] = [];
+    private CV_pointY = 0;
+    private CV_collisionVector: iVector = new nullVector();
+    private CV_xFirst = 0;
+    private CV_yFirst = 0;
+    private CV_xLast = 0;
+    private CV_yLast = 0;
+    private CV_i = 0;
     private getCollisionVector(xIndex: number){
-        var pointSpacing = this.width / (this.polygon.length-1);
-        let edgesPoints: number[] = [];
-        for(let i=0; i<this.polygon.length; i++){
-            let pointY = this.polygon[i];
-            edgesPoints.push((i*pointSpacing), -pointY);
+        this.CV_pointSpacing = this.width / (this.polygon.length-1);
+        this.CV_edgesPoints = [];
+        for(this.CV_i=0; this.CV_i<this.polygon.length; this.CV_i++){
+            this.CV_pointY = this.polygon[this.CV_i];
+            this.CV_edgesPoints.push((this.CV_i*this.CV_pointSpacing), -this.CV_pointY);
         }
 
-        let collisionVector: iVector = new nullVector();
-        for(var i=0; i<edgesPoints.length; i+=2){
-            let xFirst = edgesPoints[i];
-            let yFirst = edgesPoints[i+1];
+        this.CV_collisionVector = new nullVector();
+        for(this.CV_i=0; this.CV_i<this.CV_edgesPoints.length; this.CV_i+=2){
+            this.CV_xFirst = this.CV_edgesPoints[this.CV_i];
+            this.CV_yFirst = this.CV_edgesPoints[this.CV_i+1];
 
-            let xLast = edgesPoints[i+2];
-            let yLast = edgesPoints[i+2+1];
-            if(xIndex >= xFirst && xIndex <= xLast){
-                collisionVector = this.createVectorFromPoints(xFirst, yFirst, xLast, yLast);
+            this.CV_xLast = this.CV_edgesPoints[this.CV_i+2];
+            this.CV_yLast = this.CV_edgesPoints[this.CV_i+2+1];
+            if(xIndex >= this.CV_xFirst && xIndex <= this.CV_xLast){
+                this.CV_collisionVector = this.createVectorFromPoints(this.CV_xFirst, this.CV_yFirst, this.CV_xLast, this.CV_yLast);
             }
         }
 
         if(xIndex < 0){
-            collisionVector = this.createVectorFromPoints(edgesPoints[0], edgesPoints[1], edgesPoints[2], edgesPoints[3]);
-        }else if(xIndex > (edgesPoints.length-1)*pointSpacing){
-            collisionVector = this.createVectorFromPoints(edgesPoints[(edgesPoints.length-1)], edgesPoints[(edgesPoints.length-1)+1], 
-            edgesPoints[(edgesPoints.length-1)+2], edgesPoints[(edgesPoints.length-1)+3]);
+            this.CV_collisionVector = this.createVectorFromPoints(this.CV_edgesPoints[0], this.CV_edgesPoints[1], this.CV_edgesPoints[2], this.CV_edgesPoints[3]);
+        }else if(xIndex > (this.CV_edgesPoints.length-1)*this.CV_pointSpacing){
+            this.CV_collisionVector = this.createVectorFromPoints(this.CV_edgesPoints[(this.CV_edgesPoints.length-1)], this.CV_edgesPoints[(this.CV_edgesPoints.length-1)+1], 
+            this.CV_edgesPoints[(this.CV_edgesPoints.length-1)+2], this.CV_edgesPoints[(this.CV_edgesPoints.length-1)+3]);
         }
 
-        return collisionVector;
+        return this.CV_collisionVector;
     }
 
+
+    private triSide1 = 0;
+    private triSide2 = 0;
+    private length = 0;
+    private vectorAngle = 0;
+    private dx = 0;
+    private dy = 0;
     private createVectorFromPoints(x: number, y: number, x2: number, y2: number){
-        let triSide1 = Math.abs(x) - Math.abs(x2);
-        let triSide2 = Math.abs(y) - Math.abs(y2);
-        let length = Math.sqrt(Math.pow(triSide1, 2) + Math.pow(triSide2, 2));
-        let vectorAngle = Math.atan2(x - x2, y - y2);
-        let dx = Math.cos(vectorAngle) * length;
-        let dy = Math.sin(vectorAngle) * length;
+        this.triSide1 = Math.abs(x) - Math.abs(x2);
+        this.triSide2 = Math.abs(y) - Math.abs(y2);
+        this.length = Math.sqrt(Math.pow(this.triSide1, 2) + Math.pow(this.triSide2, 2));
+        this.vectorAngle = Math.atan2(x - x2, y - y2);
+        this.dx = Math.cos(this.vectorAngle) * this.length;
+        this.dy = Math.sin(this.vectorAngle) * this.length;
         
-        return new vector(dx, dy);
+        return new vector(this.dx, this.dy);
     }
     
 
+    private CT_index = 0;
+    private CT_spaceFromTop = 0;
+    private CT_collisionTestY = 0;
+    private CT_collisionLine: iVector = new nullVector();
+    private CT_steepness = 0;
     public collisionTest(obj: iObject): [boolean, iVector]{
 
-        let index =  (obj.g.x + obj.collisionBox.x + (obj.collisionBox.width/2)) - this.g.x;
-        let extraCheckTop = 0;
-            
-        if(obj.force.Dx < -1){
-            extraCheckTop = 16;
-        }
+        this.CT_index =  (obj.g.x + obj.collisionBox.x + (obj.collisionBox.width/2)) - this.g.x;
 
-        let spaceFromTop = this.getYFromLine(index);
+        this.CT_spaceFromTop = this.getYFromLine(this.CT_index);
         //console.log("index: ",index, "  spaceFromTop: ",spaceFromTop);
-        let collisionTestY = obj.g.y + obj.collisionBox.y + obj.collisionBox.height;
+        this.CT_collisionTestY = obj.g.y + obj.collisionBox.y + obj.collisionBox.height;
         //console.log("if ",collisionWithPosition," > ",(this.g.y - (spaceFromTop)));
-        let collision = false;
-        if(obj.force.Dy > 0 && collisionTestY > this.g.y + (spaceFromTop)-5){
-            obj.g.y = this.g.y + (spaceFromTop) - obj.collisionBox.y - obj.collisionBox.height;
-            collisionTestY = obj.g.y + obj.collisionBox.y + obj.collisionBox.height;
+        
+        if(obj.force.Dy > 0 && this.CT_collisionTestY > this.g.y + (this.CT_spaceFromTop)-5){
+            obj.g.y = this.g.y + (this.CT_spaceFromTop) - obj.collisionBox.y - obj.collisionBox.height;
+            this.CT_collisionTestY = obj.g.y + obj.collisionBox.y + obj.collisionBox.height;
 
-            let collisionLine = this.getCollisionVector(index);
+            this.CT_collisionLine = this.getCollisionVector(this.CT_index);
             //console.log("collisionLine: ",collisionLine.);
             
             //console.log("steepness: ",steepness);
             //console.log("collision angle: ",(360+90 + calculations.radiansToDegrees(collisionLine.delta))%360, "  dx: ",collisionLine.Dx);
-            if(collisionLine.Dx > 0){
-                let steepness = 1-((collisionLine.delta/(Math.PI/2))/-1);
+            if(this.CT_collisionLine.Dx > 0){
+                this.CT_steepness = 1-((this.CT_collisionLine.delta/(Math.PI/2))/-1);
                 //vector going north (vector starts at west point)
                 //
                 //
@@ -239,23 +263,23 @@ export class polygonCollisionX extends objectBase{
                 //collisionLine.delta
 
                 //Make collision line point down
-                collisionLine.Dx = -collisionLine.Dx;
-                collisionLine.Dy = -collisionLine.Dy;
-                collisionLine.magnitude = -obj.gravity.magnitude*steepness;
+                this.CT_collisionLine.Dx = -this.CT_collisionLine.Dx;
+                this.CT_collisionLine.Dy = -this.CT_collisionLine.Dy;
+                this.CT_collisionLine.magnitude = -obj.gravity.magnitude*this.CT_steepness;
                 obj.force.Dy = 0;
                 obj.force.Dx *= this.friction;
                 if(obj.force.Dx > 0){
-                    obj.force.Dx *= (1-(steepness/3));
+                    obj.force.Dx *= (1-(this.CT_steepness/3));
                 }else if(obj.force.Dx < 0){
-                    obj.force.Dx *= 1+(steepness/3);
+                    obj.force.Dx *= 1+(this.CT_steepness/3);
                 }
                 //obj.gravity = collisionLine;
                 obj.verticalCollision = 1;
 
-                return [true, collisionLine];
+                return [true, this.CT_collisionLine];
                 //obj.gravity.magnitude = 0; 
-            }else if(collisionLine.Dx < 0){
-                let steepness = 1+((collisionLine.delta/(Math.PI/2))/-1);
+            }else if(this.CT_collisionLine.Dx < 0){
+                this.CT_steepness = 1+((this.CT_collisionLine.delta/(Math.PI/2))/-1);
                 //vector going north (vector starts at east point)
                 //
                 //
@@ -267,20 +291,20 @@ export class polygonCollisionX extends objectBase{
                 //
 
                 //Make collision line point down
-                collisionLine.Dx = -collisionLine.Dx;
-                collisionLine.Dy = -collisionLine.Dy;
-                collisionLine.magnitude = obj.gravity.magnitude*steepness;
+                this.CT_collisionLine.Dx = -this.CT_collisionLine.Dx;
+                this.CT_collisionLine.Dy = -this.CT_collisionLine.Dy;
+                this.CT_collisionLine.magnitude = obj.gravity.magnitude*this.CT_steepness;
                 obj.force.Dy = 0;
                 obj.force.Dx *= this.friction;
                 if(obj.force.Dx < 0){
-                    obj.force.Dx *= (1-(steepness/3));
+                    obj.force.Dx *= (1-(this.CT_steepness/3));
                 }else if(obj.force.Dx > 0){
-                    obj.force.Dx *= 1+(steepness/3);
+                    obj.force.Dx *= 1+(this.CT_steepness/3);
                 }
                 //obj.gravity = collisionLine;
                 obj.verticalCollision = 1;
                 
-                return [true, collisionLine];
+                return [true, this.CT_collisionLine];
             }
             
             

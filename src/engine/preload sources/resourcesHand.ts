@@ -1,7 +1,7 @@
 import { tileAnimation } from "../../shared/tile/tileAnimation";
 import { calculations } from "../calculations";
-import * as PIXI from 'pixi.js'
-//import { Howl } from 'howler';
+import * as PIXI from 'pixi.js';
+import * as FontFaceObserver from 'fontfaceobserver';
 
 declare var Howl: any;
 
@@ -18,16 +18,22 @@ export class resourcesHand{
 
     constructor(app: PIXI.Application, onCompleteCallback: ()=>void, alternativePath: string = ""){
         resourcesHand.app = app;
-
-
-        fetch(alternativePath+'/resources.txt', {
-            method: 'get'
-        })
-        .then(response => response.text())
-        .then(textData => resourcesHand.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath))
-        .catch(err => {
-            console.log("err: "+err);
+        //webfontloader.load
+        let font = new FontFaceObserver.default('CrimsonPro-Black');
+ 
+        font.load().then(function () {
+            console.log('smallburg-Regular has loaded');
+            fetch(alternativePath+'/resources.txt', {
+                method: 'get'
+            })
+            .then(response => response.text())
+            .then(textData => resourcesHand.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath))
+            .catch(err => {
+                console.log("err: "+err);
+            });
         });
+
+        
 
         
     }
@@ -44,6 +50,7 @@ export class resourcesHand{
         resourcesHand.resourcesToLoad.forEach(resourceDir => {
             let resourceDirsSplit = resourceDir.split("/");
             let resourceName = resourceDirsSplit[resourceDirsSplit.length-1];
+            console.log("Add resource ", resourceDir);
             resourcesHand.app.loader.add(resourceName, alternativePath+"resources/"+resourceDir);
         });
 
@@ -59,6 +66,7 @@ export class resourcesHand{
                 }else if(split[0] == "tiles"){
                     resourcesHand.storeStaticTile(name);
                 }else if(name.indexOf(".png") != -1){
+                    //console.log("Load resource: ",name);
                     resourcesHand.storeStaticTile(name);
                 }else if(name.indexOf(".mp4") != -1){
                     resourcesHand.storeVideoAsAnimatedTexture("resources/"+resource, name);
@@ -185,7 +193,7 @@ export class resourcesHand{
         return new PIXI.Sprite(resourcesHand.staticTile[genName]);
     }
 
-    static resourcePNG(resourceName: string): PIXI.Texture | undefined{
+    /*static resourcePNG(resourceName: string): PIXI.Texture | undefined{
         for(let resourceDir of resourcesHand.resourcesToLoad){
             let splitDirs = resourceDir.split("/");
             let nameAndMeta = splitDirs[splitDirs.length-1];
@@ -198,7 +206,7 @@ export class resourcesHand{
         }
         
         throw new Error("PNG resource does not exist: "+resourceName);
-    }
+    }*/
 
     static convertGraphicsToTexture(graphics: PIXI.Graphics){
         var texture = this.app.renderer.generateTexture(graphics);

@@ -1,4 +1,4 @@
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 import { tools } from "../tools/tools";
 import { objectBase } from "./objectBase";
 import { nulliObject } from "./nulliObject";
@@ -21,9 +21,21 @@ export class objectContainer{
     private objectToRemoveBuffer: Array<iObject> = [];
     private objectToAddBuffer: Array<[iObject, number]> = [];
 
-    constructor(){
+    private roomEvents: roomEvent;
+
+    constructor(roomEvents: roomEvent){
+        this.roomEvents = roomEvents;
         this.specificObjects = {};
         this.layers = {};
+    }
+
+    /*sortLayer(layerNum: number, sortFunc: (a: iObject, b: iObject) => number){
+        this.layers[layerNum].objects.sort(sortFunc);
+    }*/
+
+    addGraphicsDirectlyToLayer(graphic: PIXI.Graphics, layerName: string){
+        let layerIndex = this.layerNames[layerName];
+        this.layers[layerIndex].graphicsContainer.addChild(graphic);
     }
 
     removeObjects(){
@@ -46,8 +58,10 @@ export class objectContainer{
         }
     }
 
+
     addObjectDirectly(obj: iObject, targetlayer:number, hidden: boolean = false){
         //Add specific classes
+        
         obj.onLayer = targetlayer;
         let objName = tools.getClassNameFromConstructorName(obj.constructor.toString());
         if(this.specificObjects[objName] == null){
@@ -56,11 +70,14 @@ export class objectContainer{
         this.specificObjects[objName].push(obj);
         
         if(this.layers[targetlayer] != undefined){
+            obj.layerIndex = this.layers[targetlayer].objects.length;
             this.layers[targetlayer].objects.push(obj);
             if(hidden == false){
                 this.layers[targetlayer].graphicsContainer.addChild(obj.g);
             }
         }
+
+        obj.init(this.roomEvents);
         
     }
 
@@ -68,11 +85,19 @@ export class objectContainer{
         this.objectToAddBuffer.push([obj, layerIndex]);
     }
 
+    addObjectLayerName(obj: iObject, layerString:string){
+        let layerIndex = this.layerNames[layerString];
+        this.objectToAddBuffer.push([obj, layerIndex]);
+    }
+
+    private PFL_addThis: [iObject, number] = [new nulliObject(0, 0), 0];
     populateFromList(){
-        for(let addThis of this.objectToAddBuffer){
-            
-            
-            this.addObjectDirectly(addThis[0], addThis[1]);
+        for(this.PFL_addThis of this.objectToAddBuffer){
+            this.addObjectDirectly(this.PFL_addThis[0], this.PFL_addThis[1]);
+        }
+
+        for(this.PFL_addThis of this.objectToAddBuffer){
+            this.PFL_addThis[0].afterInit(this.roomEvents);
         }
 
         this.objectToAddBuffer.length = 0;
@@ -82,25 +107,30 @@ export class objectContainer{
         this.objectToRemoveBuffer.push(id);
     }
 
+    private PO_removeThis: iObject = new nulliObject(0, 0);
+    private PO_target: iObject = new nulliObject(0, 0);
     purgeObjects(){
-        for(let removeThis of this.objectToRemoveBuffer){
-            for(let target of this.specificObjects[removeThis.objectName]){
-                if(target.ID == removeThis.ID){
-                    this.specificObjects[removeThis.objectName].splice(this.specificObjects[removeThis.objectName].indexOf(target), 1);
-                    break;
-                }
-            }
-
-            this.layerKeysOrdered.forEach(layerNumber => { 
-                
-                for(let target of this.layers[layerNumber].objects){
-                    if(target.ID == removeThis.ID){
-                        target.g.destroy();
-                        this.layers[layerNumber].objects.splice(this.layers[layerNumber].objects.indexOf(target), 1);
+        for(this.PO_removeThis of this.objectToRemoveBuffer){
+            if(this.specificObjects[this.PO_removeThis.objectName] != undefined){
+                for(this.PO_target of this.specificObjects[this.PO_removeThis.objectName]){
+                    if(this.PO_target.ID == this.PO_removeThis.ID){
+                        this.specificObjects[this.PO_removeThis.objectName].splice(this.specificObjects[this.PO_removeThis.objectName].indexOf(this.PO_target), 1);
                         break;
                     }
                 }
-            });
+    
+                this.layerKeysOrdered.forEach(layerNumber => { 
+                    
+                    for(this.PO_target of this.layers[layerNumber].objects){
+                        if(this.PO_target.ID == this.PO_removeThis.ID){
+                            this.PO_target.g.destroy();
+                            this.layers[layerNumber].objects.splice(this.layers[layerNumber].objects.indexOf(this.PO_target), 1);
+                            break;
+                        }
+                    }
+                });
+            }
+            
         }
 
         this.objectToRemoveBuffer.length = 0;
@@ -108,9 +138,11 @@ export class objectContainer{
 
 
     loopThroughObjectsUntilCondition(targets: string[], func:(arg:iObject)=>boolean): iObject{
-        for(var i=0; i<targets.length; i++){
+        var i=0;
+        for(;i<targets.length; i++){
             if(this.specificObjects[targets[i]] != null){
-                for(var j=0; j<this.specificObjects[targets[i]].length; j++){
+                var j=0;
+                for(; j<this.specificObjects[targets[i]].length; j++){
                     if(func(this.specificObjects[targets[i]][j])){
                         return this.specificObjects[targets[i]][j];
                     }
@@ -122,9 +154,11 @@ export class objectContainer{
 
     filterObjects(targets: string[], func:(arg:iObject)=>boolean): iObject[]{
         let foundObjects : iObject[] = [];
-        for(var i=0; i<targets.length; i++){
+        let i=0;
+        for(; i<targets.length; i++){
             if(this.specificObjects[targets[i]] != null){
-                for(var j=0; j<this.specificObjects[targets[i]].length; j++){
+                let j=0;
+                for(; j<this.specificObjects[targets[i]].length; j++){
                     if(func(this.specificObjects[targets[i]][j])){
                         foundObjects.push(this.specificObjects[targets[i]][j]);
                     }
@@ -135,30 +169,51 @@ export class objectContainer{
     }
 
 
+
+    
+
     getSpecificObjects(objName: string){
         return this.specificObjects[objName];
     }
 
     loopThrough(logicModule: roomEvent){
-        for(let x = 0; x<this.layerKeysOrdered.length; x++){
+        let x=0;
+        for(; x<this.layerKeysOrdered.length; x++){
             let key = this.layerKeysOrdered[x];
-            for(var i=0; i<this.layers[key].objects.length; i++){
+            let i=0;
+            for(; i<this.layers[key].objects.length; i++){
                 this.layers[key].objects[i].logic(logicModule);
             }
         }
     }
 
     forEveryObject(func: ((x:iObject)=>void)){
-        for(let x = 0; x<this.layerKeysOrdered.length; x++){
+        let x = 0;
+        for(; x<this.layerKeysOrdered.length; x++){
             let key = this.layerKeysOrdered[x];
-            for(var i=0; i<this.layers[key].objects.length; i++){
+            let i=0;
+            for(; i<this.layers[key].objects.length; i++){
                 func(this.layers[key].objects[i]);
             }
         }
     }
 
+    getAllObjects(){
+        let allObjectsContainer: iObject[] = [];
+        let x=0;
+        for(; x<this.layerKeysOrdered.length; x++){
+            let key = this.layerKeysOrdered[x];
+            let i=0;
+            for(; i<this.layers[key].objects.length; i++){
+                allObjectsContainer.push(this.layers[key].objects[i]);
+            }
+        }
+        return allObjectsContainer;
+    }
+
     updateLayerOffsets(camera: gameCamera, app: PIXI.Application){
-        for(let x = 0; x<this.layerKeysOrdered.length; x++){
+        let x=0;
+        for(; x<this.layerKeysOrdered.length; x++){
             //console.log("this.layerKeysOrdered[x]: ",this.layerKeysOrdered[x]);
             //console.log("this.layers: ",this.layers[this.layerKeysOrdered[x]]);
             //console.log("this.layersContainer[this.layerKeysOrdered[x]].x: ",this.layersContainer[this.layerKeysOrdered[x]].x, "  camera.getX(): ",camera.getX());

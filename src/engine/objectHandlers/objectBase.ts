@@ -1,5 +1,5 @@
 import { vector } from "../dataObjects/vector/vector";
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 import { boxCollider } from "./collision/boxCollider";
 import { uidGen } from "../tools/uidGen";
 import { movementOperations } from "../movementOperations/movementOperations";
@@ -32,7 +32,7 @@ export class objectBase implements iObject{
     gravity: iVector = nullVector.null;
     weight: number = 0.4;
     _hasBeenMoved_Tick: number = 0;
-    _isColliding_Special: boolean = false;
+    _collidingWithPolygon: boolean = false;
 
     collidesWithPolygonGeometry = false;
     _hasCollidedWithPolygon = false;
@@ -40,6 +40,16 @@ export class objectBase implements iObject{
     inputTemplate: string = "";
     outputString: string = "";
     onLayer: number = 0;
+
+    _layerIndex: number = -1;
+    get layerIndex(){
+        return this._layerIndex;
+    }
+    set layerIndex(value){
+        if(this._layerIndex == -1){
+            this._layerIndex = value;
+        }
+    }
 
     horizontalCollision: number = 0;
     verticalCollision: number = 0;
@@ -71,6 +81,11 @@ export class objectBase implements iObject{
         this._objectName = childObjectName;
         this._g.x = x;
         this._g.y = y;
+    }
+
+    
+    afterInit(roomEvents: roomEvent): void {
+        
     }
 
     init(roomEvents: roomEvent){

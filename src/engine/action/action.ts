@@ -3,7 +3,7 @@ import { iVector } from "../dataObjects/vector/iVector";
 import { nullVector } from "../dataObjects/vector/nullVector";
 import { vectorFixedDelta } from "../dataObjects/vector/vectorFixedDelta";
 import { iObject } from "../objectHandlers/iObject";
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 import { actionContainer } from "./actionContainer";
 import { actionCreatedObject } from "./actionCreatedObject";
 import { movementDirection } from "./attackDirections";
@@ -162,6 +162,7 @@ export class action implements IAction{
         return this.jobCompleted;
     }
 
+    private delta = 0;
     public play(user: iObject, l: roomEvent){
         if(this.jobCompleted) return;
 
@@ -203,12 +204,12 @@ export class action implements IAction{
                     user.gravity.magnitude = 0;
                 }
 
-                let delta = this.movementVector.delta;
+                this.delta = this.movementVector.delta;
                 if(this._actionContainer.getDirection() == movementDirection.left){
-                    delta = calculations.PI + ((calculations.PI*2)-delta);
+                    this.delta = calculations.PI + ((calculations.PI*2)-this.delta);
                 }
                 
-                user.addForceAngleMagnitude(delta, this.movementVector.magnitude);
+                user.addForceAngleMagnitude(this.delta, this.movementVector.magnitude);
                 if(this.objCreatorFunc != null){
                     
                     let newObj = new actionCreatedObject(this.objToCreateLife, this.objCreatorFunc(), this.objToCreateOffset[0], this.objToCreateOffset[1]);

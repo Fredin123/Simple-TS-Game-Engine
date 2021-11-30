@@ -2,7 +2,7 @@ import { calculations } from "../engine/calculations";
 import { baseAttackNull } from "../engine/hitboxes/baseAttack/baseAttackNull";
 import { IBaseAttack } from "../engine/hitboxes/baseAttack/IBaseAttack";
 import { iObject } from "../engine/objectHandlers/iObject";
-import { roomEvent } from "../engine/roomEvent";
+import { roomEvent } from "../engine/roomEvent/roomEvent";
 
 export class characterMoves{
     private maxRunSpeed = 6;
@@ -48,31 +48,34 @@ export class characterMoves{
         if(l.checkKeyHeld("Control")){
             this.maxRunSpeed = this.superRunSpeed;
         }else{
-            this.maxRunSpeed = this.normalRunSpeed;
+            if(character.verticalCollision > 0){
+                //REstore run speed only if we're on ground
+                this.maxRunSpeed = this.normalRunSpeed;   
+            }
         }
 
         if(l.checkKeyHeld("a") || l.checkKeyHeld("A")){
             if(character.verticalCollision > 0){
-                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/13)*this.maxRunSpeed);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/13)*this.maxRunSpeed * l.deltaTime);
             }else{
-                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/64)*this.maxRunSpeed);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/64)*this.maxRunSpeed * l.deltaTime);
             }
         }
         if(l.checkKeyHeld("d") || l.checkKeyHeld("D")){
             if(character.verticalCollision > 0){
-                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/13)*this.maxRunSpeed);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/13)*this.maxRunSpeed * l.deltaTime);
             }else{
-                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/64)*this.maxRunSpeed);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/64)*this.maxRunSpeed * l.deltaTime);
             }
         }
-        if(this.jumpButtonReleased == true && (l.checkKeyHeld("w") || l.checkKeyHeld("W")) && (character.verticalCollision > 0 || character._isColliding_Special)){
-            character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength);
+        if(this.jumpButtonReleased == true && (l.checkKeyHeld("w") || l.checkKeyHeld("W")) && (character.verticalCollision > 0 || character._collidingWithPolygon)){
+            character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime);
             
             this.jumpButtonReleased = false;
         }
 
         if(l.checkKeyReleased("h")){
-            character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength);
+            character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime);
             character.gravity.magnitude = 0;
         }
         
@@ -82,12 +85,14 @@ export class characterMoves{
         character.force.limitHorizontalMagnitude(this.maxRunSpeed);
     }
 
+    private CL_collisionWith: iObject | null = null;
+    private CL_movedBetweenLadder = false;
     private climbingLadders(l: roomEvent, character: iObject){
         if(this.ladderObject == "") return;
 
-        let collisionWith = l.isCollidingWith(character, character.collisionBox, [this.ladderObject]);
+        this.CL_collisionWith = l.isCollidingWith(character, character.collisionBox, [this.ladderObject]);
         
-        if(collisionWith != null){
+        if(this.CL_collisionWith != null){
             if((l.checkKeyHeld("w") || l.checkKeyHeld("s"))){
                 character.force.Dx = 0;
             }
@@ -103,7 +108,7 @@ export class characterMoves{
 
                 character.force.Dx *= 0.4;
                 character.force.Dy *= 0.2;
-                character.g.x = collisionWith.g.x + (collisionWith.g.width/2) - (character.g.width/2);
+                character.g.x = this.CL_collisionWith.g.x + (this.CL_collisionWith.g.width/2) - (character.g.width/2);
 
                 if(l.checkKeyHeld("w")){
                     character.g.y-=this.climbSpeed;
@@ -118,7 +123,7 @@ export class characterMoves{
 
                 if(l.checkKeyHeld("w") && this.atLadderTop == true && this.releasedJumpKeyAtLadderTop){
                     character.g.y-=1;
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime);
                 }
 
                 console.log(l.checkKeyReleased("w"));
@@ -130,11 +135,11 @@ export class characterMoves{
                 if(l.checkKeyHeld("s")){
                     character.g.y+=this.climbDownSpeed;
                     if(l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null){
-                        character.g.y = collisionWith.g.y+(collisionWith.collisionBox.y/2)+collisionWith.collisionBox.height/2-1;
+                        character.g.y = this.CL_collisionWith.g.y+(this.CL_collisionWith.collisionBox.y/2)+this.CL_collisionWith.collisionBox.height/2-1;
                     }
                 }
     
-                let movedBetweenLadder = false;
+                this.CL_movedBetweenLadder = false;
                 if(l.checkKeyReleased("d")){
                     this.canJumpLadders = true;
                 }
@@ -145,18 +150,18 @@ export class characterMoves{
                 if(l.checkKeyHeld("a")){
                     if(this.canJumpLadders){
                         character.g.x -= character.collisionBox.width;
-                        movedBetweenLadder = true;
+                        this.CL_movedBetweenLadder = true;
                         if(l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null){
                             character.g.x += character.collisionBox.width;
-                            movedBetweenLadder = false;
+                            this.CL_movedBetweenLadder = false;
                         }
-                        if(movedBetweenLadder && l.checkKeyHeld("w")){
-                            character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump);
+                        if(this.CL_movedBetweenLadder && l.checkKeyHeld("w")){
+                            character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump * l.deltaTime);
                             this.atLadderTop = false;
                             this.canJumpLadders = false;
                             this.climbindLadder = false;
                             this.releasedJumpKeyAtLadderTop = false;
-                        }else if(movedBetweenLadder){
+                        }else if(this.CL_movedBetweenLadder){
                             this.releasedJumpKeyAtLadderTop = false;
                             this.canJumpLadders = false;
                         }
@@ -167,18 +172,18 @@ export class characterMoves{
                 if(l.checkKeyHeld("d")){
                     if(this.canJumpLadders){
                         character.g.x += character.collisionBox.width;
-                        movedBetweenLadder = true;
+                        this.CL_movedBetweenLadder = true;
                         if(l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null){
                             character.g.x -= character.collisionBox.width;
-                            movedBetweenLadder = false;
+                            this.CL_movedBetweenLadder = false;
                         }
-                        if(movedBetweenLadder && l.checkKeyHeld("w")){
-                            character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump);
+                        if(this.CL_movedBetweenLadder && l.checkKeyHeld("w")){
+                            character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump * l.deltaTime);
                             this.atLadderTop = false;
                             this.canJumpLadders = false;
                             this.climbindLadder = false;
                             this.releasedJumpKeyAtLadderTop = false;
-                        }else if(movedBetweenLadder){
+                        }else if(this.CL_movedBetweenLadder){
                             this.releasedJumpKeyAtLadderTop = false;
                             this.canJumpLadders = false;
                         }
@@ -200,7 +205,7 @@ export class characterMoves{
             this.releasedJumpKeyAtLadderTop = false;
             if(l.checkKeyHeld("w") && Math.floor(character.gravity.magnitude) == 0
             && this.hasJumpedFromLadder == false){
-                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime);
                 this.hasJumpedFromLadder = true;
             }
         }
@@ -217,7 +222,7 @@ export class characterMoves{
                 this.attackButtonReleased = false;
                 this.attack.queryAttack();
                 if(this.attack.isDone()){
-                    if(character.verticalCollision > 0 || character._isColliding_Special){
+                    if(character.verticalCollision > 0 || character._collidingWithPolygon){
                         if(this.groundAttacks != null){
                             this.attack = this.groundAttacks(l);
                         }

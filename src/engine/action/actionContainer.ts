@@ -1,5 +1,5 @@
 import { iObject } from "../objectHandlers/iObject";
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 import { action } from "./action";
 import { actionCreatedObject } from "./actionCreatedObject";
 import { actionEmpty } from "./actionEmpty";
@@ -15,16 +15,18 @@ export class actionContainer{
     private direction: movementDirection = movementDirection.right;
     private stopped = false;
 
+
+    private i = 0;
     public playCurrent(user: iObject, l: roomEvent, direction: movementDirection){
         this.direction = direction;
-        for (let i = this.objectsCreated.length - 1; i >= 0; i--) {
-            var objMeta = this.objectsCreated[i];
+        for (this.i = this.objectsCreated.length - 1; this.i >= 0; this.i--) {
+            var objMeta = this.objectsCreated[this.i];
             if(objMeta.life > 0){
                 objMeta.life--;
                 this.positionCreatedObject(user, objMeta);
             }else{
                 l.deleteObject(objMeta.obj());
-                this.objectsCreated.splice(i, 1);
+                this.objectsCreated.splice(this.i, 1);
             }
         }
         

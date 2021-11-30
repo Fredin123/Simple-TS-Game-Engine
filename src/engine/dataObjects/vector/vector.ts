@@ -30,10 +30,11 @@ export class vector implements iVector{
         this.Dy = Math.sin(this.delta)*val;
     }
 
+    private IM_mag = 0;
     increaseMagnitude(addValue: number){
-        let mag = this.magnitude;
-        this.Dx = this.Dx * (mag+addValue) / mag;
-        this.Dy = this.Dy * (mag+addValue) / mag;
+        this.IM_mag = this.magnitude;
+        this.Dx = this.Dx * (this.IM_mag+addValue) / this.IM_mag;
+        this.Dy = this.Dy * (this.IM_mag+addValue) / this.IM_mag;
     }
 
 

@@ -1,5 +1,9 @@
-(function (PIXI, filterAdjustment) {
+(function (PIXI, FontFaceObserver, filterGlow, particles, filterAdjustment) {
     'use strict';
+
+    function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+
+    var FontFaceObserver__default = /*#__PURE__*/_interopDefaultLegacy(FontFaceObserver);
 
     var calculations = /** @class */ (function () {
         function calculations() {
@@ -16,10 +20,9 @@
         calculations.getShortestDeltaBetweenTwoRadians = function (rad1, rad2) {
             rad1 *= 180 / calculations.PI;
             rad2 *= 180 / calculations.PI;
-            var raw_diff = rad1 > rad2 ? rad1 - rad2 : rad2 - rad1;
-            var mod_diff = raw_diff % 360;
-            var dist = mod_diff > 180.0 ? 360.0 - mod_diff : mod_diff;
-            return dist;
+            this.raw_diff = rad1 > rad2 ? rad1 - rad2 : rad2 - rad1;
+            this.mod_diff = this.raw_diff % 360;
+            return this.mod_diff > 180.0 ? 360.0 - this.mod_diff : this.mod_diff; //Distance
         };
         calculations.flippedSin = function (delta) {
             return Math.sin(delta + calculations.PI /*We need to flip sin since our coordinate system Y goes from 0 to positive numbers when you do down*/);
@@ -37,6 +40,8 @@
         };
         calculations.PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
         calculations.EPSILON = 8.8541878128;
+        calculations.raw_diff = 0;
+        calculations.mod_diff = 0;
         return calculations;
     }());
 
@@ -44,13 +49,18 @@
         function resourcesHand(app, onCompleteCallback, alternativePath) {
             if (alternativePath === void 0) { alternativePath = ""; }
             resourcesHand.app = app;
-            fetch(alternativePath + '/resources.txt', {
-                method: 'get'
-            })
-                .then(function (response) { return response.text(); })
-                .then(function (textData) { return resourcesHand.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
-                .catch(function (err) {
-                console.log("err: " + err);
+            //webfontloader.load
+            var font = new FontFaceObserver__default['default']('CrimsonPro-Black');
+            font.load().then(function () {
+                console.log('smallburg-Regular has loaded');
+                fetch(alternativePath + '/resources.txt', {
+                    method: 'get'
+                })
+                    .then(function (response) { return response.text(); })
+                    .then(function (textData) { return resourcesHand.loadFromResources(textData.split("\n"), onCompleteCallback, alternativePath); })
+                    .catch(function (err) {
+                    console.log("err: " + err);
+                });
             });
         }
         resourcesHand.loadFromResources = function (loadedResources, onCompleteCallback, alternativePath) {
@@ -61,6 +71,7 @@
             resourcesHand.resourcesToLoad.forEach(function (resourceDir) {
                 var resourceDirsSplit = resourceDir.split("/");
                 var resourceName = resourceDirsSplit[resourceDirsSplit.length - 1];
+                console.log("Add resource ", resourceDir);
                 resourcesHand.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
             });
             resourcesHand.app.loader.load(function (e) {
@@ -78,6 +89,7 @@
                         resourcesHand.storeStaticTile(name);
                     }
                     else if (name.indexOf(".png") != -1) {
+                        //console.log("Load resource: ",name);
                         resourcesHand.storeStaticTile(name);
                     }
                     else if (name.indexOf(".mp4") != -1) {
@@ -185,20 +197,20 @@
             }
             return new PIXI.Sprite(resourcesHand.staticTile[genName]);
         };
-        resourcesHand.resourcePNG = function (resourceName) {
-            for (var _i = 0, _a = resourcesHand.resourcesToLoad; _i < _a.length; _i++) {
-                var resourceDir = _a[_i];
-                var splitDirs = resourceDir.split("/");
-                var nameAndMeta = splitDirs[splitDirs.length - 1];
-                if (nameAndMeta.toLocaleLowerCase().indexOf(".png") != -1) {
-                    nameAndMeta.split(".")[0];
-                    if (nameAndMeta == resourceName + ".png") {
+        /*static resourcePNG(resourceName: string): PIXI.Texture | undefined{
+            for(let resourceDir of resourcesHand.resourcesToLoad){
+                let splitDirs = resourceDir.split("/");
+                let nameAndMeta = splitDirs[splitDirs.length-1];
+                if(nameAndMeta.toLocaleLowerCase().indexOf(".png") != -1){
+                    let nameOnly = nameAndMeta.split(".")[0];
+                    if(nameAndMeta == resourceName+".png"){
                         return resourcesHand.app.loader.resources[nameAndMeta].texture;
                     }
                 }
             }
-            throw new Error("PNG resource does not exist: " + resourceName);
-        };
+            
+            throw new Error("PNG resource does not exist: "+resourceName);
+        }*/
         resourcesHand.convertGraphicsToTexture = function (graphics) {
             var texture = this.app.renderer.generateTexture(graphics);
             return texture;
@@ -361,18 +373,10 @@
 
       d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     }
-    /** @deprecated */
-
-    function __spreadArrays() {
-      for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
-
-      for (var r = Array(s), k = 0, i = 0; i < il; i++) for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++) r[k] = a[j];
-
-      return r;
-    }
 
     var vector = /** @class */ (function () {
         function vector(a, b) {
+            this.IM_mag = 0;
             this.Dx = a;
             this.Dy = b;
         }
@@ -407,9 +411,9 @@
             configurable: true
         });
         vector.prototype.increaseMagnitude = function (addValue) {
-            var mag = this.magnitude;
-            this.Dx = this.Dx * (mag + addValue) / mag;
-            this.Dy = this.Dy * (mag + addValue) / mag;
+            this.IM_mag = this.magnitude;
+            this.Dx = this.Dx * (this.IM_mag + addValue) / this.IM_mag;
+            this.Dy = this.Dy * (this.IM_mag + addValue) / this.IM_mag;
         };
         vector.prototype.limitHorizontalMagnitude = function (limit) {
             if (Math.abs(this.Dx) > limit) {
@@ -500,15 +504,19 @@
         function internalFunction() {
         }
         internalFunction.intersecting = function (initiator, initiadorCollisionBox, collisionTarget) {
-            var x1 = initiator.g.x + initiadorCollisionBox.x;
-            var y1 = initiator.g.y + initiadorCollisionBox.y;
-            var x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
-            var y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
-            return (x1 < x2 + collisionTarget.collisionBox.width &&
-                x1 + initiadorCollisionBox.width > x2 &&
-                y1 < y2 + collisionTarget.collisionBox.height &&
-                y1 + initiadorCollisionBox.height > y2);
+            this.x1 = initiator.g.x + initiadorCollisionBox.x;
+            this.y1 = initiator.g.y + initiadorCollisionBox.y;
+            this.x2 = collisionTarget.g.x + collisionTarget.collisionBox.x;
+            this.y2 = collisionTarget.g.y + collisionTarget.collisionBox.y;
+            return (this.x1 < this.x2 + collisionTarget.collisionBox.width &&
+                this.x1 + initiadorCollisionBox.width > this.x2 &&
+                this.y1 < this.y2 + collisionTarget.collisionBox.height &&
+                this.y1 + initiadorCollisionBox.height > this.y2);
         };
+        internalFunction.x1 = 0;
+        internalFunction.y1 = 0;
+        internalFunction.x2 = 0;
+        internalFunction.y2 = 0;
         return internalFunction;
     }());
 
@@ -533,16 +541,19 @@
             this.force = new vector(0, 0);
             this.exportedString = "";
             this._hasBeenMoved_Tick = 0;
-            this._isColliding_Special = false;
+            this._collidingWithPolygon = false;
             this.collidesWithPolygonGeometry = false;
             this.onLayer = 0;
             this.outputString = "";
             this.horizontalCollision = 0;
             this.verticalCollision = 0;
+            this.layerIndex = 0;
             this._hasCollidedWithPolygon = false;
             this.objectName = "";
             this.collisionBox = new boxCollider(0, 0, 0, 0);
         }
+        nulliObject.prototype.afterInit = function (roomEvents) {
+        };
         nulliObject.prototype.init = function (roomEvents) {
         };
         nulliObject.prototype.addMoveCollisionTarget = function () {
@@ -615,7 +626,7 @@
         }
         moveOperationsPush.pushObjectHorizontal = function (pusher, objectBeingPushed, sign, objContainer) {
             var _this = this;
-            var collided = false;
+            this.collided = false;
             if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
                 if (objectBeingPushed.collisionTargets.length == 0) {
                     return pusher;
@@ -626,27 +637,27 @@
                         internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
                         && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
                         objectBeingPushed.g.x += sign * -1;
-                        collided = true;
+                        _this.collided = true;
                     }
                     return false;
                 });
             }
-            if (collided) {
+            if (this.collided) {
                 return objectBeingPushed;
             }
             return objectGlobalData.null;
         };
         moveOperationsPush.pushObjectVertical = function (pusher, objectBeingPushed, sign, objContainer) {
             var _this = this;
-            var collided = false;
+            this.collided = false;
             if (internalFunction.intersecting(pusher, pusher.collisionBox, objectBeingPushed)) {
                 if (objectBeingPushed.collisionTargets.length == 0) {
                     return pusher;
                 }
                 objectBeingPushed.g.y += sign;
-                if (objectBeingPushed._isColliding_Special) {
+                if (objectBeingPushed._collidingWithPolygon) {
                     objectBeingPushed.g.y += sign * -1;
-                    collided = true;
+                    this.collided = true;
                     return objectBeingPushed;
                 }
                 else {
@@ -655,17 +666,18 @@
                             internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
                             && _this.pushObjectVertical(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
                             objectBeingPushed.g.y += sign * -1;
-                            collided = true;
+                            _this.collided = true;
                         }
                         return false;
                     });
                 }
             }
-            if (collided) {
+            if (this.collided) {
                 return objectBeingPushed;
             }
             return objectGlobalData.null;
         };
+        moveOperationsPush.collided = false;
         return moveOperationsPush;
     }());
 
@@ -673,43 +685,46 @@
         function horizontalMovement() {
         }
         horizontalMovement.moveForceHorizontal = function (magnitude, target, collisionNames, objContainer) {
+            var _this = this;
             if (magnitude == 0)
                 return;
             target.horizontalCollision = 0;
-            var sign = magnitude > 0 ? 1 : -1;
-            var objectsThatWereCollidingThisObjectWhileMoving = new Array();
-            var collisionTarget = objectGlobalData.null;
-            var _loop_1 = function (i) {
-                objectsThatWereCollidingThisObjectWhileMoving.length = 0;
-                target.g.x += sign;
+            this.sign = magnitude > 0 ? 1 : -1;
+            this.objectsThatWereCollidingThisObjectWhileMoving = new Array();
+            this.collisionTarget = objectGlobalData.null;
+            var _loop_1 = function () {
+                this_1.objectsThatWereCollidingThisObjectWhileMoving.length = 0;
+                target.g.x += this_1.sign;
                 if (objectGlobalData.objectsThatCollideWith[target.objectName] != null) {
                     //Push object
                     objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                        if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                            collisionTarget = moveOperationsPush.pushObjectHorizontal(target, testCollisionWith, sign, objContainer);
-                            if (collisionTarget == objectGlobalData.null) {
-                                target.force.Dx *= 1 - testCollisionWith.weight;
+                        if ((_this.sign > 0 && testCollisionWith.horizontalCollision <= 0) || (_this.sign < 0 && testCollisionWith.horizontalCollision >= 0)) {
+                            if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                _this.collisionTarget = moveOperationsPush.pushObjectHorizontal(target, testCollisionWith, _this.sign, objContainer);
+                                if (_this.collisionTarget == objectGlobalData.null) {
+                                    target.force.Dx *= 1 - testCollisionWith.weight;
+                                }
                             }
                         }
                         return false;
                     });
                     //Sticky draging
                     var stickyCheck_1 = boxCollider.copy(target.collisionBox);
-                    var checkDistance_1 = Math.abs(magnitude) + 2;
+                    var checkDistance = Math.abs(magnitude) + 2;
                     if (target.stickyTop) {
-                        stickyCheck_1.expandTop(checkDistance_1);
+                        stickyCheck_1.expandTop(checkDistance);
                     }
                     if (target.stickyBottom) {
-                        stickyCheck_1.expandBottom(checkDistance_1);
+                        stickyCheck_1.expandBottom(checkDistance);
                     }
                     if (target.stickyTop || target.stickyBottom) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                         objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
                             if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
                                 if (testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()) {
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.x += sign;
-                                    if (i >= Math.abs(magnitude) - 1) {
+                                    _this.objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.x += _this.sign;
+                                    if (_this.i >= Math.abs(magnitude) - 1) {
                                         testCollisionWith._hasBeenMoved_Tick = ticker.getTicks();
                                     }
                                 }
@@ -718,14 +733,14 @@
                         });
                     }
                 }
-                if (collisionTarget == objectGlobalData.null) {
-                    collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
+                if (this_1.collisionTarget == objectGlobalData.null) {
+                    this_1.collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
                 }
-                if (collisionTarget != objectGlobalData.null && target._isColliding_Special == false) {
-                    sign *= -1;
-                    target.g.x += 1 * sign;
-                    objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.x += 1 * sign;
+                if (this_1.collisionTarget != objectGlobalData.null && target._collidingWithPolygon == false) {
+                    this_1.sign *= -1;
+                    target.g.x += 1 * this_1.sign;
+                    this_1.objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
+                        updaterObject.g.x += 1 * _this.sign;
                     });
                     if (target.force.Dx > 0) {
                         target.horizontalCollision = 1;
@@ -734,46 +749,47 @@
                         target.horizontalCollision = -1;
                     }
                     target.force.Dx = 0;
-                    var distance = 0;
-                    if (sign <= 0) {
-                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, 0);
+                    this_1.distance = 0;
+                    if (this_1.sign <= 0) {
+                        this_1.distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, 0);
                     }
                     else {
-                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI);
+                        this_1.distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI);
                     }
-                    if (distance < 90) {
-                        target.gravity.Dy *= distance / 90;
-                        target.gravity.Dx *= 1 - (distance / 90);
+                    if (this_1.distance < 90) {
+                        target.gravity.Dy *= this_1.distance / 90;
+                        target.gravity.Dx *= 1 - (this_1.distance / 90);
                     }
-                    target.force.Dy *= collisionTarget.friction * target.friction;
+                    target.force.Dy *= this_1.collisionTarget.friction * target.friction;
                     return "break";
                 }
             };
-            for (var i = 0; i < Math.abs(magnitude); i += 1) {
-                var state_1 = _loop_1(i);
+            var this_1 = this;
+            for (this.i = 0; this.i < Math.abs(magnitude); this.i += 1) {
+                var state_1 = _loop_1();
                 if (state_1 === "break")
                     break;
             }
             //Sticky draging
-            var stickyCheck = boxCollider.copy(target.collisionBox);
-            var checkDistance = Math.abs(magnitude) + 2;
+            this.stickyCheck = boxCollider.copy(target.collisionBox);
+            this.checkDistance = Math.abs(magnitude) + 2;
             if (target.stickyLeftSide) {
-                stickyCheck.expandLeftSide(checkDistance);
+                this.stickyCheck.expandLeftSide(this.checkDistance);
             }
             if (target.stickyRightSide) {
-                stickyCheck.expandRightSide(checkDistance);
+                this.stickyCheck.expandRightSide(this.checkDistance);
             }
             if (target.stickyLeftSide || target.stickyRightSide) {
                 objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                    if (sign > 0) {
+                    if (_this.sign > 0) {
                         //Moving right
-                        if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
+                        if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
                             testCollisionWith.g.x = target.g.x - testCollisionWith.collisionBox.x - testCollisionWith.collisionBox.width;
                         }
                     }
                     else {
                         //Moving left
-                        if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
+                        if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
                             testCollisionWith.g.x = target.g.x + target.collisionBox.x + target.collisionBox.width - testCollisionWith.collisionBox.x;
                         }
                     }
@@ -781,6 +797,12 @@
                 });
             }
         };
+        horizontalMovement.sign = 0;
+        horizontalMovement.objectsThatWereCollidingThisObjectWhileMoving = new Array();
+        horizontalMovement.collisionTarget = objectGlobalData.null;
+        horizontalMovement.i = 0;
+        horizontalMovement.distance = 0;
+        horizontalMovement.checkDistance = 0;
         return horizontalMovement;
     }());
 
@@ -788,43 +810,46 @@
         function verticalMovement() {
         }
         verticalMovement.moveForceVertical = function (magnitude, target, collisionNames, objContainer) {
+            var _this = this;
             if (magnitude == 0)
                 return;
             target.verticalCollision = 0;
-            var sign = magnitude > 0 ? 1 : -1;
-            var objectsThatWereCollidingThisObjectWhileMoving = new Array();
-            var collisionTarget = objectGlobalData.null;
-            var _loop_1 = function (i) {
-                objectsThatWereCollidingThisObjectWhileMoving.length = 0;
-                target.g.y += sign;
+            this.sign = magnitude > 0 ? 1 : -1;
+            this.objectsThatWereCollidingThisObjectWhileMoving = new Array();
+            this.collisionTarget = objectGlobalData.null;
+            for (this.i = 0; this.i < Math.abs(magnitude); this.i += 1) {
+                this.objectsThatWereCollidingThisObjectWhileMoving.length = 0;
+                target.g.y += this.sign;
                 if (objectGlobalData.objectsThatCollideWith[target.objectName] != null) {
                     //push objects
                     objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                        if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                            collisionTarget = moveOperationsPush.pushObjectVertical(target, testCollisionWith, sign, objContainer);
-                            if (collisionTarget == objectGlobalData.null) {
-                                target.force.Dy *= 1 - testCollisionWith.weight;
+                        if ((_this.sign > 0 && testCollisionWith.verticalCollision <= 0) || (_this.sign < 0 && testCollisionWith.verticalCollision >= 0)) {
+                            if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                _this.collisionTarget = moveOperationsPush.pushObjectVertical(target, testCollisionWith, _this.sign, objContainer);
+                                if (_this.collisionTarget == objectGlobalData.null) {
+                                    target.force.Dy *= 1 - testCollisionWith.weight;
+                                }
                             }
                         }
                         return false;
                     });
                     //Sticky draging
-                    var stickyCheck_1 = boxCollider.copy(target.collisionBox);
-                    var checkDistance_1 = Math.abs(magnitude) + 2;
+                    this.stickyCheck = boxCollider.copy(target.collisionBox);
+                    this.checkDistance = Math.abs(magnitude) + 2;
                     if (target.stickyLeftSide) {
-                        stickyCheck_1.expandLeftSide(checkDistance_1);
+                        this.stickyCheck.expandLeftSide(this.checkDistance);
                     }
                     if (target.stickyRightSide) {
-                        stickyCheck_1.expandRightSide(checkDistance_1);
+                        this.stickyCheck.expandRightSide(this.checkDistance);
                     }
                     if (target.stickyLeftSide || target.stickyRightSide) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                         objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                            if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                            if (internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
                                 if (testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()) {
-                                    objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
-                                    testCollisionWith.g.y += sign;
-                                    if (i >= Math.abs(magnitude) - 1) {
+                                    _this.objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
+                                    testCollisionWith.g.y += _this.sign;
+                                    if (_this.i >= Math.abs(magnitude) - 1) {
                                         testCollisionWith._hasBeenMoved_Tick = ticker.getTicks();
                                     }
                                 }
@@ -834,14 +859,14 @@
                     }
                 }
                 //This has to be more optimized
-                if (collisionTarget == objectGlobalData.null) {
-                    collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
+                if (this.collisionTarget == objectGlobalData.null) {
+                    this.collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
                 }
-                if (collisionTarget != objectGlobalData.null) {
-                    sign *= -1;
-                    target.g.y += sign;
-                    objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
-                        updaterObject.g.y += sign;
+                if (this.collisionTarget != objectGlobalData.null) {
+                    this.sign *= -1;
+                    target.g.y += this.sign;
+                    this.objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
+                        updaterObject.g.y += _this.sign;
                     });
                     if (target.force.Dy > 0) {
                         target.verticalCollision = 1;
@@ -850,48 +875,43 @@
                         target.verticalCollision = -1;
                     }
                     target.force.Dy = 0;
-                    var distance = 0;
-                    if (sign >= 0) {
-                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI / 2);
+                    this.distance = 0;
+                    if (this.sign >= 0) {
+                        this.distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI / 2);
                     }
                     else {
-                        distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI + (calculations.PI / 2));
+                        this.distance = calculations.getShortestDeltaBetweenTwoRadians(target.gravity.delta, calculations.PI + (calculations.PI / 2));
                     }
-                    if (distance < 90) {
-                        target.gravity.Dy *= distance / 90;
-                        target.gravity.Dx *= 1 - (distance / 90);
+                    if (this.distance < 90) {
+                        target.gravity.Dy *= this.distance / 90;
+                        target.gravity.Dx *= 1 - (this.distance / 90);
                     }
                     //console.log("Friction");
                     //target.force.Dx *= collisionTarget.friction * target.friction;
                     target.force.Dx *= target.friction;
-                    return "break";
-                }
-            };
-            for (var i = 0; i < Math.abs(magnitude); i += 1) {
-                var state_1 = _loop_1(i);
-                if (state_1 === "break")
                     break;
+                }
             }
-            var stickyCheck = boxCollider.copy(target.collisionBox);
-            var checkDistance = Math.abs(magnitude) + 2;
+            this.stickyCheck = boxCollider.copy(target.collisionBox);
+            this.checkDistance = Math.abs(magnitude) + 2;
             if (target.stickyTop) {
-                stickyCheck.expandTop(checkDistance);
+                this.stickyCheck.expandTop(this.checkDistance);
             }
             if (target.stickyBottom) {
-                stickyCheck.expandBottom(checkDistance);
+                this.stickyCheck.expandBottom(this.checkDistance);
             }
             //Sticky draging
             if (target.stickyTop || target.stickyBottom) {
                 objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                    if (sign > 0) {
+                    if (_this.sign > 0) {
                         //Moving down
-                        if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
+                        if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
                             testCollisionWith.g.y = target.g.y - testCollisionWith.collisionBox.y - testCollisionWith.collisionBox.height;
                         }
                     }
                     else {
                         //Moving up
-                        if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, stickyCheck, testCollisionWith)) {
+                        if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
                             testCollisionWith.g.y = target.g.y + target.collisionBox.y + target.collisionBox.height - testCollisionWith.collisionBox.y;
                         }
                     }
@@ -899,6 +919,12 @@
                 });
             }
         };
+        verticalMovement.sign = 0;
+        verticalMovement.objectsThatWereCollidingThisObjectWhileMoving = new Array();
+        verticalMovement.collisionTarget = objectGlobalData.null;
+        verticalMovement.i = 0;
+        verticalMovement.distance = 0;
+        verticalMovement.checkDistance = 0;
         return verticalMovement;
     }());
 
@@ -924,34 +950,36 @@
         function polygonCollision() {
         }
         polygonCollision.collisionTest = function (target, xTest, yTest, objContainer) {
+            var _this = this;
             if (target.collidesWithPolygonGeometry == true) {
-                var collisionObjects = objContainer.filterObjects(["polygonCollisionX"], function (testCollisionWith) {
+                this.collisionObjects = objContainer.filterObjects(["polygonCollisionX"], function (testCollisionWith) {
                     if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
                         return true;
                     }
                     return false;
                 });
                 //var collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, ["polygonCollisionX"]);
-                if (collisionObjects.length == 0) {
+                if (this.collisionObjects.length == 0) {
                     //target._hasCollidedWithPolygon = false;
                     return [false, target.gravity];
                 }
-                var collisionResults_1 = [];
-                collisionObjects.forEach(function (obj) {
-                    collisionResults_1.push(obj.collisionTest(target));
+                this.collisionResults = [];
+                this.collisionObjects.forEach(function (obj) {
+                    _this.collisionResults.push(obj.collisionTest(target));
                 });
-                var currentFlatestCollision_1 = new nullVector();
-                currentFlatestCollision_1.delta = Math.PI / 2; //point north
-                collisionResults_1.forEach(function (collision) {
-                    if (collision[0] && collision[1].delta) {
-                        if (calculations.getShortestDeltaBetweenTwoRadians(collision[1].delta, 0) < calculations.getShortestDeltaBetweenTwoRadians(currentFlatestCollision_1.delta, 0)) {
-                            currentFlatestCollision_1 = collision[1];
+                /*this.currentFlatestCollision = new nullVector();
+                this.currentFlatestCollision.delta = Math.PI/2;//point north
+                this.collisionResults.forEach(collision => {
+                    
+                    if(collision[0] && collision[1].delta){
+                        if(calculations.getShortestDeltaBetweenTwoRadians(collision[1].delta, 0) < calculations.getShortestDeltaBetweenTwoRadians(this.currentFlatestCollision.delta, 0)){
+                            this.currentFlatestCollision = collision[1];
                         }
                     }
-                });
-                collisionResults_1[0];
+                });*/
+                //let collisionHighestPoint = collisionResults[0];
                 //target._hasCollidedWithPolygon = false;
-                return collisionResults_1[0];
+                return this.collisionResults[0];
                 /*if(collisionTarget != objectGlobalData.null){
                     return (collisionTarget as polygonCollisionX).collisionTest(target);
                 }*/
@@ -959,6 +987,9 @@
             //target._hasCollidedWithPolygon = false;
             return [false, target.gravity];
         };
+        polygonCollision.collisionObjects = [];
+        polygonCollision.collisionResults = [];
+        polygonCollision.currentFlatestCollision = new nullVector();
         return polygonCollision;
     }());
 
@@ -966,25 +997,28 @@
         function movementOperations() {
         }
         movementOperations.moveByForce = function (target, force, collisionNames, objContainer, deltaTime) {
-            force.Dx = force.Dx * deltaTime;
-            force.Dy = force.Dy * deltaTime;
+            force.Dx = force.Dx;
+            force.Dy = force.Dy;
             force.Dx *= target.airFriction;
             force.Dy *= target.airFriction;
-            var xdiff = force.Dx;
-            var ydiff = force.Dy;
+            this.xdiff = force.Dx;
+            this.ydiff = force.Dy;
             target.gravity.increaseMagnitude(target.weight);
-            var polygonCollisionTest = polygonCollision.collisionTest(target, Math.round(xdiff), Math.round(ydiff), objContainer);
-            force.Dx += polygonCollisionTest[1].Dx;
-            force.Dy += polygonCollisionTest[1].Dy;
-            target.gravity.magnitude = polygonCollisionTest[1].magnitude;
+            this.polygonCollisionTest = polygonCollision.collisionTest(target, Math.round(this.xdiff), Math.round(this.ydiff), objContainer);
+            force.Dx += this.polygonCollisionTest[1].Dx;
+            force.Dy += this.polygonCollisionTest[1].Dy;
+            target.gravity.magnitude = this.polygonCollisionTest[1].magnitude;
             /* if(target.gravity.magnitude < 1){
                 target.gravity.magnitude = 0K
             }*/
-            horizontalMovement.moveForceHorizontal(Math.round(xdiff), target, collisionNames, objContainer);
-            if (polygonCollisionTest[0] == false) {
-                verticalMovement.moveForceVertical(Math.round(ydiff), target, collisionNames, objContainer);
+            horizontalMovement.moveForceHorizontal(Math.round(this.xdiff), target, collisionNames, objContainer);
+            if (this.polygonCollisionTest[0] == false) {
+                verticalMovement.moveForceVertical(Math.round(this.ydiff), target, collisionNames, objContainer);
             }
         };
+        movementOperations.xdiff = 0;
+        movementOperations.ydiff = 0;
+        movementOperations.polygonCollisionTest = [false, new nullVector()];
         return movementOperations;
     }());
 
@@ -1004,12 +1038,13 @@
             this.gravity = nullVector.null;
             this.weight = 0.4;
             this._hasBeenMoved_Tick = 0;
-            this._isColliding_Special = false;
+            this._collidingWithPolygon = false;
             this.collidesWithPolygonGeometry = false;
             this._hasCollidedWithPolygon = false;
             this.inputTemplate = "";
             this.outputString = "";
             this.onLayer = 0;
+            this._layerIndex = -1;
             this.horizontalCollision = 0;
             this.verticalCollision = 0;
             this._collisionBox = new boxCollider(0, 0, 0, 0);
@@ -1021,6 +1056,18 @@
             this._g.x = x;
             this._g.y = y;
         }
+        Object.defineProperty(objectBase.prototype, "layerIndex", {
+            get: function () {
+                return this._layerIndex;
+            },
+            set: function (value) {
+                if (this._layerIndex == -1) {
+                    this._layerIndex = value;
+                }
+            },
+            enumerable: false,
+            configurable: true
+        });
         Object.defineProperty(objectBase.prototype, "g", {
             get: function () {
                 return this._g;
@@ -1056,6 +1103,8 @@
             enumerable: false,
             configurable: true
         });
+        objectBase.prototype.afterInit = function (roomEvents) {
+        };
         objectBase.prototype.init = function (roomEvents) {
         };
         objectBase.prototype.addMoveCollisionTarget = function () {
@@ -1362,64 +1411,41 @@
         return block;
     }(objectBase));
 
-    var vectorFixedDelta = /** @class */ (function () {
-        function vectorFixedDelta(delta, inputMagnitude) {
-            this.delta = delta;
-            this.Dx = Math.cos(this.delta) * inputMagnitude;
-            this.Dy = Math.sin(this.delta) * inputMagnitude;
+    var block32x64 = /** @class */ (function (_super) {
+        __extends(block32x64, _super);
+        function block32x64(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, input) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _this.setCollision(0, 0, 32, 64);
+            return _this;
         }
-        vectorFixedDelta.prototype.limitHorizontalMagnitude = function (limit) {
-            throw new Error("Method not implemented.");
-        };
-        vectorFixedDelta.prototype.limitVerticalMagnitude = function (limit) {
-            throw new Error("Method not implemented.");
-        };
-        Object.defineProperty(vectorFixedDelta.prototype, "magnitude", {
-            get: function () {
-                return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
-            },
-            set: function (newMag) {
-                var newXAdd = Math.cos(this.delta) * newMag;
-                var newYAdd = calculations.flippedSin(this.delta) * newMag;
-                this.Dx = newXAdd;
-                this.Dy = newYAdd;
-            },
-            enumerable: false,
-            configurable: true
-        });
-        vectorFixedDelta.prototype.increaseMagnitude = function (addValue) {
-            //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
-            //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;
-            var newXAdd = Math.cos(this.delta) * addValue;
-            var newYAdd = calculations.flippedSin(this.delta) * addValue;
-            if (Math.abs(newXAdd) > 0.00000000000001) {
-                this.Dx += newXAdd;
-            }
-            if (Math.abs(newYAdd) > 0.00000000000001) {
-                this.Dy += newYAdd;
-            }
-        };
-        return vectorFixedDelta;
-    }());
+        block32x64.objectName = "block32x64";
+        return block32x64;
+    }(block));
 
-    var animConfig = /** @class */ (function () {
-        function animConfig(init) {
-            this.animationName = "";
-            this.x = 0;
-            this.y = 0;
-            this.speed = 0.5;
-            this.scaleX = 1;
-            this.scaleY = 1;
-            this.anchorX = 0.5;
-            this.anchorY = 0.5;
-            this.id = "";
-            Object.assign(this, init);
-            if (this.id == "") {
-                this.id = this.animationName;
-            }
+    var block64x32 = /** @class */ (function (_super) {
+        __extends(block64x32, _super);
+        function block64x32(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, block64x32.objectName) || this;
+            _this.friction = 0.986;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 32);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000);
+                newGraphics.drawRect(0, 0, 64, 32);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
         }
-        return animConfig;
-    }());
+        block64x32.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        block64x32.objectName = "block64x32";
+        return block64x32;
+    }(objectBase));
 
     var tinyBlock32 = /** @class */ (function (_super) {
         __extends(tinyBlock32, _super);
@@ -1485,70 +1511,83 @@
         return wideBlock;
     }(objectBase));
 
-    var block32x64 = /** @class */ (function (_super) {
-        __extends(block32x64, _super);
-        function block32x64(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, input) || this;
-            _this.switch = false;
-            _this.friction = 0.986;
-            _this.setCollision(0, 0, 32, 64);
-            return _this;
-        }
-        block32x64.objectName = "block32x64";
-        return block32x64;
-    }(block));
+    var r1_scene_lake1 = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALgFoBGEgJgAYAacaeJNLbATUKIBZKa7YEUMOAOoBLTABcAFoS5dakPo0HYAEjBEBzSeMIkA7AGYeAIwhgA1hrhNMAYWQAbZHEIgAxADMv3kLQcQAT3gAEQhxCEIAbVBYcIB5YwArGDBxbABJdAAZQPgo0HERBxhCdFQHB1oRbHsoYxF0MJFkdDiPABUimGxCDwgHbBgqzDaAZXDCsE7i2vrGwpbXXxBqgAUIOHE22YamxYI+gaGQcQCABxKCHgaz1HFxuAaNJdoNGGQoVeQGtKiAXVoUGq2Ce6SgEDehGAAF9aAAPQjkcgcWgBRF6ci0RqwVzYcwBRBmSzWQQgaEAkBvD4wcSPbqZHJBFwESIUyRiTAwdC9fqDWiDcSFdAaHoEEDAAA6IGwYGsFVGFxgmFwUoIAAISNQ1VKZXKHAqYEqWKqNdDlv4mQA5eiuUwWKw2Ub45YAL0ynIRV1hMRpEASyVSGWyuWZ0ROXVK5UqKxqHzme1aHS6osOfJWIw84yaUy6O3mzW5YuWaw2Ww8eYTPKOtFOF0I13Qt3utKeL0p70+33QvxZFKB2BBwrBEMuMPhhAxPDRBAAbBisTaxbTDQBxLlk6gFCMEMoVKqxuq7BaJ6bdKtpsRjCYiHMzONHgttkubbb3-P7VPHWuXBtNh6totXg7L4flFVlAWBUFwUhAgxxAT0AFYOBREBpznTEQGxS4TjgVd129cNikjPcYwrY82lPFNeWOS9M2vW8YDIx9AJjdYX3LN9KwOaia3OH8qkbO5-2FNsqU7UD-gggcoJHKFYXgwgDAQ8gADpuHUjSNJnVFCHQhccSXXCYDXbkCMKIidyjfcmJaCjk3PGiMyzSZTxswsQGLbA2LLNyHN4usrgEv8WxElixJA7swL7SCh2g0d5M9fRtNQ3T50wxccLw0zN0Iy5d2jao3Ls4oqOrdMr2zVzOOPJ8vNLV9D3fQtP38-iVkE5tHlCjygI+CKe3AkB+0HDRhxguDPVIZK0LSrDXGXYz8Jy8y8qs0jqoLYqz24sraOcm8qsarietY+qOKOmqdrTb96yCoSQueMLgK7Abouk2LZNghL2BIabUowubDKyjctws-LrI22ykxKvzyroyrc0h9zPO8hr40ulqTj4272uCrrHpO8KXqiqSRrG+Lx2Icg0rQuR0oMzLFuy0HVpIwqka20qLyc+jDvR5iTufHykdhm7Atx+78dE56JN7UmZPG76qZp3S6cBxmTJB3LiIKg9+ahyjYb23nEYugWUbO3yrq-bHxZuSWAMJmXIskoaYtGuK5MpzgOAADh0ggEIATgBjKFs1szt3B9azYN+zreGCqXNN-Xkf3VHztT0Xbd-B3uuWInZcG4aFYphTiBnOnpwQih9Ow8OlpZnWIdjk948x42EbvVvaozq3MbF3POsdgvnde+WPsV73K6nQga9DhmG+Z7XLLZvWHzjmGE7h-aGKtwW6vY-ueKxgKh+EgnR764nXZLyey8m32DAw6cOEruv5qMiPlqjtb2dbzmRseZd0YiLFiQs0Yb2aifQed1h7516uJF2cs3bvQ9p9CaP1KC+39ilAgHBn4fyBkzMkFIxI0jpEGRkeQUHskwJyaBZUBRChFK4SU0pZSOH1IqZUJpNTag4XqA0Ro+Fmj8CGa0i8jI9FoG6LAMBEoEViH6JIKQ0gMhDPkFe0d-6p0AdvTuydu5Z3AYfYWPdt6wIlvAy+iD+ok1QWTT2X1vZkF9ihacJAQ5EJAJICAWBigACVkAfCzJsC+pDEEUJEPSYMTJXZ0IYbDZhTxRTih1Jw+UPCVSEA1FqDJQieHGlySQMRIALTwEkdhahcANSundAoxESjfT+jUVQzRKDyEtliTUhJHJ1zbxScKNJ7DdRcOEbwkp+TBHjKKaI80Eiw5GSyDACAAA3bo9huwQAaHkWRDTPQGGafEVRgYNHxM6R2aJPSOlhkmmQAwf0CAkAMMhRBogJDSHwZQIOyVC7IMiEHAwehqBApoCHbSIdNRBxICiIOPzqC+yBYi32mJfZ6AQoimcmp3Eol9l46gehfmEoxYShC2lDCYoxP7PQtcZxB39jOJF1AmWYiZSiJl2lOUst9ly3lPKg4Cp5Xyjl-LuVMsFayoV4r3E8o5USllegQVzklUqxVyqFVzg1ZilVLKOAgq4P7YFNBgWYqUpiam-svHaQoCiMgNBYWYpeVapl1ASCordYYN1vsHX6rdfoUFgqXmakdW6hCIL3WCqoJqcgBgDDUHIAhGg5AXluqDlG5ECaA3uqdaS-QIauB-HJLQRJAzMZDNYWKUZmTuGGkmeqfhBTZl1uKQ2spFS4BVNcA6Uk+z5Geg4MclRAZ1FxJoYNLplDznjrZP0xhaYK0jKbVkutOSG3TLGSukRJT22LIZiuAAqukXpfaPRz3JNCIAA";
 
-    var block64x32 = /** @class */ (function (_super) {
-        __extends(block64x32, _super);
-        function block64x32(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, block64x32.objectName) || this;
-            _this.friction = 0.986;
-            _super.prototype.setCollision.call(_this, 0, 0, 64, 32);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 64, 32);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
+    var gameStartController = /** @class */ (function (_super) {
+        __extends(gameStartController, _super);
+        function gameStartController(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, gameStartController.objectName) || this;
+            _this.switch = false;
+            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
             return _this;
         }
-        block64x32.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
+        gameStartController.prototype.init = function (roomEvents) {
+            roomEvents.loadRoom(r1_scene_lake1, ["dream_with_dad_1"]);
         };
-        block64x32.objectName = "block64x32";
-        return block64x32;
+        gameStartController.objectName = "gameStartController";
+        return gameStartController;
     }(objectBase));
 
-    var dummySandbag = /** @class */ (function (_super) {
-        __extends(dummySandbag, _super);
-        function dummySandbag(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
-            _this.switch = false;
-            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0);
-            _this.friction = 0.90;
-            _this.airFriction = 0.96;
-            _this.weight = 0.02;
-            _this.life = 1000;
-            _super.prototype.setCollision.call(_this, 0, 0, 24, 32);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x0000FF);
-                newGraphics.drawRect(0, 0, 24, 32);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            _super.prototype.addCollisionTarget.call(_this, "player", block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, tinyBlock32.objectName, wideBlock.objectName);
-            return _this;
+    var scene_home = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALgFoAOAJgAYAacaeJNLbATUKLIEYLrbYEUMOAOoBLTABcAFoQDsMyjUh8Gg7AAkYIgOaTxhMgDYArDwBGEMAGstcRpgDCyADbI4hEAGIYJb95A0nCABPeAARCHEIQgBtUFhIgHlTACsYMHFsAEl0ABlg+BjQcREnGEJ0VCcnGhFsRyhTEXQIkWR0BIAzABUSmGxCDognbBgazE6AZUjisB7S+sbm4rb3fxBagAUIOHFOhaaWlYJB4dGQcSCABzKCHibL1HEpuCatVZotGGQoDeQmjJiAF0aFBathXpkoBBPoRgABfGgAD0IHHkJBoQTYAGYFCBmrB3NhLEFEBZrLZBCA4cCQJ9vjBxC8+tk8iE3ARojTJGJMDB0AMhiMaCNxMV0Fp+gQQMAADogbBgWxVCbXGCYXByggAAg4VC1coVSqcKpgauYmp1cLWgTZADk6O5zFYbHYJsS1gAvbK85G3BFxBkQJKpdJZXL5dmxc69cqVarrOrfRaHdrdXqSk5C9bjDpTFqzXr7JatflStabba7DpFlMC040C7XQh3dAPJ6M17vWlfH5-dAAjk00HYcHiyHQm7wpH6DgAFlnGJRHDINHxN3OcFNAHE+VSqEUYwQKlUaomGgdlqm5n061mxJNpiIC-MkxeS12Kzs9q-i0dM2dGxuFs22eTsyw+Htfn+SVORBMEIShGECCnEBfTIMh5EXAgOGXAA6bgCMIwiDFXB0pUZbdd39aNSljE8ExrS9OmvDNBTOe9c0fZ8YEY99wITLYv2rH9a2ONiGyuICalbR5QPFLs6V7aCgTgkcEInWEEVQlEAE4sRIkBMWw5dSIJcjNxgHd+Wo4paKPONT14tpmPTW92JzPMZmvJzSxActsEEqsfLciSm1uaSQI7eT+MUqD+xgod4LHRDJy030OD0gyjJwlc8TIjdKOs-caJuY941qHyXNKVj62zB9828kTLw-ALK2-c9f1Lf9Qqk9YZPbF5or8iDvjigdYJAYdRy0cckJQ9KDFndFDJRAy13cCjLKo4rbNKhyGKaksqpvMTao4zyn0ajrROGgS2uE67mtOrNAObCLZKit4YsgvtxsStTko05C0tWpasI4Nb8s2qy9wPOyyscw7nLTaqQrqziGsLJHfP8wL2uTJ7uvOSS3r6yLBq+27Yt+hLVOm2bUunbCDG4LCiDBvKzIKrairhvb6Iq7Hjpqu8PK4q6Cb427PyC7G0de8KyY+imFJ+5TBzp9S5pB7CsR03KjKIZdlvW8zCthkq6PKs9JeRli0fO8WsceqXcfu4LnoAknFfuZWwKptX4pUyakpmlLNKZ5cIbZ9CF059doe2vmrcRl27dcz2xnqrzndtnHTzxh68-l73gL9oa1mp9WJqmrXGe07CKBIZbDZxHhTe5mGbMPBGDrTq8M6Jx3MZffuWsLj2iYVsuBv9yvA7+zXAe1pmSBxNn5xNqGLK7nae-2wX++Fh2xZHni5f4mX8bfP9xOJsKZ7kyn59Gmng9r5f699GQSDjw2lvbtvc23d4YHxtjfAeqNM7owutxD20tWpCUnnfae71Z4VxGkpIOGsQ4AzDkDeahBFo8ENkYfWpkE47yTpbeyAtwGdWPtA4eOdR7F0vog2WY9oGoKVug5+mCxq01wfTcOwMmazmjitYg8hAFc0TrzGhvdD550YUPU+LDz5cIQRPC+U9S5oKfqrV+1d-oiIITrHKbMSCs3jhtKhCjdopz7iolGJ01HZ0urnCB493a6JQfo3hhjvrGOwTXUODMI4NyIFiX+bMuBNwoXY4Be9QF0Mqq4kW7kPFwIvto3xXC9EPwMZ9IxWDF7CLrpE30RAjBkBbmwHS85Elmx5hbRxtDrbpPtkw9RnjWHePYTogp-iimBJKcEspQiP74JXlEgwZA-4NPIbYlpu9k4dNTi47p7iMYaPgW7JBfjao8N9nw0pgj37hNEYQ4gRgZBZQaSzZpncqI0kUgyJkYZWQFBwdyTAvIup3xFGKCU7hZTykVM4Y0qp1QWl1PqCFRoTRmjhVaAIEZ7RcydOSOwnpvQwHStReIQYUhpAyCyCMhRFFgK6YPO+zC+maLYXkw5wzjkBNOUEgOITynTIiWIhunBlmG2Ns8y4NoCggP5p0oWGST7ZIlgMllnC2GFN6py8Z3LJmXLwfym5BhrEkLYBlXKHcxQkhcFYHEbT95pNlds+lvSclaIOSqgZarSYapVhMi5OC+XXJ1mQRpiziCWJWSAXkUA2gAEERAcCpG8nsHyRDMnDGyYOfyAVo2Ba8SU0oDSQuVDCjUhAdR6gLUimF5pS0cDRSACVcBMXrm+XAHUeKsAEv0ESwMwYyVfMpTg95HZU0tozTyXc0Cc3ijzeCw0ULkWwpreWxF86q2outBioBMAcgwAgAANz6I4fsEAmgFBoF6DtvpZzdsSKS0MFL02DqTcO-tj6ozVN-vUggZCOC4R0v+gDgGAOYNEBIaQBASAmoEW-DkEMOBGCoPBnSCGkMobIWhmQOlEMGC4NhigaGSAyEQ0YEjxHZwkXg7U4j9y8NEYhhQXU8GDXUcY0YMG8GsR0dqYxpadHyN8cMIhvWWG5wUBXBwTjdG9bib1tQCTMgFwSdnFiITymhNYhUxJucQmFASbIJpnEjGsT4cQ3UujhhxP6c0xlCjHASAiaQ4h5c4mm4iYoMxrg5HENiZc+5qgOkZAIeQyRfWRG9K6h0hlKghGVwkFI+QBDP8Fz3JIoF6gMgsSJaDVQGQJkDA6WoMYLDxgiOLRIvMhDZD0RGGY0YdeJgsOznIU13UTWiNNfRE1hcTXqBNZXD1qgTWEMtcGwV0brXmuNPG6N7ryGZvTZG0tTrhGqAmCI7UkidWFx1ZXLU6gJheuYcG7lwbkHTvdbO4ty75BjuNZo7OH+t3judaO0tVr93AvHZIg977r2Pvvfe794b-3jsA9B+Dh772VOQ4hyDh7wP3v9ZOzDlHyPPuo+h2jsHP3juY+x1j2H+OieE5J6j-Hy3+tjYO6tigWGjB2dW9ltjuo2PVfmat-Lq2Vss0K3lhnBh17GBUwYdnBhMIGpXAahDBqFwy6oAaojMhWa5ZU-IFcGXEsPZy3cnLnO5CK5W5h1XekcuRZy3F83w3dMi7oyLuTxhxOLU0zh7DjGXdwdd1QHEgJqQ0EzROomU7QVSlnYW6FppF3anhRW1dEfq1R7rQ2pt7gXSUnPfi30Rgb0kpDOStNPyJpDs+Q+gvXJx2AtqkHmdMei0R5LVH5dc7a8oprYnzdXMbAQBHO2n0RDs+9vvfnyMib6QvpL8Pv35fs0MhBdXldzfI9loRU38PLeE8brtPlLcABVTIo70+XtkNSOEQA";
+
+    var vectorFixedDelta = /** @class */ (function () {
+        function vectorFixedDelta(delta, inputMagnitude) {
+            this.delta = delta;
+            this.Dx = Math.cos(this.delta) * inputMagnitude;
+            this.Dy = Math.sin(this.delta) * inputMagnitude;
         }
-        dummySandbag.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
+        vectorFixedDelta.prototype.limitHorizontalMagnitude = function (limit) {
+            throw new Error("Method not implemented.");
         };
-        dummySandbag.objectName = "dummySandbag";
-        return dummySandbag;
-    }(objectBase));
+        vectorFixedDelta.prototype.limitVerticalMagnitude = function (limit) {
+            throw new Error("Method not implemented.");
+        };
+        Object.defineProperty(vectorFixedDelta.prototype, "magnitude", {
+            get: function () {
+                return Math.sqrt(Math.pow(this.Dx, 2) + Math.pow(this.Dy, 2));
+            },
+            set: function (newMag) {
+                var newXAdd = Math.cos(this.delta) * newMag;
+                var newYAdd = calculations.flippedSin(this.delta) * newMag;
+                this.Dx = newXAdd;
+                this.Dy = newYAdd;
+            },
+            enumerable: false,
+            configurable: true
+        });
+        vectorFixedDelta.prototype.increaseMagnitude = function (addValue) {
+            //this.Dx = this.Dx * (this.magnitude+addValue) / this.magnitude;
+            //this.Dy = this.Dy * (this.magnitude+addValue) / this.magnitude;
+            var newXAdd = Math.cos(this.delta) * addValue;
+            var newYAdd = calculations.flippedSin(this.delta) * addValue;
+            if (Math.abs(newXAdd) > 0.00000000000001) {
+                this.Dx += newXAdd;
+            }
+            if (Math.abs(newYAdd) > 0.00000000000001) {
+                this.Dy += newYAdd;
+            }
+        };
+        return vectorFixedDelta;
+    }());
+
+    var animConfig = /** @class */ (function () {
+        function animConfig(init) {
+            this.animationName = "";
+            this.x = 0;
+            this.y = 0;
+            this.speed = 0.5;
+            this.scaleX = 1;
+            this.scaleY = 1;
+            this.anchorX = 0.5;
+            this.anchorY = 0.5;
+            this.id = "";
+            Object.assign(this, init);
+            if (this.id == "") {
+                this.id = this.animationName;
+            }
+        }
+        return animConfig;
+    }());
 
     var ladder = /** @class */ (function (_super) {
         __extends(ladder, _super);
@@ -1724,6 +1763,7 @@
             this.objToCreateLife = 0;
             this.beforePaylod = true;
             this.destroyPreviousObjects = false;
+            this.delta = 0;
             this._actionContainer = actionContainer;
         }
         action.new = function (actionContainer) {
@@ -1857,11 +1897,11 @@
                     if (this._resetUserGravity) {
                         user.gravity.magnitude = 0;
                     }
-                    var delta = this.movementVector.delta;
+                    this.delta = this.movementVector.delta;
                     if (this._actionContainer.getDirection() == movementDirection.left) {
-                        delta = calculations.PI + ((calculations.PI * 2) - delta);
+                        this.delta = calculations.PI + ((calculations.PI * 2) - this.delta);
                     }
-                    user.addForceAngleMagnitude(delta, this.movementVector.magnitude);
+                    user.addForceAngleMagnitude(this.delta, this.movementVector.magnitude);
                     if (this.objCreatorFunc != null) {
                         var newObj = new actionCreatedObject(this.objToCreateLife, this.objCreatorFunc(), this.objToCreateOffset[0], this.objToCreateOffset[1]);
                         this._actionContainer.objectsCreated.push(newObj);
@@ -1970,18 +2010,19 @@
             this.objectsCreated = [];
             this.direction = movementDirection.right;
             this.stopped = false;
+            this.i = 0;
         }
         actionContainer.prototype.playCurrent = function (user, l, direction) {
             this.direction = direction;
-            for (var i = this.objectsCreated.length - 1; i >= 0; i--) {
-                var objMeta = this.objectsCreated[i];
+            for (this.i = this.objectsCreated.length - 1; this.i >= 0; this.i--) {
+                var objMeta = this.objectsCreated[this.i];
                 if (objMeta.life > 0) {
                     objMeta.life--;
                     this.positionCreatedObject(user, objMeta);
                 }
                 else {
                     l.deleteObject(objMeta.obj());
-                    this.objectsCreated.splice(i, 1);
+                    this.objectsCreated.splice(this.i, 1);
                 }
             }
             if (this.current().getUserShouldBeStill() != genericStatus.notSet) {
@@ -2068,13 +2109,15 @@
     }());
 
     var baseAttack = /** @class */ (function () {
-        function baseAttack(creator, direction) {
+        function baseAttack(creator, direction, attackTargets) {
             this.attackSeries = new actionContainer();
+            this.attackTargets = [];
             //private movementInformationPlayer: actionPlayer = new actionPlayer();
             this.done = false;
             this.attackDirection = movementDirection.right;
             this.attackDirection = direction;
             this.creator = creator;
+            this.attackTargets = attackTargets;
         }
         baseAttack.prototype.isDone = function () {
             return this.done;
@@ -2100,26 +2143,55 @@
         return baseAttack;
     }());
 
+    var dummySandbag = /** @class */ (function (_super) {
+        __extends(dummySandbag, _super);
+        function dummySandbag(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, dummySandbag.objectName) || this;
+            _this.switch = false;
+            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0);
+            _this.friction = 0.78;
+            _this.airFriction = 0.9947;
+            _this.weight = 0.037;
+            _this.life = 1000;
+            _this.collidesWithPolygonGeometry = true;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 98);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x0000FF);
+                newGraphics.drawRect(0, 0, 64, 98);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, "player", block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, tinyBlock32.objectName, wideBlock.objectName);
+            return _this;
+        }
+        dummySandbag.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        dummySandbag.objectName = "dummySandbag";
+        return dummySandbag;
+    }(objectBase));
+
     var threeHitNormal = /** @class */ (function (_super) {
         __extends(threeHitNormal, _super);
-        function threeHitNormal(creator, direction) {
-            var _this = _super.call(this, creator, direction) || this;
+        function threeHitNormal(creator, direction, attackTargets) {
+            var _this = _super.call(this, creator, direction, attackTargets) || this;
             var returnUserFacing = function () {
                 return creator.facingRight;
             };
-            var collision = [dummySandbag.objectName];
             _this.attackSeries
                 .newAction().vector(0, 1).userStill(true)
-                .create(function () { return hitbox.new([18, 12], 87, 1, collision, returnUserFacing); }).objOffset([16, -5]).objLife(3)
+                .create(function () { return hitbox.new([36, 24], 87, 1, attackTargets, returnUserFacing); }).objOffset([32, -5]).objLife(3)
                 .startupWait(3)
                 .newAction().vector(0, 1).userStill(true).continueWindow(15).removePrevObjsOnCreate()
-                .create(function () { return hitbox.new([18, 12], 40, 5, collision, returnUserFacing); }).objOffset([16, -5]).objLife(5)
+                .create(function () { return hitbox.new([36, 24], 40, 5, attackTargets, returnUserFacing); }).objOffset([32, -5]).objLife(5)
                 .startupWait(5)
                 .newAction().vector(60, 4).userStill(true).continueWindow(19)
                 .startupWait(5)
                 .endWait(16)
                 .newAction().userStill(true).removePrevObjsOnCreate()
-                .create(function () { return hitbox.new([27, 32], 40, 5, collision, returnUserFacing); }).objOffset([16, 8]).objLife(12)
+                .create(function () { return hitbox.new([52, 64], 40, 5, attackTargets, returnUserFacing); }).objOffset([32, 8]).objLife(12)
                 .startupWait(0)
                 .endWait(10);
             return _this;
@@ -2147,19 +2219,18 @@
 
     var slideKick = /** @class */ (function (_super) {
         __extends(slideKick, _super);
-        function slideKick(creator, direction) {
-            var _this = _super.call(this, creator, direction) || this;
+        function slideKick(creator, direction, attackTargets) {
+            var _this = _super.call(this, creator, direction, attackTargets) || this;
             var returnUserFacing = function () {
                 return creator.facingRight;
             };
-            var collision = [dummySandbag.objectName];
             _this.attackSeries
                 .newAction().vector(0, 16).userStill(true)
-                .create(function () { return hitbox.new([18, 12], 20, 3, collision, returnUserFacing); }).objOffset([16, 5]).objLife(10)
+                .create(function () { return hitbox.new([36, 24], 20, 3, attackTargets, returnUserFacing); }).objOffset([32, 5]).objLife(10)
                 .startupWait(6)
                 .endWait(20).userFriction(1)
                 .newAction().vector(40, 12) //.continueWindow(19)
-                .create(function () { return hitbox.new([20, 20], 80, 7, collision, returnUserFacing); }).objOffset([8, -10]).objLife(20)
+                .create(function () { return hitbox.new([40, 40], 80, 7, attackTargets, returnUserFacing); }).objOffset([20, -10]).objLife(20)
                 .startupWait(0)
                 .endWait(3);
             return _this;
@@ -2172,22 +2243,21 @@
 
     var forwardAir = /** @class */ (function (_super) {
         __extends(forwardAir, _super);
-        function forwardAir(creator, direction) {
-            var _this = _super.call(this, creator, direction) || this;
+        function forwardAir(creator, direction, attackTargets) {
+            var _this = _super.call(this, creator, direction, attackTargets) || this;
             var returnUserFacing = function () {
                 return creator.facingRight;
             };
-            var collision = [dummySandbag.objectName];
             _this.attackSeries
                 .newAction().vector(90, 1).resetGravity()
                 .startupWait(3)
                 .endWait(3)
                 .newAction().resetGravity().removePrevObjsOnCreate()
-                .create(function () { return hitbox.new([20, 48], 280, 3, collision, returnUserFacing); }).objOffset([16, 5]).objLife(4)
+                .create(function () { return hitbox.new([20, 48], 280, 3, attackTargets, returnUserFacing); }).objOffset([32, 5]).objLife(4)
                 .startupWait(2).repeat(2)
                 .endWait(8)
                 .newAction().resetGravity().removePrevObjsOnCreate()
-                .create(function () { return hitbox.new([32, 48], 10, 4, collision, returnUserFacing); }).objOffset([16, 5]).objLife(10)
+                .create(function () { return hitbox.new([32, 48], 10, 4, attackTargets, returnUserFacing); }).objOffset([32, 5]).objLife(10)
                 .startupWait(6)
                 .endWait(10);
             return _this;
@@ -2197,18 +2267,17 @@
 
     var downAir = /** @class */ (function (_super) {
         __extends(downAir, _super);
-        function downAir(creator, direction) {
-            var _this = _super.call(this, creator, direction) || this;
+        function downAir(creator, direction, attackTargets) {
+            var _this = _super.call(this, creator, direction, attackTargets) || this;
             var returnUserFacing = function () {
                 return creator.facingRight;
             };
-            var collision = [dummySandbag.objectName];
             _this.attackSeries
                 .newAction().vector(90, 2).resetGravity()
                 .startupWait(2)
                 .endWait(6)
                 .newAction().vector(270, 18).resetGravity()
-                .create(function () { return hitbox.new([82, 32], 80, 8.5, collision, returnUserFacing); }).objOffset([0, 5]).objLife(60)
+                .create(function () { return hitbox.new([82, 32], 80, 8.5, attackTargets, returnUserFacing); }).objOffset([0, 5]).objLife(60)
                 .startupWait(3)
                 .endWait(10);
             return _this;
@@ -2218,19 +2287,18 @@
 
     var neutralAir = /** @class */ (function (_super) {
         __extends(neutralAir, _super);
-        function neutralAir(creator, direction) {
-            var _this = _super.call(this, creator, direction) || this;
+        function neutralAir(creator, direction, attackTargets) {
+            var _this = _super.call(this, creator, direction, attackTargets) || this;
             var returnUserFacing = function () {
                 return creator.facingRight;
             };
-            var collision = [dummySandbag.objectName];
             _this.attackSeries
                 .newAction().resetGravity()
-                .create(function () { return hitbox.new([32, 24], 10, 4, collision, returnUserFacing); }).objOffset([16, 0]).objLife(8)
+                .create(function () { return hitbox.new([64, 48], 10, 4, attackTargets, returnUserFacing); }).objOffset([32, 0]).objLife(8)
                 .startupWait(2)
                 .endWait(4)
                 .newAction().resetGravity()
-                .create(function () { return hitbox.new([20, 24], 170, 4, collision, returnUserFacing); }).objOffset([-16, 0]).objLife(8)
+                .create(function () { return hitbox.new([40, 48], 170, 4, attackTargets, returnUserFacing); }).objOffset([-32, 0]).objLife(8)
                 .startupWait(4)
                 .endWait(10);
             return _this;
@@ -2264,6 +2332,8 @@
             this.attackButtonReleased = true;
             this.airAttacks = null;
             this.groundAttacks = null;
+            this.CL_collisionWith = null;
+            this.CL_movedBetweenLadder = false;
             this.ladderObject = ladderObject;
             this.airAttacks = airAttacks;
             this.groundAttacks = groundAttacks;
@@ -2278,30 +2348,33 @@
                 this.maxRunSpeed = this.superRunSpeed;
             }
             else {
-                this.maxRunSpeed = this.normalRunSpeed;
+                if (character.verticalCollision > 0) {
+                    //REstore run speed only if we're on ground
+                    this.maxRunSpeed = this.normalRunSpeed;
+                }
             }
             if (l.checkKeyHeld("a") || l.checkKeyHeld("A")) {
                 if (character.verticalCollision > 0) {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 13) * this.maxRunSpeed);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 13) * this.maxRunSpeed * l.deltaTime);
                 }
                 else {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 64) * this.maxRunSpeed);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 64) * this.maxRunSpeed * l.deltaTime);
                 }
             }
             if (l.checkKeyHeld("d") || l.checkKeyHeld("D")) {
                 if (character.verticalCollision > 0) {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 13) * this.maxRunSpeed);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 13) * this.maxRunSpeed * l.deltaTime);
                 }
                 else {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 64) * this.maxRunSpeed);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 64) * this.maxRunSpeed * l.deltaTime);
                 }
             }
-            if (this.jumpButtonReleased == true && (l.checkKeyHeld("w") || l.checkKeyHeld("W")) && (character.verticalCollision > 0 || character._isColliding_Special)) {
-                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength);
+            if (this.jumpButtonReleased == true && (l.checkKeyHeld("w") || l.checkKeyHeld("W")) && (character.verticalCollision > 0 || character._collidingWithPolygon)) {
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime);
                 this.jumpButtonReleased = false;
             }
             if (l.checkKeyReleased("h")) {
-                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime);
                 character.gravity.magnitude = 0;
             }
             if (l.checkKeyHeld("w") || l.checkKeyHeld("W")) {
@@ -2312,8 +2385,8 @@
         characterMoves.prototype.climbingLadders = function (l, character) {
             if (this.ladderObject == "")
                 return;
-            var collisionWith = l.isCollidingWith(character, character.collisionBox, [this.ladderObject]);
-            if (collisionWith != null) {
+            this.CL_collisionWith = l.isCollidingWith(character, character.collisionBox, [this.ladderObject]);
+            if (this.CL_collisionWith != null) {
                 if ((l.checkKeyHeld("w") || l.checkKeyHeld("s"))) {
                     character.force.Dx = 0;
                 }
@@ -2327,7 +2400,7 @@
                     character.gravity.magnitude = 0;
                     character.force.Dx *= 0.4;
                     character.force.Dy *= 0.2;
-                    character.g.x = collisionWith.g.x + (collisionWith.g.width / 2) - (character.g.width / 2);
+                    character.g.x = this.CL_collisionWith.g.x + (this.CL_collisionWith.g.width / 2) - (character.g.width / 2);
                     if (l.checkKeyHeld("w")) {
                         character.g.y -= this.climbSpeed;
                         while (l.isCollidingWith(character, character.collisionBox, [this.ladderObject]) == null ||
@@ -2338,7 +2411,7 @@
                     }
                     if (l.checkKeyHeld("w") && this.atLadderTop == true && this.releasedJumpKeyAtLadderTop) {
                         character.g.y -= 1;
-                        character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump);
+                        character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime);
                     }
                     console.log(l.checkKeyReleased("w"));
                     if (l.checkKeyReleased("w") && this.atLadderTop == true) {
@@ -2348,10 +2421,10 @@
                     if (l.checkKeyHeld("s")) {
                         character.g.y += this.climbDownSpeed;
                         if (l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null) {
-                            character.g.y = collisionWith.g.y + (collisionWith.collisionBox.y / 2) + collisionWith.collisionBox.height / 2 - 1;
+                            character.g.y = this.CL_collisionWith.g.y + (this.CL_collisionWith.collisionBox.y / 2) + this.CL_collisionWith.collisionBox.height / 2 - 1;
                         }
                     }
-                    var movedBetweenLadder = false;
+                    this.CL_movedBetweenLadder = false;
                     if (l.checkKeyReleased("d")) {
                         this.canJumpLadders = true;
                     }
@@ -2361,19 +2434,19 @@
                     if (l.checkKeyHeld("a")) {
                         if (this.canJumpLadders) {
                             character.g.x -= character.collisionBox.width;
-                            movedBetweenLadder = true;
+                            this.CL_movedBetweenLadder = true;
                             if (l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null) {
                                 character.g.x += character.collisionBox.width;
-                                movedBetweenLadder = false;
+                                this.CL_movedBetweenLadder = false;
                             }
-                            if (movedBetweenLadder && l.checkKeyHeld("w")) {
-                                character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump);
+                            if (this.CL_movedBetweenLadder && l.checkKeyHeld("w")) {
+                                character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump * l.deltaTime);
                                 this.atLadderTop = false;
                                 this.canJumpLadders = false;
                                 this.climbindLadder = false;
                                 this.releasedJumpKeyAtLadderTop = false;
                             }
-                            else if (movedBetweenLadder) {
+                            else if (this.CL_movedBetweenLadder) {
                                 this.releasedJumpKeyAtLadderTop = false;
                                 this.canJumpLadders = false;
                             }
@@ -2382,19 +2455,19 @@
                     if (l.checkKeyHeld("d")) {
                         if (this.canJumpLadders) {
                             character.g.x += character.collisionBox.width;
-                            movedBetweenLadder = true;
+                            this.CL_movedBetweenLadder = true;
                             if (l.isCollidingWith(character, character.collisionBox, character.collisionTargets) != null) {
                                 character.g.x -= character.collisionBox.width;
-                                movedBetweenLadder = false;
+                                this.CL_movedBetweenLadder = false;
                             }
-                            if (movedBetweenLadder && l.checkKeyHeld("w")) {
-                                character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump);
+                            if (this.CL_movedBetweenLadder && l.checkKeyHeld("w")) {
+                                character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump * l.deltaTime);
                                 this.atLadderTop = false;
                                 this.canJumpLadders = false;
                                 this.climbindLadder = false;
                                 this.releasedJumpKeyAtLadderTop = false;
                             }
-                            else if (movedBetweenLadder) {
+                            else if (this.CL_movedBetweenLadder) {
                                 this.releasedJumpKeyAtLadderTop = false;
                                 this.canJumpLadders = false;
                             }
@@ -2409,7 +2482,7 @@
                 this.releasedJumpKeyAtLadderTop = false;
                 if (l.checkKeyHeld("w") && Math.floor(character.gravity.magnitude) == 0
                     && this.hasJumpedFromLadder == false) {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime);
                     this.hasJumpedFromLadder = true;
                 }
             }
@@ -2421,7 +2494,7 @@
                     this.attackButtonReleased = false;
                     this.attack.queryAttack();
                     if (this.attack.isDone()) {
-                        if (character.verticalCollision > 0 || character._isColliding_Special) {
+                        if (character.verticalCollision > 0 || character._collidingWithPolygon) {
                             if (this.groundAttacks != null) {
                                 this.attack = this.groundAttacks(l);
                             }
@@ -2443,7 +2516,7 @@
 
     var grassFilter = /** @class */ (function () {
         function grassFilter(polygonPosGlslAdapted, spacingConst, grassPerLine, minGrassHeight, aspectRatio, filterAreaWidth, filterAreaHeight, filterAreaX, filterAreaY) {
-            this.grassShader = "\n    precision lowp float;\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n\n    uniform float yPolPos[{yPolPosArrayLength}];\n\n    uniform float time;\n    uniform float windWidth;\n    uniform float aspectRatio;\n    uniform float cameraPosition;\n    uniform float cameraSize;\n    \n\n    uniform float grassMaxHeight;\n\n    uniform vec2 collisionPoints[2];\n\n    const int grassPerLine = {grassPerLine};\n    const float SPACING = {spacing};\n    const float MINGRASSHEIGHT = {MINGRASSHEIGHT};\n    const float SPACEBETWEENEACHBLADE = {SPACEBETWEENEACHBLADE};\n\n    float randFromVec(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    float distSquared(vec2 A, vec2 B){\n        vec2 C = (A - B) * vec2(aspectRatio, 1.0);\n        return dot( C, C );\n    }\n\n    vec4 generateGrass(float polygonYPos, int lineIndex, float lineStart, float topYPos, float heightDifference){\n        \n        for(int b=0; b<grassPerLine; b++){\n            float grassBladeX = lineStart+(float(b)*SPACEBETWEENEACHBLADE);\n            if(vTextureCoord.x > grassBladeX-grassMaxHeight && vTextureCoord.x < grassBladeX+grassMaxHeight){\n                float grassBladeRandomVal = randFromVec(vec2(lineIndex, b));\n                float randomBladePosition = grassBladeRandomVal * SPACEBETWEENEACHBLADE;\n                grassBladeX += randomBladePosition;\n\n                float relativePosition = (grassBladeX - (float(lineIndex)*SPACING))/SPACING;\n                float grassBladeY = polygonYPos + (relativePosition*heightDifference);\n                \n                float collisionForce = 0.0;\n                for(int i=0; i<2; i++){\n                    \n                    float distanceFromGrassBladeToCollider = abs(grassBladeX - collisionPoints[i].x);\n                    \n                    //Alternative WIP formula for collision(go to desmos.com): 1-(cos(log((x+0.008)^3)*1)*0.5)-0.5\n                    if(distanceFromGrassBladeToCollider < grassMaxHeight/3.5){\n                        float distancePercentage = (distanceFromGrassBladeToCollider/(grassMaxHeight/3.5));\n                        float distanceToCollider = grassBladeX - collisionPoints[i].x;\n\n                        float distanceToColliderY = abs(grassBladeY - collisionPoints[i].y);\n                        float distanceToColliderYPercentage = 0.0;\n                        if(distanceToColliderY < 0.02){\n                            distanceToColliderYPercentage =  1.0-(distanceToColliderY / (0.02));\n                        }\n\n                        if(distanceToCollider < 0.0){\n                            collisionForce = -2.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }else{\n                            collisionForce = 1.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }\n                        collisionForce = collisionForce * distanceToColliderYPercentage;\n                        break;\n                    }\n                }\n                \n                \n                float grassBladeHeight = grassMaxHeight * grassBladeRandomVal;\n                if(grassBladeHeight < MINGRASSHEIGHT){\n                    grassBladeHeight += 0.01;\n                }\n                float grassHeightStrengthModify = grassBladeHeight/grassMaxHeight;\n                float grassTop = polygonYPos - grassBladeHeight + topYPos;\n    \n                \n                float yPosOfGras = ((vTextureCoord.y - grassTop)/(grassBladeHeight));\n                \n                //Apply wind effect\n                //Wave from top to right\n                float windStrength = collisionForce + pow(cos(time), 2.0);\n                float steepSlopeSwayLimit = 1.0;\n                if(heightDifference > 0.01){\n                    steepSlopeSwayLimit = 0.3;\n                }\n                float offsetCurve = (1.0-yPosOfGras) * 0.00085 * (0.9+windStrength);\n\n\n                \n                vec2 grassBladePoint = vec2(grassBladeX, grassBladeY);\n                    \n                float distanceToBladeStartSquared = distSquared(grassBladePoint, vec2(vTextureCoord.x, vTextureCoord.y));\n                float extraCurve = (distanceToBladeStartSquared/(grassBladeHeight*grassBladeHeight)) * 0.0015 * windStrength *  grassHeightStrengthModify * steepSlopeSwayLimit;\n                \n\n                float bladeWidthMoon = 0.0002;\n                \n                float bladePosition = lineStart+(float(b)*SPACEBETWEENEACHBLADE) + randomBladePosition;\n\n                float grassBladeLeftSideStart = bladePosition + offsetCurve + extraCurve;\n                float grassBladeRightSideStart = bladePosition + offsetCurve + extraCurve;\n\n                float alpha = 0.0;\n                \n                if((vTextureCoord.x) > grassBladeLeftSideStart - bladeWidthMoon\n                && (vTextureCoord.x) < grassBladeRightSideStart + bladeWidthMoon\n                && distanceToBladeStartSquared < (grassBladeHeight*grassBladeHeight)){\n                    alpha = 1.0;\n                }\n\n\n                if(alpha != 0.0){\n                    if(grassBladeRandomVal < 0.2){\n                        return vec4(0.12, 0.42, 0.01568627, alpha);\n                    }else if(grassBladeRandomVal < 0.4){\n                        return vec4(0.4196, 0.6078, 0.1176, alpha);\n                    }else if(grassBladeRandomVal < 0.6){\n                        return vec4(0.5529, 0.749, 0.2235, alpha);\n                    }else if(grassBladeRandomVal < 0.8){\n                        return vec4(0.448, 0.5509, 0.2019, alpha);\n                    }else if(grassBladeRandomVal <= 1.0){\n                        return vec4(0.425, 0.6509, 0.1019, alpha);\n                    }\n                }\n\n                /*if(distanceToBladeStartSquared < 0.000001){\n                    return vec4(0.0, 0.0, 1.0, 1.0);\n                }*/\n                \n            }\n            \n            \n        }\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n    void main(void)\n    {\n        /*float distToPlayer = distSquared(vTextureCoord, collisionPoints[0]);\n        if(distToPlayer < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer2 = distSquared(vTextureCoord, collisionPoints[1]);\n        if(distToPlayer2 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer3 = distSquared(vTextureCoord, collisionPoints[2]);\n        if(distToPlayer3 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }*/\n\n        float distanceToCamera = abs(vTextureCoord.x - cameraPosition);\n        if(distanceToCamera < cameraSize){\n            for (int lineIndex = 0; lineIndex < {yPolPosArrayLength}; ++lineIndex){\n\n            \n                float heightDifference = yPolPos[lineIndex+1] - yPolPos[lineIndex];\n    \n                float relativePosition = (vTextureCoord.x - (float(lineIndex)*SPACING))/SPACING;\n    \n                float topYPos = (relativePosition*heightDifference);\n    \n                float grassTop = yPolPos[lineIndex] - grassMaxHeight*1.0;\n                float groundY = yPolPos[lineIndex] + topYPos;\n                if(vTextureCoord.y > grassTop\n                && vTextureCoord.y < groundY){\n\n                    float lineStart = float(lineIndex)*SPACING;\n                    \n                    if(vTextureCoord.x > lineStart - SPACING && vTextureCoord.x < lineStart+SPACING*2.0){\n                        vec4 grassResult = generateGrass(yPolPos[lineIndex], lineIndex, lineStart, topYPos, heightDifference);\n\n                    \n                        if(grassResult != vec4(0.0, 0.0, 0.0, 0.0)){\n                            gl_FragColor = grassResult;\n                        }else{\n                            //gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);\n                        }\n                    }\n                    \n                }\n\n            }\n        }\n        \n        //gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);\n    }";
+            this.grassShader = "\n    precision lowp float;\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n\n    uniform float yPolPos[{yPolPosArrayLength}];\n\n    uniform float time;\n    uniform float windWidth;\n    uniform float aspectRatio;\n    uniform float cameraPosition;\n    uniform float cameraSize;\n    \n\n    uniform float grassMaxHeight;\n\n    uniform vec2 collisionPoints[2];\n\n    const int grassPerLine = {grassPerLine};\n    const float SPACING = {spacing};\n    const float MINGRASSHEIGHT = {MINGRASSHEIGHT};\n    const float SPACEBETWEENEACHBLADE = {SPACEBETWEENEACHBLADE};\n    const float grassWidth = 0.00015;\n\n    float randFromVec(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    float distSquared(vec2 A, vec2 B){\n        vec2 C = (A - B) * vec2(aspectRatio, 1.0);\n        return dot( C, C );\n    }\n\n    vec4 generateGrass(float polygonYPos, int lineIndex, float lineStart, float topYPos, float heightDifference){\n        \n        for(int b=0; b<grassPerLine; b++){\n            float grassBladeX = lineStart+(float(b)*SPACEBETWEENEACHBLADE);\n            if(vTextureCoord.x > grassBladeX-grassMaxHeight && vTextureCoord.x < grassBladeX+grassMaxHeight){\n                float grassBladeRandomVal = randFromVec(vec2(lineIndex, b));\n                float randomBladePosition = grassBladeRandomVal * SPACEBETWEENEACHBLADE;\n                grassBladeX += randomBladePosition;\n\n                float relativePosition = (grassBladeX - (float(lineIndex)*SPACING))/SPACING;\n                float grassBladeY = polygonYPos + (relativePosition*heightDifference);\n                \n                float collisionForce = 0.0;\n                for(int i=0; i<2; i++){\n                    \n                    float distanceFromGrassBladeToCollider = abs(grassBladeX - collisionPoints[i].x);\n                    \n                    //Alternative WIP formula for collision(go to desmos.com): 1-(cos(log((x+0.008)^3)*1)*0.5)-0.5\n                    if(distanceFromGrassBladeToCollider < grassMaxHeight/3.5){\n                        float distancePercentage = (distanceFromGrassBladeToCollider/(grassMaxHeight/3.5));\n                        float distanceToCollider = grassBladeX - collisionPoints[i].x;\n\n                        float distanceToColliderY = abs(grassBladeY - collisionPoints[i].y);\n                        float distanceToColliderYPercentage = 0.0;\n                        if(distanceToColliderY < 0.02){\n                            distanceToColliderYPercentage =  1.0-(distanceToColliderY / (0.02));\n                        }\n\n                        if(distanceToCollider < 0.0){\n                            collisionForce = -2.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }else{\n                            collisionForce = 1.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }\n                        collisionForce = collisionForce * distanceToColliderYPercentage;\n                        break;\n                    }\n                }\n                \n                \n                float grassBladeHeight = grassMaxHeight * grassBladeRandomVal;\n                if(grassBladeHeight < MINGRASSHEIGHT){\n                    grassBladeHeight += 0.01;\n                }\n                float grassHeightStrengthModify = grassBladeHeight/grassMaxHeight;\n                float grassTop = polygonYPos - grassBladeHeight + topYPos;\n    \n                \n                float yPosOfGras = ((vTextureCoord.y - grassTop)/(grassBladeHeight));\n                \n                //Apply wind effect\n                //Wave from top to right\n                float windStrength = collisionForce + pow(cos(time), 2.0);\n                float steepSlopeSwayLimit = 1.0;\n                if(heightDifference > 0.01){\n                    steepSlopeSwayLimit = 0.3;\n                }\n                float offsetCurve = (1.0-yPosOfGras) * 0.00085 * (0.9+windStrength);\n\n\n                \n                vec2 grassBladePoint = vec2(grassBladeX, grassBladeY);\n                    \n                float distanceToBladeStartSquared = distSquared(grassBladePoint, vec2(vTextureCoord.x, vTextureCoord.y));\n                float extraCurve = (distanceToBladeStartSquared/(grassBladeHeight*grassBladeHeight)) * 0.0015 * windStrength *  grassHeightStrengthModify * steepSlopeSwayLimit;\n                \n\n                \n                \n                float bladePosition = lineStart+(float(b)*SPACEBETWEENEACHBLADE) + randomBladePosition;\n\n                float grassBladeLeftSideStart = bladePosition + offsetCurve + extraCurve;\n                float grassBladeRightSideStart = bladePosition + offsetCurve + extraCurve;\n\n                float alpha = 0.0;\n                \n                if((vTextureCoord.x) > grassBladeLeftSideStart - grassWidth\n                && (vTextureCoord.x) < grassBladeRightSideStart + grassWidth\n                && distanceToBladeStartSquared < (grassBladeHeight*grassBladeHeight)){\n                    alpha = 1.0;\n                }\n\n\n                if(alpha != 0.0){\n                    if(grassBladeRandomVal < 0.2){\n                        return vec4(0.12, 0.42, 0.01568627, alpha);\n                    }else if(grassBladeRandomVal < 0.4){\n                        return vec4(0.4196, 0.6078, 0.1176, alpha);\n                    }else if(grassBladeRandomVal < 0.6){\n                        return vec4(0.5529, 0.749, 0.2235, alpha);\n                    }else if(grassBladeRandomVal < 0.8){\n                        return vec4(0.448, 0.5509, 0.2019, alpha);\n                    }else if(grassBladeRandomVal <= 1.0){\n                        return vec4(0.425, 0.6509, 0.1019, alpha);\n                    }\n                }\n\n                /*if(distanceToBladeStartSquared < 0.000001){\n                    return vec4(0.0, 0.0, 1.0, 1.0);\n                }*/\n                \n            }\n            \n            \n        }\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n    void main(void)\n    {\n        /*float distToPlayer = distSquared(vTextureCoord, collisionPoints[0]);\n        if(distToPlayer < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer2 = distSquared(vTextureCoord, collisionPoints[1]);\n        if(distToPlayer2 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer3 = distSquared(vTextureCoord, collisionPoints[2]);\n        if(distToPlayer3 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }*/\n\n        float distanceToCamera = abs(vTextureCoord.x - cameraPosition);\n        if(distanceToCamera < cameraSize){\n            for (int lineIndex = 0; lineIndex < {yPolPosArrayLength}; ++lineIndex){\n\n            \n                float heightDifference = yPolPos[lineIndex+1] - yPolPos[lineIndex];\n    \n                float relativePosition = (vTextureCoord.x - (float(lineIndex)*SPACING))/SPACING;\n    \n                float topYPos = (relativePosition*heightDifference);\n    \n                float grassTop = yPolPos[lineIndex] - grassMaxHeight - abs(heightDifference);\n                float groundY = yPolPos[lineIndex] + topYPos;\n                if(vTextureCoord.y > grassTop\n                && vTextureCoord.y < groundY){\n\n                    float lineStart = float(lineIndex)*SPACING;\n                    \n                    if(vTextureCoord.x > lineStart - SPACING && vTextureCoord.x < lineStart+SPACING*2.0){\n                        vec4 grassResult = generateGrass(yPolPos[lineIndex], lineIndex, lineStart, topYPos, heightDifference);\n\n                    \n                        if(grassResult != vec4(0.0, 0.0, 0.0, 0.0)){\n                            gl_FragColor = grassResult;\n                        }else{\n                            //gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);\n                        }\n                    }\n                    \n                }\n\n            }\n        }\n        \n        //gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);\n    }";
             this.grassFragment = { yPolPos: [1, 2, 3, 4], time: 1.0, windWidth: 0.4,
                 aspectRatio: 4.0, cameraPosition: 0.0, cameraSize: 0.06,
                 grassMaxHeight: 0.02,
@@ -2474,10 +2547,10 @@
             this.grassFragment.aspectRatio = aspectRatio;
             this.grassFragment.cameraSize = 0.078; //0.08;
             this.grassFragment.grassMaxHeight = 0.0225;
-            console.log("movingGrassFragShaderParamsFixed: ", movingGrassFragShaderParamsFixed);
-            console.log("grassFragment: ", this.grassFragment);
+            /*console.log("movingGrassFragShaderParamsFixed: ",movingGrassFragShaderParamsFixed);
+            console.log("grassFragment: ", this.grassFragment);*/
             this.myFilter = new PIXI.Filter(undefined, movingGrassFragShaderParamsFixed, this.grassFragment);
-            this.myFilter.resolution = 0.5;
+            //this.myFilter.resolution = 0.5;
             this.myFilter.autoFit = false;
         }
         grassFilter.prototype.filter = function () {
@@ -2528,11 +2601,48 @@
         return grassFilter;
     }());
 
+    var demonAi1 = /** @class */ (function (_super) {
+        __extends(demonAi1, _super);
+        function demonAi1(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, demonAi1.objectName) || this;
+            _this.switch = false;
+            _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0);
+            _this.friction = 0.88;
+            _this.airFriction = 0.9947;
+            _this.weight = 0.017;
+            _this.life = 1000;
+            _this.collidesWithPolygonGeometry = true;
+            _this.attackTarget = null;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 64);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0xFF11BB);
+                newGraphics.drawRect(0, 0, 64, 64);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            _super.prototype.addCollisionTarget.call(_this, player.objectName, block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, "dummySandbag", tinyBlock32.objectName, wideBlock.objectName);
+            return _this;
+        }
+        demonAi1.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            if (this.attackTarget == null) {
+                var players = l.keepObjectsWithinArea(l.getSpecificObjects(player.objectName), this.g.x, this.g.y, 1000);
+                if (players.length > 0) {
+                    this.attackTarget = players[0];
+                }
+            }
+        };
+        demonAi1.objectName = "demonAi1";
+        return demonAi1;
+    }(objectBase));
+
     var player = /** @class */ (function (_super) {
         __extends(player, _super);
         function player(xp, yp, input) {
             var _this = _super.call(this, xp, yp, player.objectName) || this;
-            _this.airFriction = 0.99;
+            _this.airFriction = 0.9947;
             _this.friction = 0.7;
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
             _this.weight = 0.05;
@@ -2540,9 +2650,9 @@
             _this.currentSpriteObj = new spriteContainer();
             _this.collidesWithPolygonGeometry = true;
             _this.facingRight = true;
+            _this.attackTargets = [dummySandbag.objectName, demonAi1.objectName];
             _super.prototype.setCollision.call(_this, 0, 0, 64, 98);
             //console.log(input);
-            grassFilter.primaryCollider = _this;
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI.Graphics();
                 newGraphics.beginFill(0xFF3e50);
@@ -2553,26 +2663,26 @@
                 return g;
             });
             _this.g.filters = [];
-            _super.prototype.addCollisionTarget.call(_this, block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, "dummySandbag", tinyBlock32.objectName, wideBlock.objectName);
+            _super.prototype.addCollisionTarget.call(_this, demonAi1.objectName, block.objectName, block32x64.objectName, block64x32.objectName, movingBlockHori.objectName, movingBlockVert.objectName, "dummySandbag", tinyBlock32.objectName, wideBlock.objectName);
             _this.updateCurrentSprite();
             _this.characterMoveBase = new characterMoves(ladder.objectName, function (l) {
                 //Ground attacks
                 if (l.checkKeyHeld("s")) {
-                    return new slideKick(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                    return new slideKick(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left, _this.attackTargets);
                 }
                 else {
-                    return new threeHitNormal(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                    return new threeHitNormal(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left, _this.attackTargets);
                 }
             }, function (l) {
                 //air attacks
                 if (l.checkKeyHeld("d") || l.checkKeyHeld("a")) {
-                    return new forwardAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                    return new forwardAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left, _this.attackTargets);
                 }
                 else if (l.checkKeyHeld("s")) {
-                    return new downAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                    return new downAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left, _this.attackTargets);
                 }
                 else if (!l.checkKeyHeld("d") && !l.checkKeyHeld("d") && !l.checkKeyHeld("d") && !l.checkKeyHeld("d")) {
-                    return new neutralAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left);
+                    return new neutralAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left, _this.attackTargets);
                 }
                 return new baseAttackNull();
             });
@@ -2580,11 +2690,13 @@
         }
         player.prototype.init = function (roomEvents) {
             var _this = this;
-            if (roomEvents.getRoomStartString() != "") {
-                var roomStartObj = JSON.parse(roomEvents.getRoomStartString());
+            grassFilter.primaryCollider = this;
+            if (roomEvents.getRoomStartString().indexOf("target_room") != -1) {
+                var targetJson = roomEvents.getRoomStartString()[roomEvents.getRoomStartString().indexOf("target_room") + 1];
+                var roomStartObj = JSON.parse(targetJson);
                 if (roomStartObj.from != null) {
                     var from_1 = roomStartObj.from;
-                    var roomChangers = roomEvents.objContainer.getSpecificObjects("roomChanger");
+                    var roomChangers = roomEvents.getSpecificObjects("roomChanger");
                     roomChangers.forEach(function (roomChanger) {
                         var roomChangerJson = JSON.parse(roomChanger.outputString);
                         var facing = roomChangerJson.facing;
@@ -2605,25 +2717,25 @@
         player.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
             //l.queryKey();
-            this.characterMoveBase.move(l, this);
+            if (l.flags.has("freezeObjects")) {
+                this.characterMoveBase.move(l, this);
+            }
             l.setCameraTarget(this.g.x + this.collisionBox.x + (this.collisionBox.width / 2), this.g.y);
-            //console.log(this.force.Dy);
-            //console.log("Grav mag", this.gravity.magnitude);
-            /*if(l.checkKeyReleased("p") && this.attacking == false){
-                l.deleteObject(this);
-                l.addObject(new mio(this.g.x, this.g.y-32, ""), this.onLayer);
-            }*/
             if (this.verticalCollision > 0) {
                 if (this.force.Dx > 0) {
-                    this.facingRight = true;
+                    if (l.checkKeyHeld("d") && l.checkKeyHeld("a") == false) {
+                        this.facingRight = true;
+                    }
                 }
                 else if (this.force.Dx < 0) {
-                    this.facingRight = false;
+                    if (l.checkKeyHeld("a") && l.checkKeyHeld("d") == false) {
+                        this.facingRight = false;
+                    }
                 }
             }
         };
         player.prototype.playFootstepSounds = function () {
-            resourcesHand.playRandomAudio(["footstepDirt1.wav", "footstepDirt2.wav", "footstepDirt3.wav", "footstepDirt4.wav"]);
+            resourcesHand.playRandomAudio(["footstepGrass1.wav", "footstepGrass2.wav", "footstepGrass3.wav", "footstepGrass4.wav"]);
         };
         player.prototype.updateCurrentSprite = function () {
             _super.prototype.removeAllSprites.call(this);
@@ -2652,6 +2764,900 @@
         };
         player.objectName = "player";
         return player;
+    }(objectBase));
+
+    var textPromptBox = /** @class */ (function (_super) {
+        __extends(textPromptBox, _super);
+        function textPromptBox(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, textPromptBox.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.textContainer = null;
+            _this.blurrCharacters = 10;
+            _this.blurredCharactersArray = [];
+            _this.blurredCharactersFilterArray = [];
+            _this.okButton = null;
+            _this.okButtonGlow = null;
+            _this.okButtonGlowStrength = 15;
+            _this.promptWidth = 0;
+            _this.promptHeight = 0;
+            _this.FontStyle = null;
+            _this.textPrompts = [];
+            _this.currentPromptLines = [];
+            _this.currentPrompt = "";
+            _this.currentPromptIndex = 0;
+            _this.displayedLengthOfPrompt = 0;
+            _this.characterSpeed = 3;
+            _this.characterSpeedCount = 10;
+            _this.fontSize = 29;
+            _this.boxPadding = 8;
+            _this.promptDone = false;
+            _this.promptAlpha = 1;
+            _this.enterKeyHeld = false;
+            _this.promptDoneCallback = function () { };
+            _super.prototype.setCollision.call(_this, 0, 32, 64, 64);
+            console.log("New text prompt: ", input);
+            try {
+                _this.textPrompts = JSON.parse(input);
+            }
+            catch (err) {
+                console.log("promt could not parse: ", input);
+            }
+            //console.log(this.textPrompts);
+            _this.currentPrompt = _this.textPrompts[0];
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x003eff);
+                newGraphics.drawRect(0, 32, 64, 64);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            return _this;
+        }
+        textPromptBox.prototype.afterInit = function (l) {
+            var _this = this;
+            this.okButtonGlow = new filterGlow.GlowFilter({ distance: 15, outerStrength: 0, color: 0xfffec1 });
+            this.promptWidth = l.getWindowWidth() * 0.75;
+            this.promptHeight = l.getWindowHeight() * 0.25;
+            this.g.removeChildren();
+            var newGraphics = new PIXI.Graphics();
+            newGraphics.beginFill(0x000000, 0.4);
+            newGraphics.drawRect(-this.boxPadding, -this.boxPadding, this.promptWidth + this.boxPadding * 2, this.promptHeight + this.boxPadding * 2);
+            newGraphics.endFill();
+            this.g.addChild(newGraphics);
+            this.FontStyle = new PIXI.TextStyle({
+                breakWords: false,
+                /*dropShadowAlpha: 0.5,
+                dropShadowAngle: 0.6,*/
+                //dropShadowColor: "#46382b",
+                fill: "white",
+                fontFamily: "Inconsolata_ExtraCondensed-Light",
+                fontSize: this.fontSize,
+                lineHeight: 24,
+                //lineJoin: "bevel",
+                wordWrap: true,
+                letterSpacing: 3,
+                wordWrapWidth: this.promptWidth
+            });
+            this.currentPromptLines = PIXI.TextMetrics.measureText(this.currentPrompt, this.FontStyle).lines;
+            this.currentPrompt = "";
+            this.currentPromptLines.forEach(function (line) {
+                //console.log("line: ",line);
+                _this.currentPrompt += line.replace(/ /g, '_') + "\n";
+            });
+            for (var i = 0; i < this.blurrCharacters; i++) {
+                var newText = new PIXI.Text("", this.FontStyle);
+                var newFilter = new PIXI.filters.BlurFilter(6, 3 + 2 * ((this.blurrCharacters - i) / this.blurrCharacters));
+                newText.filters = [newFilter];
+                this.blurredCharactersArray.push(newText);
+                this.blurredCharactersFilterArray.push(newFilter);
+                this.g.addChild(newText);
+            }
+            this.textContainer = new PIXI.Text("", this.FontStyle);
+            this.g.addChild(this.textContainer);
+            this.okButton = new PIXI.Text("", this.FontStyle);
+            var widthOfOk = PIXI.TextMetrics.measureText("O.K.", this.FontStyle).lineWidths[0];
+            this.okButton.x = (this.promptWidth / 2) - (widthOfOk / 2);
+            this.okButton.y = this.promptHeight - 40;
+            this.okButton.filters = [this.okButtonGlow];
+            this.g.addChild(this.okButton);
+        };
+        textPromptBox.prototype.setPromptCallback = function (callback) {
+            this.promptDoneCallback = callback;
+        };
+        textPromptBox.prototype.logic = function (l) {
+            var _this = this;
+            this.g.x = l.getCameraX() - (this.promptWidth / 2);
+            this.g.y = l.getCameraY() + (l.getWindowHeight() / 2) - (this.promptHeight) - 48;
+            this.okButtonGlowStrength = Math.cos(ticker.getTicks() * 0.074) * 1.4;
+            this.okButtonGlow.outerStrength = this.okButtonGlowStrength;
+            if (this.promptDone) {
+                this.g.alpha = this.promptAlpha;
+                this.promptAlpha *= 0.928;
+                if (this.promptAlpha < 0.004) {
+                    console.log("Callback: ", this.promptDoneCallback);
+                    //l.goToRoom(scene_home);
+                    this.promptDoneCallback(l);
+                    l.deleteObject(this);
+                }
+                return;
+            }
+            if (this.enterKeyHeld) {
+                if (this.displayedLengthOfPrompt < this.currentPrompt.length - 9 + this.blurrCharacters) {
+                    this.displayedLengthOfPrompt += 10;
+                }
+            }
+            if (l.checkKeyPressed("Enter")) {
+                this.enterKeyHeld = true;
+                if (this.displayedLengthOfPrompt >= this.currentPrompt.length + this.blurrCharacters) {
+                    this.textContainer.text = "";
+                    if (this.currentPromptIndex < this.textPrompts.length - 1) {
+                        this.currentPromptIndex++;
+                        this.currentPrompt = this.textPrompts[this.currentPromptIndex];
+                        this.currentPromptLines = PIXI.TextMetrics.measureText(this.currentPrompt, this.FontStyle).lines;
+                        this.currentPrompt = "";
+                        this.currentPromptLines.forEach(function (line) {
+                            //console.log("line: ",line);
+                            _this.currentPrompt += line.replace(/ /g, '_') + "\n";
+                        });
+                        this.displayedLengthOfPrompt = 0;
+                        this.okButton.text = "";
+                        this.enterKeyHeld = false;
+                    }
+                    else {
+                        this.promptDone = true;
+                    }
+                }
+            }
+            if (l.checkKeyReleased("Enter")) {
+                this.enterKeyHeld = false;
+            }
+            var maxBlur = 20;
+            var bluePerIndex = maxBlur / this.blurrCharacters;
+            if (this.characterSpeedCount > 0) {
+                this.characterSpeedCount--;
+                for (var i = 0; i < this.blurrCharacters; i++) {
+                    this.blurredCharactersFilterArray[i].blur = (maxBlur - bluePerIndex - (i * bluePerIndex))
+                        + (this.characterSpeedCount / this.characterSpeed) * bluePerIndex;
+                }
+            }
+            else {
+                this.characterSpeedCount = this.characterSpeed;
+                var extraSpace = 0;
+                if (this.displayedLengthOfPrompt - this.blurrCharacters + 1 > 0) {
+                    this.textContainer.text = this.currentPrompt.substr(0, this.displayedLengthOfPrompt - this.blurrCharacters + 1).replace(/_/g, ' ');
+                }
+                for (var i = 0; i < this.blurrCharacters; i++) {
+                    if (this.displayedLengthOfPrompt - i < this.currentPrompt.length) {
+                        var targetChar = this.currentPrompt[this.displayedLengthOfPrompt - i];
+                        if (targetChar == undefined) {
+                            this.blurredCharactersArray[i].text = "";
+                        }
+                        else {
+                            if (targetChar == "_") {
+                                this.blurredCharactersArray[i].text = " ";
+                            }
+                            else {
+                                this.blurredCharactersArray[i].text = targetChar;
+                            }
+                        }
+                        var lines = PIXI.TextMetrics.measureText(this.currentPrompt.substr(0, this.displayedLengthOfPrompt - i), this.FontStyle).lines;
+                        var textMetricsNoSpaces = PIXI.TextMetrics.measureText(this.currentPrompt.replace(/ /g, '_').substr(0, this.displayedLengthOfPrompt - i), this.FontStyle);
+                        var textMetricsWithSpaces = PIXI.TextMetrics.measureText(this.currentPrompt.substr(0, this.displayedLengthOfPrompt - i), this.FontStyle);
+                        textMetricsNoSpaces.lineWidths[textMetricsNoSpaces.lineWidths.length - 1] + extraSpace + 4;
+                        textMetricsWithSpaces.lineWidths[textMetricsWithSpaces.lineWidths.length - 1] + extraSpace + 4;
+                        var latestLine = lines[lines.length - 1];
+                        //Check if last char should be a space
+                        if (this.currentPrompt[lines[lines.length - 1].length] == " ") {
+                            latestLine += " ";
+                        }
+                        var lineWidths = PIXI.TextMetrics.measureText(latestLine.replace(/ /g, '_'), this.FontStyle).lineWidths;
+                        var xPosition = lineWidths[lineWidths.length - 1];
+                        this.blurredCharactersArray[i].x = xPosition + 4; // - (textMetricsWithSpaces.lines.length-1)*lastLineWithSpaces;
+                        this.blurredCharactersArray[i].y = textMetricsWithSpaces.lineHeight * (textMetricsWithSpaces.lineWidths.length - 1);
+                        this.blurredCharactersFilterArray[i].blur = (maxBlur - bluePerIndex - (i * bluePerIndex))
+                            + (this.characterSpeedCount / this.characterSpeed) * bluePerIndex;
+                        //l.getRenderer().render(this.g);
+                    }
+                    else {
+                        this.blurredCharactersArray[i].text = "";
+                    }
+                }
+                if (this.displayedLengthOfPrompt < this.currentPrompt.length + this.blurrCharacters) {
+                    this.displayedLengthOfPrompt++;
+                }
+                else {
+                    this.okButton.text = "O.K.";
+                }
+            }
+        };
+        textPromptBox.objectName = "textPromptBox";
+        return textPromptBox;
+    }(objectBase));
+
+    var handleRoomStartString = /** @class */ (function (_super) {
+        __extends(handleRoomStartString, _super);
+        function handleRoomStartString(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, handleRoomStartString.objectName) || this;
+            _this.switch = false;
+            return _this;
+        }
+        handleRoomStartString.prototype.init = function (l) {
+            var args = l.getRoomStartString();
+            args.forEach(function (arg) {
+                if (arg == "dream_with_dad_1") {
+                    var p = new player(1187, 653, "");
+                    l.addObjectLayerName(p, "Layer 1");
+                    l.flags.add("freezeObjects");
+                    var prompt_1 = new textPromptBox(0, 0, JSON.stringify(["Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+                        "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat",
+                        "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+                        "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo"]));
+                    prompt_1.setPromptCallback(function (l) {
+                        l.flags.remove("freezeObjects");
+                        l.flags.add("day");
+                        l.goToRoom(scene_home, []);
+                    });
+                    l.addObjectLayerName(prompt_1, "GUILayer");
+                }
+            });
+        };
+        handleRoomStartString.objectName = "handleRoomStartString";
+        return handleRoomStartString;
+    }(objectBase));
+
+    var fallingLeavesParticles = /** @class */ (function (_super) {
+        __extends(fallingLeavesParticles, _super);
+        function fallingLeavesParticles(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, fallingLeavesParticles.objectName) || this;
+            _this.elapsed = Date.now();
+            _super.prototype.setCollision.call(_this, 0, 0, 256, 256);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x223eFF, 0.1);
+                newGraphics.drawRect(0, 0, 256, 256);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.calculateBounds();
+                return g;
+            });
+            //PIXI.particle
+            _this.emitter = new particles.Emitter(
+            // The PIXI.Container to put the emitter in
+            // if using blend modes, it's important to put this
+            // on top of a bitmap, and not use the root stage Container
+            _this.g, 
+            // The collection of particle images to use
+            [resourcesHand.getStaticTile("fallingLeaf.png").texture], 
+            // Emitter configuration, edit this to change the look
+            // of the emitter
+            {
+                "alpha": {
+                    "start": 1,
+                    "end": 0
+                },
+                "scale": {
+                    "start": 0.45,
+                    "end": 0.6,
+                    "minimumScaleMultiplier": 0.5
+                },
+                "color": {
+                    "start": "#ffffff",
+                    "end": "#ffffff"
+                },
+                "speed": {
+                    "start": 50,
+                    "end": 100,
+                    "minimumSpeedMultiplier": 1.03
+                },
+                "acceleration": {
+                    "x": 2,
+                    "y": 0
+                },
+                "maxSpeed": 0,
+                "startRotation": {
+                    "min": 50,
+                    "max": 70
+                },
+                "noRotation": false,
+                "rotationSpeed": {
+                    "min": 0,
+                    "max": 140
+                },
+                "lifetime": {
+                    "min": 4,
+                    "max": 6
+                },
+                "blendMode": "normal",
+                "ease": [
+                    {
+                        "s": 0,
+                        "cp": 0.379,
+                        "e": 0.548
+                    },
+                    {
+                        "s": 0.548,
+                        "cp": 0.717,
+                        "e": 0.676
+                    },
+                    {
+                        "s": 0.676,
+                        "cp": 0.635,
+                        "e": 1
+                    }
+                ],
+                "frequency": 0.5,
+                "emitterLifetime": -1,
+                "maxParticles": 32,
+                "pos": {
+                    "x": 0,
+                    "y": 0
+                },
+                "addAtBack": false,
+                "spawnType": "rect",
+                "spawnRect": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 801,
+                    "h": 20
+                }
+            });
+            _this.emitter.emit = true;
+            return _this;
+        }
+        fallingLeavesParticles.prototype.logic = function (l) {
+            var now = Date.now();
+            // The emitter requires the elapsed
+            // number of seconds since the last update
+            this.emitter.update((now - this.elapsed) * 0.001);
+            this.elapsed = now;
+        };
+        fallingLeavesParticles.objectName = "fallingLeavesParticles";
+        return fallingLeavesParticles;
+    }(objectBase));
+
+    var textPrompt = /** @class */ (function (_super) {
+        __extends(textPrompt, _super);
+        function textPrompt(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, textPrompt.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.text = "[SPACE]";
+            _super.prototype.setCollision.call(_this, 0, 32, 64, 64);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x003eff);
+                newGraphics.drawRect(0, 32, 64, 64);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                var text = new PIXI.Text('[SPACE]', { fontFamily: 'Arial', fontSize: 24, fill: 0xff1010, align: 'center' });
+                g.addChild(text);
+                g.calculateBounds();
+                return g;
+            });
+            return _this;
+        }
+        textPrompt.prototype.logic = function (l) {
+        };
+        textPrompt.objectName = "textPrompt";
+        return textPrompt;
+    }(objectBase));
+
+    var gameStartRoom = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALnVQBsSAacaeJNLbATUOLMslgRQxwHUBLTABcAFs1IUqHWt2wAJGHwDmwwWNYgARhDABrRXDqYAwshLI4hEAGIADHfshKJCAE94AEQiCIhANqhYbwB5DQArGDBBbABJdAAZV3g-UEE+Ehg1CT5sEygNPnQvPmR0IIAzABU0mGxCMogSbBhKAXKAZW9UsCr03PzC1JLLRxBsgAUIOEFyvoKioYJ6xuaQQRcABwyCGxb0ddRBDrgCxWHKRRhkKDHkAqi-AF1KKGzsE+ioCAvCYABfSgAHoQAIwATgATJQXCCIZRCrBLIpqB1JoITOhBAYyElfk8QBcrjBMXwarEEm4LARfHjhAJMDB0HUGk1KE1BKl0IpagQQMAADogbBgLEkNqbGCYXACggAAmB5BlAqFIrFMAlDGlct+I2cFIActRLOT4HKRgAvWL0oHbXG-IA";
+
+    var roomIndex = {
+        "gameStartRoom": gameStartRoom, "r1_scene_lake1": r1_scene_lake1, "scene_home": scene_home,
+    };
+
+    var roomChanger = /** @class */ (function (_super) {
+        __extends(roomChanger, _super);
+        function roomChanger(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, roomChanger.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.0;
+            _this.inputTemplate = '{"to": "", "from": "", "facing": ""}';
+            _this.targetRoom = "";
+            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
+            _this.targetRoom = input;
+            _this.outputString = _this.targetRoom;
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x003eff);
+                newGraphics.drawRect(0, 0, 32, 32);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.calculateBounds();
+                return g;
+            });
+            return _this;
+        }
+        roomChanger.prototype.logic = function (l) {
+            var collisionTarget = l.isCollidingWith(this, this.collisionBox, [player.objectName]);
+            if (collisionTarget != null) {
+                var inputJson = JSON.parse(this.targetRoom);
+                //console.log(inputJson);
+                //console.log("Load room: ",roomIndex[inputJson.to]);
+                l.loadRoom(roomIndex[inputJson.to], ["target_room", this.targetRoom]);
+            }
+        };
+        roomChanger.objectName = "roomChanger";
+        return roomChanger;
+    }(objectBase));
+
+    var skyBackground = /** @class */ (function (_super) {
+        __extends(skyBackground, _super);
+        function skyBackground(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, skyBackground.objectName) || this;
+            _this.skyFilter = "\n    precision lowp float;\n    varying vec2 vTextureCoord;\n\n    const vec2 star = vec2(0.5, 0.5);\n\n    uniform int timeOfDay;\n    uniform float starBrightness;\n\n    float randFromVec(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    void main(void)\n    {\n\n        //Dawn 07:17  -  0\n        vec3 dawnColor1 = vec3(0.36784,0.33843,0.5545);\n        vec3 dawnColor2 = vec3(0.78117,0.592,0.5447);\n\n\n        //Sunrise 08:04  -  1\n        vec3 sunriseColor1 = vec3(0.4219,0.6047,0.8945);\n        vec3 sunriseColor2 = vec3(0.8649,0.86392,0.54235);\n\n        //Morning 10:00  -  2\n        vec3 morningColor1 = vec3(0.45019,0.6929,0.97804);\n        vec3 morningColor2 = vec3(0.6494,0.82745,0.98745);\n\n        //Afternoon 14:00  -  3\n        vec3 afternoonColor1 = vec3(0.3145,0.563529,0.8643);\n        vec3 afternoonColor2 = vec3(0.56588,0.770196,0.92941);\n\n        //Sunset 17:00  -  4\n        vec3 sunsetColor1 = vec3(0.5309,0.378,0.53098);\n        vec3 sunsetColor2 = vec3(0.92588,0.66549,0.238039);\n\n        //Dusk 17:54  -  5\n        vec3 duskColor1 = vec3(0.2549,0.29568,0.5545);\n        vec3 duskColor2 = vec3(0.8827,0.5494,0.2988);\n\n        //Night 19:00  -  6\n        vec3 nightColor1 = vec3(0.0023137,0.061568,0.138823);\n        vec3 nightColor2 = vec3(0.14667,0.28783,0.4847);\n\n\n        float nightSkyHeight = 0.5;\n        vec3 color = mix(dawnColor1,dawnColor2, vTextureCoord.y);\n\n        if(timeOfDay == 1){\n            color = mix(sunriseColor1,sunriseColor2, vTextureCoord.y);\n        }else if(timeOfDay == 2){\n            color = mix(morningColor1,morningColor2, vTextureCoord.y);\n        }else if(timeOfDay == 3){\n            color = mix(afternoonColor1,afternoonColor2, vTextureCoord.y);\n        }else if(timeOfDay == 4){\n            color = mix(sunsetColor1,sunsetColor2, vTextureCoord.y);\n        }else if(timeOfDay == 5){\n            color = mix(duskColor1,duskColor2, vTextureCoord.y);\n        }else if(timeOfDay == 6){\n            color = mix(nightColor1,nightColor2, vTextureCoord.y);\n        }\n\n        float randNum = randFromVec(vTextureCoord);\n\n        if(vTextureCoord.y < 0.5){\n            float closeToTopOfStarPart = (vTextureCoord.y/0.5) * 1.4;\n            if(randNum < 0.001 * starBrightness){\n                gl_FragColor = mix(vec4(1.0, 1.0, 1.0, 1.0), vec4(color,1.0), closeToTopOfStarPart);\n            }else{\n                gl_FragColor = vec4(color,1.0);\n            }\n        }else{\n            gl_FragColor = vec4(color,1.0);\n        }\n        \n        \n    }";
+            _this.skyUniform = {
+                'timeOfDay': 0,
+                'starBrightness': 1
+            };
+            _this.timeOfDay = 2;
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x000000, 1); // use an alpha value of 1 to make it visible
+                newGraphics.drawRect(-1280, -360, 1280 * 2, 720);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.cacheAsBitmap = true;
+                return g;
+            });
+            return _this;
+        }
+        skyBackground.prototype.init = function (roomEvents) {
+            if (roomEvents.flags.has("dawn")) {
+                this.timeOfDay = 0;
+            }
+            else if (roomEvents.flags.has("sunrise")) {
+                this.timeOfDay = 1;
+            }
+            else if (roomEvents.flags.has("morning")) {
+                this.timeOfDay = 2;
+            }
+            else if (roomEvents.flags.has("afternoon")) {
+                this.timeOfDay = 3;
+            }
+            else if (roomEvents.flags.has("sunset")) {
+                this.timeOfDay = 4;
+            }
+            else if (roomEvents.flags.has("dusk")) {
+                this.timeOfDay = 5;
+            }
+            else if (roomEvents.flags.has("night")) {
+                this.timeOfDay = 6;
+            }
+            this.skyUniform.timeOfDay = this.timeOfDay;
+            if (this.timeOfDay == 0) { //dawn
+                this.skyUniform.starBrightness = 0.5;
+            }
+            else if (this.timeOfDay == 1) { //Sunrise
+                this.skyUniform.starBrightness = 0.4;
+            }
+            else if (this.timeOfDay == 2) { //Morning
+                this.skyUniform.starBrightness = 0.1;
+            }
+            else if (this.timeOfDay == 3) { //afternoon
+                this.skyUniform.starBrightness = 0.1;
+            }
+            else if (this.timeOfDay == 4) { //Sunset
+                this.skyUniform.starBrightness = 0.2;
+            }
+            else if (this.timeOfDay == 5) { //Dusk
+                this.skyUniform.starBrightness = 0.4;
+            }
+            else if (this.timeOfDay == 6) { //night
+                this.skyUniform.starBrightness = 1.0;
+            }
+            var filterSky = new PIXI.Filter(undefined, this.skyFilter, this.skyUniform);
+            filterSky.autoFit = false;
+            this.g.filters = [filterSky];
+            this.g.cacheAsBitmap = true;
+            roomEvents.getRenderer().render(this.g);
+            this.g.filters = [];
+            if (this.timeOfDay == 0) { //dawn
+                //vec3(0.36784,0.33843,0.5545);
+                //vec3(0.78117,0.592,0.5447);
+                roomEvents.setLayerFilterExclude("GUILayer", [new filterAdjustment.AdjustmentFilter({
+                        red: 0.57,
+                        green: 0.48,
+                        blue: 0.545,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 1) { //Sunrise
+                /*vec3 sunriseColor1 = vec3(0.4219,0.6047,0.8945);
+                vec3 sunriseColor2 = vec3(0.8649,0.86392,0.54235);*/
+                roomEvents.setLayerFilterExclude("GUILayer", [new filterAdjustment.AdjustmentFilter({
+                        red: 0.64,
+                        green: 0.72,
+                        blue: 0.714,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 2) { //Morning
+                //vec3 morningColor1 = vec3(0.45019,0.6929,0.97804);
+                //vec3 morningColor2 = vec3(0.6494,0.82745,0.98745);
+                roomEvents.setLayerFilterExclude("GUILayer", [new filterAdjustment.AdjustmentFilter({
+                        red: 0.645,
+                        green: 0.855,
+                        blue: 0.995,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 3) { //afternoon
+                //vec3 afternoonColor1 = vec3(0.3145,0.563529,0.8643);
+                //vec3 afternoonColor2 = vec3(0.56588,0.770196,0.92941);
+                roomEvents.setLayerFilterExclude("GUILayer", [new filterAdjustment.AdjustmentFilter({
+                        red: 0.535,
+                        green: 0.765,
+                        blue: 0.99,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 4) { //Sunset
+                //vec3 sunsetColor1 = vec3(0.5309,0.378,0.53098);
+                //vec3 sunsetColor2 = vec3(0.92588,0.66549,0.238039);
+                roomEvents.setLayerFilterExclude("GUILayer", [new filterAdjustment.AdjustmentFilter({
+                        red: 0.725,
+                        green: 0.515,
+                        blue: 0.38,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 5) { //Dusk
+                //vec3 duskColor1 = vec3(0.2549,0.29568,0.5545);
+                //vec3 duskColor2 = vec3(0.8827,0.5494,0.2988);
+                roomEvents.setLayerFilterExclude("GUILayer", [new filterAdjustment.AdjustmentFilter({
+                        red: 0.5688,
+                        green: 0.415,
+                        blue: 0.4244,
+                        contrast: 1.0,
+                        brightness: 1.0,
+                    })]);
+            }
+            else if (this.timeOfDay == 6) { //night
+                roomEvents.setLayerFilterExclude("GUILayer", [new filterAdjustment.AdjustmentFilter({
+                        red: 0.1,
+                        green: 0.1,
+                        blue: 1.00,
+                        contrast: 1.1,
+                        brightness: 1.2,
+                    })]);
+            }
+        };
+        skyBackground.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+            var panPercentage = (l.getCameraX() - l.getCameraBounds()[0]) / l.getCameraBounds()[2];
+            this.g.x = l.getCameraX() - (640 * panPercentage);
+            this.g.y = l.getCameraY();
+            //console.log("panPercentage: ",panPercentage);
+        };
+        skyBackground.objectName = "skyBackground";
+        return skyBackground;
+    }(objectBase));
+
+    var treeGen = /** @class */ (function (_super) {
+        __extends(treeGen, _super);
+        function treeGen(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, treeGen.objectName) || this;
+            _this.switch = false;
+            _this.friction = 0.986;
+            _this.myShaderFrag = "\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n    uniform float treeSeed;\n\n    uniform float aspectRatio;\n    uniform int treeDistanceAwayFrom;\n    uniform int renderLeaves;\n    uniform float trunkLean;\n    uniform float treeTop;\n    uniform float leavesGroupSize;\n\n    uniform vec4 filterArea;\n    uniform vec2 dimensions;\n\n    uniform vec3 closeTreeGroups[3];\n\n    float distSquared(vec2 A, vec2 B){\n        vec2 C = (A - B); //* vec2(aspectRatio, 1.0);\n        return dot( C, C );\n    }\n\n    float rand(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    float det(vec2 a, vec2 b) { return a.x*b.y-b.x*a.y; }\n\n    vec2 closestPointInSegment( vec2 a, vec2 b )\n    {\n        vec2 ba = b - a;\n        return a + ba*clamp( -dot(a,ba)/dot(ba,ba), 0.0, 1.0 );\n    }\n\n    float getBezierT(vec2 b0, vec2 b1, vec2 b2) {\n            \n        float a=det(b0,b2), b=2.0*det(b1,b0), d=2.0*det(b2,b1); // \uD835\uDEFC,\uD835\uDEFD,\uD835\uDEFF(\uD835\uDC5D)\n        \n        //if( abs(2.0*a+b+d) < 1000.0 ) return closestPointInSegment(b0,b2);\n            \n        float f=b*d-a*a; // \uD835\uDC53(\uD835\uDC5D)\n        vec2 d21=b2-b1, d10=b1-b0, d20=b2-b0;\n        vec2 gf=2.0*(b*d21+d*d10+a*d20);\n        gf=vec2(gf.y,-gf.x); // \u2207\uD835\uDC53(\uD835\uDC5D)\n        vec2 pp=-f*gf/dot(gf,gf); // \uD835\uDC5D\u2032\n        vec2 d0p=b0-pp; // \uD835\uDC5D\u2032 to origin\n        float ap=det(d0p,d20), bp=2.0*det(d10,d0p); // \uD835\uDEFC,\uD835\uDEFD(\uD835\uDC5D\u2032)\n        // (note that 2*ap+bp+dp=2*a+b+d=4*area(b0,b1,b2))\n        float t=clamp((ap+bp)/(2.0*a+b+d), 0.0 ,1.0);\n\n        return t;\n    }\n\n\n    vec4 treeTrunk(float trunkCenter, float angle, vec2 normalizedCoord){\n        vec4 trunkColor = vec4(0.0, 0.0, 0.0, 1.0);\n        float grassBladeRandomVal = rand(vec2(treeSeed, treeSeed));\n        if(treeDistanceAwayFrom == 0/*grassBladeRandomVal < 0.25*/){\n            trunkColor = vec4(0.00039215686, 0.06039215686, 0.06392156862, 1.0);\n        }else if(treeDistanceAwayFrom == 1/*grassBladeRandomVal < 0.5*/){\n            trunkColor = vec4(0.06117647058, 0.22705882352, 0.19490196078, 1.0);\n        }else if(treeDistanceAwayFrom == 2/*grassBladeRandomVal < 0.75*/){\n            trunkColor = vec4(0.27137254902, 0.39568627451, 0.35490196078, 1.0);\n        }else if(treeDistanceAwayFrom == 3 /*grassBladeRandomVal <= 1.0*/){\n            trunkColor = vec4(0.66117647058, 0.73176470588, 0.66980392156, 1.0);\n        }\n\n        //Specks\n        float randomSpecks = rand(vec2(normalizedCoord.x+treeSeed, normalizedCoord.y+treeSeed)*vec2(0.1, 0.1));\n        if(randomSpecks < 0.1*normalizedCoord.y){\n            trunkColor = vec4(0.0, 0.10823529411, 0.08980392156, 1.0);\n        }\n        \n        float trunkThickness = clamp(rand(vec2(treeSeed, treeSeed)), 0.016, 0.025) / aspectRatio;\n        \n\n        float leftTrunkFootWidth = clamp(rand(vec2(treeSeed+0.2, treeSeed+0.2)),0.1, 0.3);\n        float leftTrunkFootHeight = clamp(rand(vec2(treeSeed+0.25, treeSeed+0.25)),0.1, 0.2);\n\n        float rightTrunkFootWidth = clamp(rand(vec2(treeSeed+0.69, treeSeed+0.69)),0.1, 0.3);\n        float rightTrunkFootHeight = clamp(rand(vec2(treeSeed+0.5, treeSeed-0.5)),0.1, 0.2);\n\n        float height = rand(vec2(treeSeed+0.3, treeSeed+0.3));\n\n        trunkThickness = trunkThickness * (normalizedCoord.y*0.5);\n\n        float leanFix = trunkLean * (1.0 - normalizedCoord.y);\n\n\n        \n        float extraPartOnRight = 0.0;\n        float randExtra = rand(normalizedCoord*vec2(1.0, 0.2));\n        if(randExtra < 0.5){\n            extraPartOnRight = 0.003;\n        }\n\n        float extraPartOnLeft = 0.0;\n        float randExtra2 = rand(vec2(normalizedCoord.x+5.0, normalizedCoord.y)*vec2(1.0, 0.2));\n        if(randExtra2 < 0.5){\n            extraPartOnLeft = 0.003;\n        }\n\n        if(normalizedCoord.x > trunkCenter - trunkThickness + leanFix - extraPartOnLeft && normalizedCoord.x < trunkCenter + trunkThickness + leanFix + extraPartOnRight\n            && normalizedCoord.y > treeTop){\n            return trunkColor;\n        }\n\n        float removeFooterEnd = 0.18;\n\n        //Left side trunk foot\n        /*float leftFootXStart = trunkCenter - trunkThickness - leftTrunkFootWidth;\n        float xInLeftFootPercentage = 0.0;\n        if(normalizedCoord.x > leftFootXStart+removeFooterEnd && normalizedCoord.x < leftFootXStart+leftTrunkFootWidth){\n            xInLeftFootPercentage = (normalizedCoord.x - leftFootXStart)/leftTrunkFootWidth;\n            xInLeftFootPercentage = pow(xInLeftFootPercentage, 6.0);\n            if(normalizedCoord.y > 1.0-(xInLeftFootPercentage*leftTrunkFootHeight)){\n                return trunkColor;\n            }\n        }\n\n        //right side trunk foot\n        float rightFootXStart = trunkCenter + trunkThickness;\n        if(normalizedCoord.x > rightFootXStart && normalizedCoord.x < rightFootXStart+rightTrunkFootWidth-removeFooterEnd){\n            float xInFootPercentage = 1.0-(normalizedCoord.x - rightFootXStart)/rightTrunkFootWidth;\n            xInFootPercentage = pow(xInFootPercentage, 6.0);\n            if(normalizedCoord.y > 1.0-(xInFootPercentage*rightTrunkFootHeight)){\n                return trunkColor;\n            }\n        }\n\n        //Fill space between feet right\n        if(normalizedCoord.x >= trunkCenter\n            && normalizedCoord.x <= rightFootXStart\n            && normalizedCoord.y > (1.0-rightTrunkFootHeight)){\n                return trunkColor;\n        }\n        //Fill space between feet left\n        if(normalizedCoord.x <= trunkCenter\n            && normalizedCoord.x >= leftFootXStart+leftTrunkFootWidth\n            && normalizedCoord.y > (1.0-leftTrunkFootHeight)){\n                return trunkColor;\n        }*/\n\n\n\n        //branches\n        float numberOfBranches = 3.0;\n        /*float bezierT = getBezierT(grassBladePoint-textureCoordAspect.xy, \n            grassForcePoint-textureCoordAspect.xy, \n            grassBladeEndPoint-textureCoordAspect.xy);*/\n\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n    vec4 leaf(vec2 position, vec2 normalizedCoord){\n\n        if(distSquared(normalizedCoord.xy, position) < 0.001){\n            float grassBladeRandomVal = rand(position);\n            if(grassBladeRandomVal < 0.2){\n                return vec4(0.12, 0.42, 0.01568627, 1.0);\n            }else if(grassBladeRandomVal < 0.4){\n                return vec4(0.4196, 0.6078, 0.1176, 1.0);\n            }else if(grassBladeRandomVal < 0.6){\n                return vec4(0.5529, 0.749, 0.2235, 1.0);\n            }else if(grassBladeRandomVal < 0.8){\n                return vec4(0.448, 0.5509, 0.2019, 1.0);\n            }else if(grassBladeRandomVal <= 1.0){\n                return vec4(0.425, 0.6509, 0.1019, 1.0);\n            }\n        }\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n\n    vec4 generateLeavesGroup(vec2 leavGroupOrigin, float groupSize, vec2 normalizedCoord){\n        float shadowRand = rand(vec2(treeSeed, 0));\n        float angleOfShadow = 0.785398163/*45 degrees*/ + shadowRand * 1.48352;\n        \n\n        float extraPoint = 0.0;\n        float randExtra = rand(vec2(normalizedCoord.x+5.0, normalizedCoord.y));\n        if(randExtra < 0.5){\n            extraPoint = 0.00168;\n        }\n\n        float distanceToorigin = distSquared(normalizedCoord, leavGroupOrigin);\n        if(distanceToorigin < groupSize*groupSize+extraPoint){\n            float randNumb = rand(normalizedCoord);\n\n\n            float darkSpotStartX = leavGroupOrigin.x + cos(angleOfShadow) * (groupSize*groupSize)*1.0;\n            float darkSpotStartY = leavGroupOrigin.y + sin(angleOfShadow) * (groupSize*groupSize)*1.0;\n\n            vec2 darkSpot = vec2(darkSpotStartX, darkSpotStartY);\n            float percentageToDarkSpotCenter = distSquared(normalizedCoord, darkSpot)/(groupSize*groupSize*2.0);\n            if(randNumb < 0.35*percentageToDarkSpotCenter){\n                return vec4(0.00039215686, 0.06039215686, 0.06392, 1.0);\n            }\n            \n            float percentageToCenter = distanceToorigin/(groupSize*groupSize);\n            if(randNumb < 0.07*percentageToCenter){\n                return vec4(0.996078, 0.996078, 0.965882, 1.0);\n            }else if(randNumb < 0.2*percentageToCenter){\n                return vec4(0.39, 0.49725, 0.452549, 1.0);\n            }else if(randNumb < 0.3*percentageToCenter){\n                return vec4(0.06117, 0.227, 0.19, 1.0);\n            }\n\n            if(distanceToorigin > groupSize*groupSize && distanceToorigin < groupSize*groupSize+extraPoint){\n                float randHalo = rand(normalizedCoord);\n                float distanceToCloseLeavesGroup = distSquared(normalizedCoord, closeTreeGroups[0].xy);\n                float distanceToCloseLeavesGroup2 = distSquared(normalizedCoord, closeTreeGroups[1].xy);\n                float distanceToCloseLeavesGroup3 = distSquared(normalizedCoord, closeTreeGroups[2].xy);\n                \n                if(randHalo < 0.5 && (\n                    distanceToCloseLeavesGroup < closeTreeGroups[0].z*closeTreeGroups[0].z ||\n                    distanceToCloseLeavesGroup2 < closeTreeGroups[1].z*closeTreeGroups[1].z ||\n                    distanceToCloseLeavesGroup3 < closeTreeGroups[2].z*closeTreeGroups[2].z\n                )){\n                    return vec4(0.8, 0.8, 0.8, 1.0);\n                }\n            }\n\n            return vec4(0.00039215686, 0.06039215686, 0.06392, 1.0);\n        }\n        \n        \n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n\n    \n\n\n    void main(void)\n    {\n        vec2 normalizedCoord = vTextureCoord;\n        \n        //float trunkLean = (clamp(rand(vec2(treeSeed+2.1, treeSeed+1.53)), 0.0, 1.0) - 0.5)*0.25;\n        float trunkCenter = 0.5;\n        //float treeTop = clamp(rand(vec2(treeSeed+1.1, treeSeed)), 0.10, 0.22);\n\n        \n        //float leavesGroupSize = 0.2;\n        float leavesGroupY = treeTop + leavesGroupSize;\n        float leavesGroupX = trunkLean * (1.0 - leavesGroupY);\n\n        float angleToTop = 0.0;\n        vec2 deltaAngleToTop = ( vec2(trunkCenter, 1.0) - vec2(leavesGroupX, leavesGroupY));  \n        float angle = atan(deltaAngleToTop.y, deltaAngleToTop.x);\n\n        if(renderLeaves == 0){\n            vec4 trunk = treeTrunk(trunkCenter, angle, normalizedCoord);\n\n\n            if(trunk != vec4(0.0, 0.0, 0.0, 0.0)){\n                gl_FragColor = trunk;\n            }\n        }\n        \n\n        if(renderLeaves != 0){\n            vec4 topLeaves = generateLeavesGroup(vec2(trunkCenter + leavesGroupX, leavesGroupY), leavesGroupSize, normalizedCoord);\n            if(topLeaves != vec4(0.0, 0.0, 0.0, 0.0)){\n                gl_FragColor = topLeaves;\n            }else{\n                //gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);\n            }\n        }\n\n        /*if(distSquared(vec2(0.5, 0.5), normalizedCoord) < 0.00005){\n            gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);\n        }\n\n        if(distSquared(vec2(0.0, 0.0), normalizedCoord) < 0.0005){\n            gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);\n        }\n\n        if(distSquared(vec2(1.0, 0.0), normalizedCoord) < 0.0005){\n            gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);\n        }\n\n        if(distSquared(vec2(1.0, 1.0), normalizedCoord) < 0.0005){\n            gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);\n        }*/\n\n        \n\n\n    }\n    ";
+            _this.treeUniforms = {
+                aspectRatio: 1.0,
+                treeSeed: 0.0,
+                treeDistanceAwayFrom: -1,
+                renderLeaves: 0,
+                trunkLean: 0,
+                treeTop: 0,
+                leavesGroupSize: 0.0,
+                closeTreeGroups: [
+                    0.0, 0.0, 0.4,
+                    -2, -2, 0.2,
+                    -2, -2, 0.2
+                ]
+            };
+            _this.leavesGroupY = 0;
+            _this.leavesGroupX = 0;
+            _this.elapsed = Date.now();
+            _this.treeSquareSize = 0;
+            _this.hasFallingLeaves = false;
+            _this.now = 0;
+            _super.prototype.setCollision.call(_this, 0, 0, 24, 24);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x00FF00);
+                newGraphics.drawRect(-12, 0, 24, 24);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                return g;
+            });
+            _this.treeTrunkFilterGraphics = new PIXI.Graphics();
+            _this.treeLeavesFilterGraphics = new PIXI.Graphics();
+            _this.fallingLeavesCon = new PIXI.Graphics();
+            _this.leavesEmitter = new particles.Emitter(
+            // The PIXI.Container to put the emitter in
+            // if using blend modes, it's important to put this
+            // on top of a bitmap, and not use the root stage Container
+            _this.fallingLeavesCon, 
+            // The collection of particle images to use
+            [resourcesHand.getStaticTile("fallingLeaf.png").texture], 
+            // Emitter configuration, edit this to change the look
+            // of the emitter
+            {
+                "alpha": {
+                    "start": 1,
+                    "end": 0
+                },
+                "scale": {
+                    "start": 0.45,
+                    "end": 0.6,
+                    "minimumScaleMultiplier": 0.5
+                },
+                "color": {
+                    "start": "#ffffff",
+                    "end": "#ffffff"
+                },
+                "speed": {
+                    "start": 50,
+                    "end": 100,
+                    "minimumSpeedMultiplier": 1.03
+                },
+                "acceleration": {
+                    "x": 0,
+                    "y": 0
+                },
+                "maxSpeed": 0,
+                "startRotation": {
+                    "min": 50,
+                    "max": 70
+                },
+                "noRotation": false,
+                "rotationSpeed": {
+                    "min": 0,
+                    "max": 140
+                },
+                "lifetime": {
+                    "min": 5,
+                    "max": 14
+                },
+                "blendMode": "normal",
+                "ease": [
+                    {
+                        "s": 0,
+                        "cp": 0.379,
+                        "e": 0.548
+                    },
+                    {
+                        "s": 0.548,
+                        "cp": 0.717,
+                        "e": 0.676
+                    },
+                    {
+                        "s": 0.676,
+                        "cp": 0.635,
+                        "e": 1
+                    }
+                ],
+                "frequency": 3,
+                "emitterLifetime": -1,
+                "maxParticles": 2,
+                "pos": {
+                    "x": 0,
+                    "y": 0
+                },
+                "addAtBack": false,
+                "spawnType": "rect",
+                "spawnRect": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 100,
+                    "h": 5
+                }
+            });
+            return _this;
+        }
+        treeGen.prototype.clamp = function (val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        };
+        treeGen.sfc32 = function (a, b, c, d) {
+            return function () {
+                a >>>= 0;
+                b >>>= 0;
+                c >>>= 0;
+                d >>>= 0;
+                var t = (a + b) | 0;
+                a = b ^ b >>> 9;
+                b = c + (c << 3) | 0;
+                c = (c << 21 | c >>> 11);
+                d = d + 1 | 0;
+                t = t + d | 0;
+                c = c + t | 0;
+                return (t >>> 0) / 4294967296;
+            };
+        };
+        treeGen.prototype.init = function (roomEvents) {
+            if (Math.random() < 0.4) {
+                this.hasFallingLeaves = true;
+            }
+            //this.g.removeChildren();
+            treeGen.randomTreeGenerator(); //next
+            treeGen.randomTreeGenerator(); //next
+            if (treeGen.randomTreeGenerator() < 0.5) {
+                treeGen.randomTreeGenerator();
+                treeGen.randomTreeGenerator();
+                treeGen.randomTreeGenerator();
+                treeGen.randomTreeGenerator();
+            }
+            var randNumb = treeGen.randomTreeGenerator();
+            //console.log("randNumb: ",randNumb);
+            this.clamp(randNumb, 0.72, 1.0);
+            this.treeSquareSize = 1024; //800*treeHeight;
+            //this.g.x = this.g.x - (this.treeSquareWidth/2)-24;
+            this.treeTrunkFilterGraphics.beginFill(0x000000);
+            this.treeTrunkFilterGraphics.drawRect(0, -this.treeSquareSize, this.treeSquareSize, this.treeSquareSize);
+            this.treeTrunkFilterGraphics.endFill();
+            this.treeLeavesFilterGraphics.beginFill(0x000000);
+            this.treeLeavesFilterGraphics.drawRect(0, -this.treeSquareSize, this.treeSquareSize, this.treeSquareSize);
+            this.treeLeavesFilterGraphics.endFill();
+            this.treeTrunkFilterGraphics.x = -this.treeSquareSize / 2;
+            this.g.addChild(this.treeTrunkFilterGraphics);
+            this.g.calculateBounds();
+            this.treeUniforms.trunkLean = (this.clamp(treeGen.randomTreeGenerator(), 0.0, 1.0) - 0.5) * 0.25;
+            this.treeUniforms.treeTop = this.clamp(treeGen.randomTreeGenerator(), 0.20, 0.44);
+            this.treeUniforms.leavesGroupSize = this.clamp(treeGen.randomTreeGenerator(), 0.09, 0.12);
+            this.treeUniforms.aspectRatio = 1.0; //this.treeTrunkFilterGraphics.width/this.treeTrunkFilterGraphics.height;
+            this.treeUniforms.treeSeed = treeGen.randomTreeGenerator(); //this.g.x;
+            var myFilter = new PIXI.Filter(undefined, this.myShaderFrag, this.treeUniforms);
+            myFilter.autoFit = false;
+            this.treeTrunkFilterGraphics.filters = [myFilter];
+            this.treeTrunkFilterGraphics.cacheAsBitmap = true;
+            //float leavesGroupX = trunkLean * (1.0 - leavesGroupY);
+            this.leavesGroupX = this.g.x + this.treeUniforms.trunkLean * (this.treeSquareSize / 2);
+            this.leavesGroupY = this.g.y - this.treeSquareSize + this.treeSquareSize * this.treeUniforms.treeTop + this.treeSquareSize * this.treeUniforms.leavesGroupSize;
+            //console.log("this.leavesGroupX: ",this.leavesGroupX, "   this.leavesGroupY: ",this.leavesGroupY);
+        };
+        treeGen.prototype.afterInit = function (roomEvents) {
+            var _this = this;
+            //DETERMINE COLOR
+            var closeTrees = roomEvents.keepObjectsWithinArea(roomEvents.getSpecificObjects(treeGen.objectName), this.g.x, this.g.y, this.treeSquareSize / 4);
+            closeTrees.sort(function (a, b) {
+                return a.layerIndex - b.layerIndex;
+            });
+            //ordered as index 0 is first tree in array
+            //check if close tree leaves group are inside this tree square
+            var pointsOfCloseTreeGroups = [];
+            //console.log("My id: ",this.ID);
+            //console.log("closeTrees: ",closeTrees);
+            closeTrees.forEach(function (tree) {
+                /*console.log("if ",tree.leavesGroupX ,">", this.g.x - (this.treeSquareSize/2),
+                "&&", tree.leavesGroupX, "<", this.g.x - (this.treeSquareSize/2) + this.treeSquareSize,
+                "&&", tree.leavesGroupY, ">", this.g.y - this.treeSquareSize,
+                "&&", tree.leavesGroupY ,"<", this.g.y);*/
+                if (tree.leavesGroupX > _this.g.x - (_this.treeSquareSize / 2)
+                    && tree.leavesGroupX < _this.g.x - (_this.treeSquareSize / 2) + _this.treeSquareSize
+                    && tree.leavesGroupY > _this.g.y - _this.treeSquareSize
+                    && tree.leavesGroupY < _this.g.y
+                    && tree.ID != _this.ID
+                /*&& tree.layerIndex < this.layerIndex*/ ) {
+                    pointsOfCloseTreeGroups.push(tree);
+                }
+            });
+            //console.log("pointsOfCloseTreeGroups: ",pointsOfCloseTreeGroups);
+            if (pointsOfCloseTreeGroups.length > 0) {
+                for (var i = 0; i < pointsOfCloseTreeGroups.length; i++) {
+                    var targetTree = pointsOfCloseTreeGroups[i];
+                    var percentageOfRectangleX = (targetTree.leavesGroupX - (this.g.x - (this.treeSquareSize / 2))) / this.treeSquareSize;
+                    var percentageOfRectangleY = (targetTree.leavesGroupY - (this.g.y - this.treeSquareSize)) / this.treeSquareSize;
+                    this.treeUniforms.closeTreeGroups[0 + (i * 3)] = percentageOfRectangleX;
+                    this.treeUniforms.closeTreeGroups[1 + (i * 3)] = percentageOfRectangleY;
+                    this.treeUniforms.closeTreeGroups[2 + (i * 3)] = targetTree.treeUniforms.leavesGroupSize;
+                    //console.log("this.treeUniforms.closeTreeGroups: ",this.treeUniforms.closeTreeGroups);
+                }
+            }
+            if (closeTrees.length >= 4) {
+                var treeType1Left = Math.floor(closeTrees.length * 0.5);
+                var treeType2Left = Math.floor(closeTrees.length * 0.2);
+                var treeType3Left = Math.floor(closeTrees.length * 0.2);
+                for (var i = 0; i < closeTrees.length; i++) {
+                    var tree = closeTrees[i];
+                    if (treeType1Left > 0) {
+                        treeType1Left--;
+                        tree.treeUniforms.treeDistanceAwayFrom = 0;
+                    }
+                    else if (treeType2Left > 0) {
+                        treeType2Left--;
+                        tree.treeUniforms.treeDistanceAwayFrom = 1;
+                    }
+                    else if (treeType3Left > 0) {
+                        treeType3Left--;
+                        tree.treeUniforms.treeDistanceAwayFrom = 2;
+                    }
+                    else {
+                        tree.treeUniforms.treeDistanceAwayFrom = 3;
+                    }
+                }
+            }
+            else if (closeTrees.length == 3 || closeTrees.length == 2) {
+                var darkestTreeColor = treeGen.randomTreeGenerator();
+                if (darkestTreeColor < 0.5) {
+                    closeTrees[0].treeUniforms.treeDistanceAwayFrom = 0;
+                }
+                else {
+                    closeTrees[0].treeUniforms.treeDistanceAwayFrom = 1;
+                }
+                var secondDarkest = treeGen.randomTreeGenerator();
+                if (secondDarkest < 0.5) {
+                    closeTrees[1].treeUniforms.treeDistanceAwayFrom = 2;
+                }
+                else {
+                    closeTrees[1].treeUniforms.treeDistanceAwayFrom = 3;
+                }
+                if (closeTrees.length == 3) {
+                    closeTrees[2].treeUniforms.treeDistanceAwayFrom = 3;
+                }
+            }
+            else if (closeTrees.length == 1) {
+                var darkestTreeColor = treeGen.randomTreeGenerator();
+                if (darkestTreeColor < 0.25) {
+                    closeTrees[0].treeUniforms.treeDistanceAwayFrom = 3;
+                }
+                else if (darkestTreeColor < 0.5) {
+                    closeTrees[0].treeUniforms.treeDistanceAwayFrom = 2;
+                }
+                else if (darkestTreeColor < 0.75) {
+                    closeTrees[0].treeUniforms.treeDistanceAwayFrom = 1;
+                }
+                else if (darkestTreeColor <= 1.0) {
+                    closeTrees[0].treeUniforms.treeDistanceAwayFrom = 0;
+                }
+            }
+            roomEvents.getRenderer().render(this.treeTrunkFilterGraphics);
+            this.treeTrunkFilterGraphics.filters = [];
+            //Leaves group
+            this.treeUniforms.renderLeaves = 1;
+            var myFilter = new PIXI.Filter(undefined, this.myShaderFrag, this.treeUniforms);
+            this.treeLeavesFilterGraphics.filters = [myFilter];
+            this.treeLeavesFilterGraphics.cacheAsBitmap = true;
+            roomEvents.getRenderer().render(this.treeLeavesFilterGraphics);
+            this.treeLeavesFilterGraphics.filters = [];
+            //falling leavs container
+            this.fallingLeavesCon.x = this.leavesGroupX; //this.g.x + (this.g.width/2) + this.treeUniforms.trunkLean * this.treeSquareSize + 32;
+            this.fallingLeavesCon.y = this.leavesGroupY; //this.g.y - this.treeSquareSize + (this.treeSquareSize*0.4);
+            //roomEvents.addGraphicsDirectlyToLayer(this.fallingLeavesCon, "treeLeavesContainer");
+            //this.g.addChild(this.fallingLeavesCon);
+            this.treeLeavesFilterGraphics.x = this.g.x;
+            this.treeLeavesFilterGraphics.y = this.g.y;
+            if (this.hasFallingLeaves) {
+                roomEvents.addGraphicsDirectlyToLayer(this.fallingLeavesCon, "treeLeavesContainer");
+            }
+            this.treeLeavesFilterGraphics.x -= this.treeSquareSize / 2;
+            roomEvents.addGraphicsDirectlyToLayer(this.treeLeavesFilterGraphics, "treeLeavesContainer");
+            var newGraphics = new PIXI.Graphics();
+            newGraphics.beginFill(0x00FF00);
+            newGraphics.drawRect(-2, -2, 4, 4);
+            newGraphics.endFill();
+            newGraphics.x = this.leavesGroupX;
+            newGraphics.y = this.leavesGroupY;
+            roomEvents.addGraphicsDirectlyToLayer(newGraphics, "treeLeavesContainer");
+        };
+        treeGen.prototype.logic = function (l) {
+            if (this.hasFallingLeaves) {
+                this.now = Date.now();
+                this.leavesEmitter.update((this.now - this.elapsed) * 0.001);
+                this.elapsed = this.now;
+            }
+        };
+        treeGen.objectName = "treeGen";
+        treeGen.randomTreeGenerator = treeGen.sfc32(0x9E3779B9, 0x243F6A88, 0xB7E15162, 440);
+        return treeGen;
     }(objectBase));
 
     var mio = /** @class */ (function (_super) {
@@ -2956,465 +3962,6 @@
         return mio;
     }(objectBase));
 
-    var collisionPolygon = /** @class */ (function (_super) {
-        __extends(collisionPolygon, _super);
-        function collisionPolygon(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, collisionPolygon.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.986;
-            _this.previousTargets = [];
-            _this.line = [0, 32, 16, 32, 48, 16, 64, 16];
-            _super.prototype.setCollision.call(_this, 0, 0, 64, 64);
-            return _this;
-        }
-        collisionPolygon.prototype.setPolygon = function (polygon) {
-            var _this = this;
-            this.line = polygon;
-            _super.prototype.style.call(this, function (g) {
-                var myGraph = new PIXI.Graphics();
-                // Move it to the beginning of the line
-                //myGraph.position.set(0, 12);
-                var linesWithEnding = __spreadArrays(_this.line);
-                linesWithEnding.push(64, 64, 0, 64);
-                //console.log(linesWithEnding);
-                myGraph.beginFill(0xff0000);
-                myGraph.drawPolygon(linesWithEnding);
-                myGraph.endFill();
-                g.addChild(myGraph);
-                return g;
-            });
-        };
-        collisionPolygon.prototype.getYFromLine = function (xIndex) {
-            for (var i = 0; i < this.line.length; i += 2) {
-                var xFirst = this.line[i];
-                var yFirst = this.line[i + 1];
-                var xLast = this.line[i + 2];
-                var yLast = this.line[i + 2 + 1];
-                if (xIndex >= xFirst && xIndex <= xLast) {
-                    if (yFirst == yLast) {
-                        return yFirst;
-                    }
-                    else {
-                        var steps = xLast - xFirst;
-                        var stepSize = (yFirst - yLast) / steps;
-                        return yFirst + (stepSize * (xFirst - xIndex));
-                    }
-                }
-            }
-            if (xIndex <= 0) {
-                return this.line[1];
-            }
-            else if (xIndex >= this.line[this.line.length - 1 - 1]) {
-                return this.line[this.line.length - 1];
-            }
-            return 0;
-        };
-        collisionPolygon.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            for (var _i = 0, _a = this.previousTargets; _i < _a.length; _i++) {
-                var prevTarget = _a[_i];
-                prevTarget._isColliding_Special = false;
-            }
-            var newTargets = l.isCollidingWithMultiple(this, this.collisionBox, [player.objectName, mio.objectName, dummySandbag.objectName]);
-            for (var _b = 0, newTargets_1 = newTargets; _b < newTargets_1.length; _b++) {
-                var target = newTargets_1[_b];
-                /*for(var prevTarget of this.previousTargets){
-                    if(target.ID == prevTarget.ID){
-                        this.previousTargets.splice(this.previousTargets.indexOf(prevTarget), 1);
-                    }
-                }*/
-                var index = (target.g.x + target.collisionBox.x + (target.collisionBox.width / 2)) - this.g.x;
-                if (target.force.Dx < -1) ;
-                var spaceFromTop = this.getYFromLine(index);
-                if (Math.round(target.force.Dy) >= 0) {
-                    if (target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + (spaceFromTop / 2)) {
-                        target.gravity.magnitude = 0;
-                        target.force.Dy = 0;
-                        target.force.Dx *= 0.916;
-                        target.g.y = this.g.y - target.collisionBox.y - target.collisionBox.height + spaceFromTop; // - target.collisionBox.y - (target.collisionBox.height) + 6 + (6*(1-ratio));
-                        target._isColliding_Special = true;
-                    }
-                    else {
-                        target._isColliding_Special = false;
-                    }
-                }
-                else if (Math.round(target.force.Dy) < 0) {
-                    target._isColliding_Special = false;
-                }
-                /*if(target.force.Dy >= 0){
-                    let index =  (target.g.x + target.collisionBox.x + (target.collisionBox.width/2)) - this.g.x;
-        
-                    let extraCheckTop = 0;
-        
-                    if(target.force.Dx < -1){
-                        extraCheckTop = 16;
-                    }
-                    let spaceFromTop = this.getYFromLine(index);
-                    if(target.g.y + target.collisionBox.y + target.collisionBox.height > this.g.y + (spaceFromTop/2)){
-                        target.gravity.magnitude = 0;
-                        target.force.Dy = 0;
-                        target.force.Dx *= 0.916;
-                        
-                        target.g.y = this.g.y - target.collisionBox.y - target.collisionBox.height + spaceFromTop;// - target.collisionBox.y - (target.collisionBox.height) + 6 + (6*(1-ratio));
-                        target._isColliding_Special = true;
-                    }else{
-                        //target._isColliding_Special = false;
-                    }
-                }else if(target.force.Dy <= 0){
-                    //target._isColliding_Special = false;
-                }*/
-            }
-            this.previousTargets = newTargets;
-        };
-        collisionPolygon.objectName = "collisionPolygon";
-        return collisionPolygon;
-    }(objectBase));
-
-    var collisionSlopeLeft = /** @class */ (function (_super) {
-        __extends(collisionSlopeLeft, _super);
-        function collisionSlopeLeft(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, input) || this;
-            _this.switch = false;
-            _this.friction = 0.986;
-            _this.setPolygon([0, 32, 16, 32, 48, 16, 64, 16]);
-            return _this;
-        }
-        collisionSlopeLeft.objectName = "collisionSlopeLeft";
-        return collisionSlopeLeft;
-    }(collisionPolygon));
-
-    var collisionSlopeRight = /** @class */ (function (_super) {
-        __extends(collisionSlopeRight, _super);
-        function collisionSlopeRight(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, input) || this;
-            _this.switch = false;
-            _this.friction = 0.986;
-            _this.setPolygon([0, 16, 16, 16, 48, 32, 64, 32]);
-            return _this;
-        }
-        collisionSlopeRight.objectName = "collisionSlopeRight";
-        return collisionSlopeRight;
-    }(collisionPolygon));
-
-    var grass = /** @class */ (function (_super) {
-        __extends(grass, _super);
-        function grass(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, grass.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.986;
-            _this.myShaderFrag = "\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n\n\n    float rand(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n\n    void main(void)\n    {\n\n        gl_FragColor = vec4(1.0, 0.3, 1.0, 1.0);\n\n        \n    }\n    ";
-            //uniform mediump vec4 time;
-            _this.customVertexShader = "\n    attribute vec2 aVertexPosition;\n    attribute vec2 aTextureCoord;\n    uniform mat3 projectionMatrix;\n    uniform float time;\n    uniform float collisionX;\n\n    varying vec2 vTextureCoord;\n    void main(void)\n    {\n        vec4 offset = vec4(0.0);\n        \n        vec4 tempPos = vec4((projectionMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0);\n\n        if (aTextureCoord.y < 0.5) {\n            tempPos.x += 0.01 * sin(time);\n\n            tempPos.x -= (collisionX) * 0.10;\n        }\n        \n        gl_Position = tempPos;\n        \n        vTextureCoord = aTextureCoord;\n    }";
-            _this.vertexUniform = {
-                time: 0.0,
-                collisionX: 0.0
-            };
-            _this.targetCollisionX = 0.0;
-            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                /*newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, 0, 32, 32);
-                newGraphics.endFill();*/
-                //g.addChild(newGraphics);
-                var grass = resourcesHand.getStaticTile("grass1");
-                console.log("grass: ", grass);
-                var simpleShader = new PIXI.Filter(_this.customVertexShader, undefined, _this.vertexUniform);
-                grass.filters = [simpleShader];
-                newGraphics.addChild(grass);
-                //var uniforms = { uSampler2:PIXI.Texture.from('required/assets/SceneRotate.jpg') };
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-        }
-        grass.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            var newTargets = l.isCollidingWithMultiple(this, this.collisionBox, [player.objectName]);
-            if (newTargets.length > 0) {
-                var xInCollision = (newTargets[0].g.x + newTargets[0].collisionBox.x + (newTargets[0].collisionBox.width / 2)) - (this.g.x);
-                var collisionPosVec = xInCollision / this.collisionBox.width;
-                if (collisionPosVec < 0) {
-                    collisionPosVec = 0;
-                }
-                else if (collisionPosVec > 1) {
-                    collisionPosVec = 1;
-                }
-                this.targetCollisionX = (collisionPosVec - 0.5) * 2;
-                if (this.targetCollisionX > 0.0) {
-                    this.targetCollisionX = (1 - this.targetCollisionX);
-                    //this.targetCollisionX = Math.sin(1.0-this.targetCollisionX);
-                }
-                else if (this.targetCollisionX < 0.0) {
-                    this.targetCollisionX = -(1 + this.targetCollisionX);
-                    //this.targetCollisionX = Math.sin(-1.0+this.targetCollisionX);
-                }
-                console.log("this.targetCollisionX: ", this.targetCollisionX);
-            }
-            if (this.vertexUniform.collisionX < this.targetCollisionX - 0.05) {
-                if (this.vertexUniform.collisionX < 0) {
-                    this.vertexUniform.collisionX += (1 - Math.abs(this.vertexUniform.collisionX)) * 0.03;
-                }
-                else {
-                    this.vertexUniform.collisionX += (1 - Math.abs(this.vertexUniform.collisionX)) * 0.2;
-                }
-            }
-            else if (this.vertexUniform.collisionX > this.targetCollisionX + 0.05) {
-                if (this.vertexUniform.collisionX > 0) {
-                    this.vertexUniform.collisionX -= (1 - Math.abs(this.vertexUniform.collisionX)) * 0.03;
-                }
-                else {
-                    this.vertexUniform.collisionX -= (1 - Math.abs(this.vertexUniform.collisionX)) * 0.2;
-                }
-            }
-            this.vertexUniform.time += 0.01;
-        };
-        grass.objectName = "grass";
-        return grass;
-    }(objectBase));
-
-    var textPrompt = /** @class */ (function (_super) {
-        __extends(textPrompt, _super);
-        function textPrompt(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, textPrompt.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.0;
-            _this.text = "[SPACE]";
-            _super.prototype.setCollision.call(_this, 0, 32, 64, 64);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x003eff);
-                newGraphics.drawRect(0, 32, 64, 64);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                var text = new PIXI.Text('[SPACE]', { fontFamily: 'Arial', fontSize: 24, fill: 0xff1010, align: 'center' });
-                g.addChild(text);
-                g.calculateBounds();
-                return g;
-            });
-            return _this;
-        }
-        textPrompt.prototype.logic = function (l) {
-            l.getInteractionObject().openText(this.text);
-        };
-        textPrompt.objectName = "textPrompt";
-        return textPrompt;
-    }(objectBase));
-
-    var scene_home = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALgFoAOAJgAYAacaeJNLbATUKLIEYLrbYEUMOAOoBLTABcAFoQDsMyjUh8Gg7AAkYIgOaTxhMgDYArDwBGEMAGstcRpgDCyADbI4hEAGIYJb95A0nCABPeAARCHEIQgBtUFhIgHlTACsYMHFsAEl0ABlg+BjQcREnGEJ0VCcnGhFsRyhTEXQIkWR0BIAzABUSmGxCDognbBgazE6AZUjisB7S+sbm4rb3fxBagAUIOHFOhaaWlYJB4dGQcSCABzKCHibL1HEpuCatVZotGGQoDeQmjJiAF0aFBathXpkoBBPoRgABfGgAD0IHHkJBoQTYZCMBhozVg7mwliCiAs1lsghAcOBIE+3xg4hefWyeRCbgI0RpkjEmBg6AGQxGNBG4mK6C0-QIIGAAB0QNgwLYqhNrjBMLg5QQAAQcKhauUKpVOFUwNXMTU6uFrQJsgBydHc5isNjsawAXtlecjbgi4gyIElUuksrl8uzYudeuVKtV1nVvotDu1ur1JSchetxh0pi1Zr19ktWvypWtNttdh0C0mBacaBdroQ7ugHk9Ga93rSvj8-ugARyaaDsODxZDoTd4Uj9BwAJxkDFsDhkdEgfE3ECXG0FX2R0rRqo1eMNA7LZNzPo1jNiSbTER5+YJ49FjtlnZ7B+Fo7ps71m5NlvPdsSw+Ltfn+SVORBMEIShGECAnEBvQ4cgABZ5wIZDl1XdwxRJFwrAAZjIKkqCKKMCAqfc4yrE9OjPNNBTOK9sxvO8YGop8gLjLZX0rd9q2OBi6yuX8ambR4APFDs6W7MCgUgodoLHWEEQQwgDBIbg0KIGc5xXB0pRwxA8MsQjiNI3dyJjA92LaWjUwvRisxzGYzxs4sQFLbBuIrNyHKEhtblE-820kzjpNA3twIHKCRxg8cVO9Mh8JIVCQExdDMP0844FNABxPkqRpaSGSZENWQKDlQG9UgMLQoxZ2A75RAkaQCBIHTGpkyKYg4AwOHwqgOHq1ChunXFRo4AA6acxuGmaTGQ-CBqGmQDEmih8IMZDjGxAwyAwkaDAoGRppxeRkJkJaSGSw6KGQybkK4CgyFnTbCJIIxBqMchJqMMgZCG-DFyMIwOF1QGjEm8hQenGdpxMPbwaMfCTpnEg5GnCh0f65C5yG5Dp1+vqKD22GjBkchlpxKbXvw7aZGQxn8IoT7epZqGKf6zbMcuv6vpm9auDRpKNpkPmhr+ybmcpmQKBm2ctq+vrpqSumDAZpmWa+5LfvkTa+pkWcSaplHJrRjGsYBum8dByGyE4ZLqfw6dyEGi61tWuWLo2+rjGW7b8PW7Fjr6ob9vF5Dnt+9H9sjraQ7x53CZS7gDBdw3p0I-2o8WjbuGR56DCBwbNtRo65d6gnnfG5LCcWo7+ruinkuWlG1sZ1FsRxIxHpRkucSDh25ZMVECZL-DIaO7E3rpzOa4w36xsp9rLr6kv+qlww+qrrbM-RfqN8Igxt7nqv98IqakMNzm7tmxOl2m+H4ZRpb5HkdfA+S7hnvdyhNsGl6kN2qUHJkDDgGEXYAI0mbMaXAjrIzGuNYO01eozg1qHABUcwZFwJqtHB05MEUDNltCe316pDRIONVERCSApUZvIUGzN7aDXAYHEGfsu7GzXlwMak1ZaUIpnIDSxhxrHUDkuC6oMSCwwpiTQaJNIbuzkHtIuFAkL7w2vdWO6MUYXWnO-IWJBJp7WkfbAmd0MKs24FNEmcs5CEVAZ9MaZAg48Nhu1BWqFpwLwngDR611Rp0yoJjRR-V-rfUupHZ2wShpm0uuHSOmccRUHRvdJC-VLoT2uuTFJzt1rIR7tdZ6piGoeL4XTFeM0lxITnHIe65NZGzjJouVCq0bHM1lsfdqi5jpUDFmtW2+d2py0xrqBmRCAb53+sYZGxdV4wMWlI+GkdsR9NiTotO18XZDSoOpIxGMCbhMxkDGQuzlbqT+ujZGKF2pnKmhcpcYtkr7VucfNalA5a0MjtdCmuItpTU2gHTa9tj53V2cdB6S85Byy6WDKg5MjHgIwpwRmWNCKoWRidYZ-U-qr0NvC+2m9HqeJwZ9cx61aHGHoe9RWBMAV-Q6c7Xqcg5y4N+ttdSjNcbEwZlQDCRiu5g0pYjDafLaGTUFeo4+nBRX8olSDIVlCRUDTZT3LpXLDBcF5XKyVwqZUqvFbqpV+qxUCoVVK5VfLYZSwZWI2G6t346vNXqrgBqzWgwtSa1VHK6Hcq1ahOlNqRaXXtSyq19Lg1Moday7xD0CYE3IX4x2Vr7qM28U-VErCPqmvlR6l1srrUT0jaGx1H0zbk0zpo469cDUuNsQzdJuL1YYo2nwx6JNwFJKZgSxRDtukA26eiTFUMhZFrxQQ5G90AYvXpsixcuo-ouPRTpLapL4XcGMYtGOS9jqrRVRTaaRcQbvW2Wovlx9dZ6PcYbRaYq61HQbe1Jt2rKF3vWg+-xYdVravhm++tn7n0Btfci991bG3TJfbqED-7wPfqA1Bn6MGn0QaAwag1CGMN8opmKqD2GLronw1hgjq0iNYdxBdANeGSOEfdqRmjVHiOMbI3R6jeHXZ6KwwQi6pyOO8duRhXDPH8Xcc46JvjuGuPCbFlhslUmhNCck4psTwn+PXStQNEwc5QZaYUMjT6PcNNHXhYrb61B6qfSOgQvq6ITG7LHsYKz6ldnYbTtQPZuyUoeb+TNNZYzOB9MIn0xmfTkZ9PVn06TFNWkNUNrU7xfTX2G2oLjVmXTynJTkBTV6DVerqXS+jIR2W8ZpcyQVrLSUcslaupl0xztit5dKzVorg0qsZcKxV+r+zqvtbqy1hr3Xyu9b40YQE1IaDckwLyYsX5hQMjFBKdwsp5SKmcMaVU6oLS6n1Mto0JozSbatAEMM9oCRSnKnAHU7pPQwEQtueIAYUhpAyCyMMclOz0jbMyUMbI3sTam35eUc3XiSmlAaFbyp1sakIDqPUYPdvrfNNDjgh2QCbjgCdtcNgIBDiu1gG7+hqRwiAA";
-
-    var roomIndex = {
-        "scene_home": scene_home,
-    };
-
-    var roomChanger = /** @class */ (function (_super) {
-        __extends(roomChanger, _super);
-        function roomChanger(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, roomChanger.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.0;
-            _this.inputTemplate = '{"to": "", "from": "", "facing": ""}';
-            _this.targetRoom = "";
-            _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
-            _this.targetRoom = input;
-            _this.outputString = _this.targetRoom;
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x003eff);
-                newGraphics.drawRect(0, 0, 32, 32);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                g.calculateBounds();
-                return g;
-            });
-            return _this;
-        }
-        roomChanger.prototype.logic = function (l) {
-            var collisionTarget = l.isCollidingWith(this, this.collisionBox, [player.objectName]);
-            if (collisionTarget != null) {
-                var inputJson = JSON.parse(this.targetRoom);
-                //console.log(inputJson);
-                //console.log("Load room: ",roomIndex[inputJson.to]);
-                l.loadRoom(roomIndex[inputJson.to], this.targetRoom);
-            }
-        };
-        roomChanger.objectName = "roomChanger";
-        return roomChanger;
-    }(objectBase));
-
-    var skyBackground = /** @class */ (function (_super) {
-        __extends(skyBackground, _super);
-        function skyBackground(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, skyBackground.objectName) || this;
-            _this.skyFilter = "\n    precision lowp float;\n    varying vec2 vTextureCoord;\n\n    const vec2 star = vec2(0.5, 0.5);\n\n    uniform int timeOfDay;\n    uniform float starBrightness;\n\n    float randFromVec(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    void main(void)\n    {\n\n        //Dawn 07:17  -  0\n        vec3 dawnColor1 = vec3(0.36784,0.33843,0.5545);\n        vec3 dawnColor2 = vec3(0.78117,0.592,0.5447);\n\n\n        //Sunrise 08:04  -  1\n        vec3 sunriseColor1 = vec3(0.4219,0.6047,0.8945);\n        vec3 sunriseColor2 = vec3(0.8649,0.86392,0.54235);\n\n        //Morning 10:00  -  2\n        vec3 morningColor1 = vec3(0.45019,0.6929,0.97804);\n        vec3 morningColor2 = vec3(0.6494,0.82745,0.98745);\n\n        //Afternoon 14:00  -  3\n        vec3 afternoonColor1 = vec3(0.3145,0.563529,0.8643);\n        vec3 afternoonColor2 = vec3(0.56588,0.770196,0.92941);\n\n        //Sunset 17:00  -  4\n        vec3 sunsetColor1 = vec3(0.5309,0.378,0.53098);\n        vec3 sunsetColor2 = vec3(0.92588,0.66549,0.238039);\n\n        //Dusk 17:54  -  5\n        vec3 duskColor1 = vec3(0.2549,0.29568,0.5545);\n        vec3 duskColor2 = vec3(0.8827,0.5494,0.2988);\n\n        //Night 19:00  -  6\n        vec3 nightColor1 = vec3(0.0023137,0.061568,0.138823);\n        vec3 nightColor2 = vec3(0.14667,0.28783,0.4847);\n\n\n        float nightSkyHeight = 0.5;\n        vec3 color = mix(dawnColor1,dawnColor2, vTextureCoord.y);\n\n        if(timeOfDay == 1){\n            color = mix(sunriseColor1,sunriseColor2, vTextureCoord.y);\n        }else if(timeOfDay == 2){\n            color = mix(morningColor1,morningColor2, vTextureCoord.y);\n        }else if(timeOfDay == 3){\n            color = mix(afternoonColor1,afternoonColor2, vTextureCoord.y);\n        }else if(timeOfDay == 4){\n            color = mix(sunsetColor1,sunsetColor2, vTextureCoord.y);\n        }else if(timeOfDay == 5){\n            color = mix(duskColor1,duskColor2, vTextureCoord.y);\n        }else if(timeOfDay == 6){\n            color = mix(nightColor1,nightColor2, vTextureCoord.y);\n        }\n\n        float randNum = randFromVec(vTextureCoord);\n\n        if(vTextureCoord.y < 0.5){\n            float closeToTopOfStarPart = (vTextureCoord.y/0.5) * 1.4;\n            if(randNum < 0.001 * starBrightness){\n                gl_FragColor = mix(vec4(1.0, 1.0, 1.0, 1.0), vec4(color,1.0), closeToTopOfStarPart);\n            }else{\n                gl_FragColor = vec4(color,1.0);\n            }\n        }else{\n            gl_FragColor = vec4(color,1.0);\n        }\n        \n        \n    }";
-            _this.skyUniform = {
-                'timeOfDay': 0,
-                'starBrightness': 1
-            };
-            _this.timeOfDay = 2;
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000, 1); // use an alpha value of 1 to make it visible
-                newGraphics.drawRect(-1280, -360, 1280 * 2, 720);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                g.cacheAsBitmap = true;
-                return g;
-            });
-            return _this;
-        }
-        skyBackground.prototype.init = function (roomEvents) {
-            this.skyUniform.timeOfDay = this.timeOfDay;
-            if (this.timeOfDay == 0) { //dawn
-                this.skyUniform.starBrightness = 0.5;
-            }
-            else if (this.timeOfDay == 1) { //Sunrise
-                this.skyUniform.starBrightness = 0.4;
-            }
-            else if (this.timeOfDay == 2) { //Morning
-                this.skyUniform.starBrightness = 0.1;
-            }
-            else if (this.timeOfDay == 3) { //afternoon
-                this.skyUniform.starBrightness = 0.1;
-            }
-            else if (this.timeOfDay == 4) { //Sunset
-                this.skyUniform.starBrightness = 0.2;
-            }
-            else if (this.timeOfDay == 5) { //Dusk
-                this.skyUniform.starBrightness = 0.4;
-            }
-            else if (this.timeOfDay == 6) { //night
-                this.skyUniform.starBrightness = 1.0;
-            }
-            var filterSky = new PIXI.Filter(undefined, this.skyFilter, this.skyUniform);
-            filterSky.autoFit = false;
-            this.g.filters = [filterSky];
-            this.g.cacheAsBitmap = true;
-            roomEvents.getRenderer().render(this.g);
-            this.g.filters = [];
-            if (this.timeOfDay == 0) { //dawn
-                //vec3(0.36784,0.33843,0.5545);
-                //vec3(0.78117,0.592,0.5447);
-                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
-                        red: 0.57,
-                        green: 0.48,
-                        blue: 0.545,
-                        contrast: 1.0,
-                        brightness: 1.0,
-                    })]);
-            }
-            else if (this.timeOfDay == 1) { //Sunrise
-                /*vec3 sunriseColor1 = vec3(0.4219,0.6047,0.8945);
-                vec3 sunriseColor2 = vec3(0.8649,0.86392,0.54235);*/
-                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
-                        red: 0.64,
-                        green: 0.72,
-                        blue: 0.714,
-                        contrast: 1.0,
-                        brightness: 1.0,
-                    })]);
-            }
-            else if (this.timeOfDay == 2) { //Morning
-                //vec3 morningColor1 = vec3(0.45019,0.6929,0.97804);
-                //vec3 morningColor2 = vec3(0.6494,0.82745,0.98745);
-                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
-                        red: 0.645,
-                        green: 0.855,
-                        blue: 0.995,
-                        contrast: 1.0,
-                        brightness: 1.0,
-                    })]);
-            }
-            else if (this.timeOfDay == 3) { //afternoon
-                //vec3 afternoonColor1 = vec3(0.3145,0.563529,0.8643);
-                //vec3 afternoonColor2 = vec3(0.56588,0.770196,0.92941);
-                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
-                        red: 0.535,
-                        green: 0.765,
-                        blue: 0.99,
-                        contrast: 1.0,
-                        brightness: 1.0,
-                    })]);
-            }
-            else if (this.timeOfDay == 4) { //Sunset
-                //vec3 sunsetColor1 = vec3(0.5309,0.378,0.53098);
-                //vec3 sunsetColor2 = vec3(0.92588,0.66549,0.238039);
-                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
-                        red: 0.725,
-                        green: 0.515,
-                        blue: 0.38,
-                        contrast: 1.0,
-                        brightness: 1.0,
-                    })]);
-            }
-            else if (this.timeOfDay == 5) { //Dusk
-                //vec3 duskColor1 = vec3(0.2549,0.29568,0.5545);
-                //vec3 duskColor2 = vec3(0.8827,0.5494,0.2988);
-                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
-                        red: 0.5688,
-                        green: 0.415,
-                        blue: 0.4244,
-                        contrast: 1.0,
-                        brightness: 1.0,
-                    })]);
-            }
-            else if (this.timeOfDay == 6) {
-                roomEvents.addStageFilter([new filterAdjustment.AdjustmentFilter({
-                        red: 0.25,
-                        green: 0.25,
-                        blue: 1.25,
-                        contrast: 1.2,
-                        brightness: 1.2,
-                    })]);
-            }
-        };
-        skyBackground.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-            var panPercentage = (l.getCameraX() - l.getCameraBounds()[0]) / l.getCameraBounds()[2];
-            this.g.x = l.getCameraX() - (640 * panPercentage);
-            this.g.y = l.getCameraY();
-            //console.log("panPercentage: ",panPercentage);
-        };
-        skyBackground.objectName = "skyBackground";
-        return skyBackground;
-    }(objectBase));
-
-    var treeGen = /** @class */ (function (_super) {
-        __extends(treeGen, _super);
-        function treeGen(xp, yp, input) {
-            var _this = _super.call(this, xp, yp, treeGen.objectName) || this;
-            _this.switch = false;
-            _this.friction = 0.986;
-            _this.myShaderFrag = "\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n    const float treeSeed = 0.0;\n\n    uniform float aspectRatio;\n\n\n    float distSquared(vec2 A, vec2 B){\n        vec2 C = (A - B) * vec2(aspectRatio, 1.0);\n        return dot( C, C );\n    }\n\n    float rand(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    float det(vec2 a, vec2 b) { return a.x*b.y-b.x*a.y; }\n\n    vec2 closestPointInSegment( vec2 a, vec2 b )\n    {\n        vec2 ba = b - a;\n        return a + ba*clamp( -dot(a,ba)/dot(ba,ba), 0.0, 1.0 );\n    }\n\n    float getBezierT(vec2 b0, vec2 b1, vec2 b2) {\n            \n        float a=det(b0,b2), b=2.0*det(b1,b0), d=2.0*det(b2,b1); // \uD835\uDEFC,\uD835\uDEFD,\uD835\uDEFF(\uD835\uDC5D)\n        \n        //if( abs(2.0*a+b+d) < 1000.0 ) return closestPointInSegment(b0,b2);\n            \n        float f=b*d-a*a; // \uD835\uDC53(\uD835\uDC5D)\n        vec2 d21=b2-b1, d10=b1-b0, d20=b2-b0;\n        vec2 gf=2.0*(b*d21+d*d10+a*d20);\n        gf=vec2(gf.y,-gf.x); // \u2207\uD835\uDC53(\uD835\uDC5D)\n        vec2 pp=-f*gf/dot(gf,gf); // \uD835\uDC5D\u2032\n        vec2 d0p=b0-pp; // \uD835\uDC5D\u2032 to origin\n        float ap=det(d0p,d20), bp=2.0*det(d10,d0p); // \uD835\uDEFC,\uD835\uDEFD(\uD835\uDC5D\u2032)\n        // (note that 2*ap+bp+dp=2*a+b+d=4*area(b0,b1,b2))\n        float t=clamp((ap+bp)/(2.0*a+b+d), 0.0 ,1.0);\n\n        return t;\n    }\n\n\n    vec4 treeTrunk(float trunkLean, float trunkCenter){\n        vec4 trunkColor = vec4(0.06117, 0.227, 0.1949, 1.0);\n        \n        float trunkThickness = clamp(rand(vec2(treeSeed, treeSeed)), 0.1, 0.4);\n        \n\n        float leftTrunkFootWidth = clamp(rand(vec2(treeSeed+0.2, treeSeed+0.2)),0.1, 0.3);\n        float leftTrunkFootHeight = clamp(rand(vec2(treeSeed+0.25, treeSeed+0.25)),0.1, 0.2);\n\n        float rightTrunkFootWidth = clamp(rand(vec2(treeSeed+0.69, treeSeed+0.69)),0.1, 0.3);\n        float rightTrunkFootHeight = clamp(rand(vec2(treeSeed+0.5, treeSeed-0.5)),0.1, 0.2);\n\n        float height = rand(vec2(treeSeed+0.3, treeSeed+0.3));\n\n        trunkThickness = trunkThickness * (vTextureCoord.y);\n\n        float leanFix = trunkLean * (1.0 - vTextureCoord.y);\n\n        if(vTextureCoord.x > trunkCenter - trunkThickness + leanFix && vTextureCoord.x < trunkCenter + trunkThickness + leanFix\n            && vTextureCoord.y > 0.15){\n            return trunkColor;\n        }\n\n        float removeFooterEnd = 0.18;\n\n        //Left side trunk foot\n        float leftFootXStart = trunkCenter - trunkThickness - leftTrunkFootWidth;\n        float xInLeftFootPercentage = 0.0;\n        if(vTextureCoord.x > leftFootXStart+removeFooterEnd && vTextureCoord.x < leftFootXStart+leftTrunkFootWidth){\n            xInLeftFootPercentage = (vTextureCoord.x - leftFootXStart)/leftTrunkFootWidth;\n            xInLeftFootPercentage = pow(xInLeftFootPercentage, 6.0);\n            if(vTextureCoord.y > 1.0-(xInLeftFootPercentage*leftTrunkFootHeight)){\n                return trunkColor;\n            }\n        }\n\n        //right side trunk foot\n        float rightFootXStart = trunkCenter + trunkThickness;\n        if(vTextureCoord.x > rightFootXStart && vTextureCoord.x < rightFootXStart+rightTrunkFootWidth-removeFooterEnd){\n            float xInFootPercentage = 1.0-(vTextureCoord.x - rightFootXStart)/rightTrunkFootWidth;\n            xInFootPercentage = pow(xInFootPercentage, 6.0);\n            if(vTextureCoord.y > 1.0-(xInFootPercentage*rightTrunkFootHeight)){\n                return trunkColor;\n            }\n        }\n\n        //Fill space between feet right\n        if(vTextureCoord.x >= trunkCenter\n            && vTextureCoord.x <= rightFootXStart\n            && vTextureCoord.y > (1.0-rightTrunkFootHeight)){\n                return trunkColor;\n        }\n        //Fill space between feet left\n        if(vTextureCoord.x <= trunkCenter\n            && vTextureCoord.x >= leftFootXStart+leftTrunkFootWidth\n            && vTextureCoord.y > (1.0-leftTrunkFootHeight)){\n                return trunkColor;\n        }\n\n\n\n        //branches\n        float numberOfBranches = 3.0;\n        /*float bezierT = getBezierT(grassBladePoint-textureCoordAspect.xy, \n            grassForcePoint-textureCoordAspect.xy, \n            grassBladeEndPoint-textureCoordAspect.xy);*/\n\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n    vec4 leaf(vec2 position){\n\n        if(distSquared(vTextureCoord.xy, position) < 0.001){\n            float grassBladeRandomVal = rand(position);\n            if(grassBladeRandomVal < 0.2){\n                return vec4(0.12, 0.42, 0.01568627, 1.0);\n            }else if(grassBladeRandomVal < 0.4){\n                return vec4(0.4196, 0.6078, 0.1176, 1.0);\n            }else if(grassBladeRandomVal < 0.6){\n                return vec4(0.5529, 0.749, 0.2235, 1.0);\n            }else if(grassBladeRandomVal < 0.8){\n                return vec4(0.448, 0.5509, 0.2019, 1.0);\n            }else if(grassBladeRandomVal <= 1.0){\n                return vec4(0.425, 0.6509, 0.1019, 1.0);\n            }\n        }\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n\n    vec4 generateLeavesGroup(vec2 leavGroupOrigin, float groupSize){\n        float angleOfShadow = 0.785398163; //45 degrees\n        \n\n\n        if(distSquared(vTextureCoord, leavGroupOrigin) < groupSize*groupSize){\n            float randNumb = rand(vTextureCoord);\n\n\n            float darkSpotStartX = leavGroupOrigin.x + cos(angleOfShadow) * (groupSize*groupSize)*2.0;\n            float darkSpotStartY = leavGroupOrigin.y + sin(angleOfShadow) * (groupSize*groupSize)*2.0;\n\n            vec2 darkSpot = vec2(darkSpotStartX, darkSpotStartY);\n            float percentageToDarkSpotCenter = distSquared(vTextureCoord, darkSpot)/(groupSize*groupSize);\n            if(randNumb < 0.10*percentageToDarkSpotCenter){\n                return vec4(0.00039215686, 0.06039215686, 0.06392, 1.0);\n            }\n\n            \n            float percentageToCenter = distSquared(vTextureCoord, leavGroupOrigin)/(groupSize*groupSize);\n            if(randNumb < 0.07*percentageToCenter){\n                return vec4(0.996078, 0.996078, 0.965882, 1.0);\n            }else if(randNumb < 0.2*percentageToCenter){\n                return vec4(0.39, 0.49725, 0.452549, 1.0);\n            }else if(randNumb < 0.3*percentageToCenter){\n                return vec4(0.06117, 0.227, 0.19, 1.0);\n            }\n            return vec4(0.00039215686, 0.06039215686, 0.06392, 1.0);\n        }\n        \n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n\n    \n\n\n    void main(void)\n    {\n\n        float trunkCenter = 0.5;\n        float trunkLean = (clamp(rand(vec2(treeSeed+2.1, treeSeed+1.53)), 0.0, 1.0) - 0.5)*0.25;\n        vec4 trunk = treeTrunk(trunkLean, trunkCenter);\n\n\n        if(trunk != vec4(0.0, 0.0, 0.0, 0.0)){\n            gl_FragColor = trunk;\n        }\n\n        float leavesGroupX = trunkLean * (1.0 - 0.13);\n        vec4 topLeaves = generateLeavesGroup(vec2(trunkCenter + leavesGroupX, 0.13), 0.2);\n        if(topLeaves != vec4(0.0, 0.0, 0.0, 0.0)){\n            gl_FragColor = topLeaves;\n        }\n\n\n    }\n    ";
-            _this.treeUniforms = {
-                aspectRatio: 1.0
-            };
-            //super.setCollision(0, 0, 256, 256);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x000000);
-                newGraphics.drawRect(0, -512, 512, 512);
-                newGraphics.endFill();
-                g.addChild(newGraphics);
-                return g;
-            });
-            return _this;
-        }
-        treeGen.prototype.init = function (roomEvents) {
-            this.treeUniforms.aspectRatio = this.g.width / this.g.height;
-            var myFilter = new PIXI.Filter(undefined, this.myShaderFrag, this.treeUniforms);
-            this.g.filters = [myFilter];
-            this.g.cacheAsBitmap = true;
-            roomEvents.getRenderer().render(this.g);
-            this.g.filters = [];
-        };
-        treeGen.prototype.logic = function (l) {
-            _super.prototype.logic.call(this, l);
-        };
-        treeGen.objectName = "treeGen";
-        return treeGen;
-    }(objectBase));
-
     var tileMetaObj = /** @class */ (function (_super) {
         __extends(tileMetaObj, _super);
         function tileMetaObj(xp, yp) {
@@ -3470,15 +4017,16 @@
                 //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
                 function (xp, yp, input) { return new movingBlockHori(xp, yp, input); },
                 function (xp, yp, input) { return new movingBlockVert(xp, yp, input); },
-                function (xp, yp, input) { return new collisionSlopeLeft(xp, yp, input); },
-                function (xp, yp, input) { return new collisionSlopeRight(xp, yp, input); },
                 function (xp, yp, input) { return new block(xp, yp, input); },
                 function (xp, yp, input) { return new block32x64(xp, yp, input); },
                 function (xp, yp, input) { return new block64x32(xp, yp, input); },
                 function (xp, yp, input) { return new tinyBlock32(xp, yp, input); },
                 function (xp, yp, input) { return new wideBlock(xp, yp, input); },
+                function (xp, yp, input) { return new gameStartController(xp, yp, input); },
+                function (xp, yp, input) { return new handleRoomStartString(xp, yp, input); },
+                function (xp, yp, input) { return new demonAi1(xp, yp, input); },
                 function (xp, yp, input) { return new dummySandbag(xp, yp, input); },
-                function (xp, yp, input) { return new grass(xp, yp, input); },
+                function (xp, yp, input) { return new fallingLeavesParticles(xp, yp, input); },
                 function (xp, yp, input) { return new ladder(xp, yp, input); },
                 function (xp, yp, input) { return new textPrompt(xp, yp, input); },
                 function (xp, yp, input) { return new roomChanger(xp, yp, input); },
@@ -3486,6 +4034,7 @@
                 function (xp, yp, input) { return new treeGen(xp, yp, input); },
                 function (xp, yp, input) { return new mio(xp, yp, input); },
                 function (xp, yp, input) { return new player(xp, yp, input); },
+                function (xp, yp, input) { return new textPromptBox(xp, yp, input); },
             ];
         }
         objectGenerator.prototype.getAvailibleObjects = function () {
@@ -3571,9 +4120,17 @@
             });
             this.generateObjects.getAvailibleObjects().forEach(function (obj) {
                 var tempObj = obj(0, 0, "");
+                var width = tempObj.g.width;
+                var height = tempObj.g.height;
+                if (width <= 0) {
+                    width = 32;
+                }
+                if (height <= 0) {
+                    height = 32;
+                }
                 var appRenderObject = new PIXI.Application({
-                    width: tempObj.g.width,
-                    height: tempObj.g.height,
+                    width: width,
+                    height: height,
                     transparent: true
                 });
                 appRenderObject.stage.addChild(tempObj.g);
@@ -4570,6 +5127,14 @@
         userObject.prototype.interactClick = function (mouseX, mouseY) {
         };
         userObject.prototype.render = function (xoffset, yoffset, tileCounter, context) {
+            console.log("Draw userObject");
+            context.beginPath();
+            context.arc(this.x + xoffset + 16, this.y + yoffset + 16, 16, 0, 2 * Math.PI, false);
+            context.fillStyle = 'white';
+            context.fill();
+            context.lineWidth = 5;
+            context.strokeStyle = 'blue';
+            context.stroke();
             if (this.tile == null) {
                 if (fileSystemHandlerObjects.classAndImage[this.name] != null) {
                     if (fileSystemHandlerObjects.classAndImage[this.name].complete) {
@@ -5617,8 +6182,10 @@
                 this.previousMouseY = this.mouseYPosition;
             }
             else if (cursorData.cursorType == cursorType.pensil && this.canvasRenderPart.layerHandler.selectedLayer != null) {
+                console.log("this.cursor: ", this.cursor);
                 if (this.cursor.objectSelected != null || this.cursor.currentSubTile != null) {
                     var nameOfMetaObject = (_a = this.cursor.objectSelected) === null || _a === void 0 ? void 0 : _a.objectName;
+                    console.log("Placing this object: ", nameOfMetaObject);
                     if (nameOfMetaObject == null) {
                         nameOfMetaObject = (_b = this.cursor.currentSubTile) === null || _b === void 0 ? void 0 : _b.name;
                     }
@@ -5709,6 +6276,11 @@
             var mousePosition = this.canvasRenderPart.getCanvasMousePositions(e);
             this.mouseXPosition = mousePosition[0];
             this.mouseYPosition = mousePosition[1];
+            document.getElementById("mousePositionContainer").innerHTML = "x: " + (this.mouseXPosition - this.canvasRenderPart.gridXOffset) + "    y: " + (this.mouseYPosition - this.canvasRenderPart.gridYOffset);
+            var objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+            if (objTarget.length != 0 && objTarget[0].type != objectTypes.geometry) {
+                document.getElementById("objectNameContainer").innerHTML = objTarget[0].name;
+            }
             if (this.mouseDown) {
                 this.mouseListenerDown(e);
             }
@@ -5749,4 +6321,4 @@
         }, 16);
     }
 
-}(PIXI, PIXI.filters));
+}(PIXI, FontFaceObserver, PIXI.filters, PIXI.particles, PIXI.filters));

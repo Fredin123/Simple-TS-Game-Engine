@@ -7,7 +7,7 @@ import { internalFunction } from '../../internalFunctions';
 import { iObject } from '../../objectHandlers/iObject';
 import { nulliObject } from '../../objectHandlers/nulliObject';
 import { objectBase } from '../../objectHandlers/objectBase';
-import { roomEvent } from '../../roomEvent';
+import { roomEvent } from '../../roomEvent/roomEvent';
 
 export class hitbox extends objectBase{
     switch: boolean = false;

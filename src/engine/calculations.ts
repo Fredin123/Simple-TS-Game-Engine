@@ -17,14 +17,15 @@ export class calculations{
         return Math.round((value) * Math.pow(10, nDecimal)) / Math.pow(10, nDecimal);
     }
 
+
+    private static raw_diff = 0;
+    private static mod_diff = 0;
     static getShortestDeltaBetweenTwoRadians(rad1: number, rad2: number){
         rad1 *= 180/calculations.PI;
         rad2 *= 180/calculations.PI;
-        let raw_diff: number = rad1 > rad2 ? rad1 - rad2 : rad2 - rad1;
-        let mod_diff = raw_diff % 360;
-        let dist = mod_diff > 180.0 ? 360.0 - mod_diff : mod_diff;
-
-        return dist;
+        this.raw_diff = rad1 > rad2 ? rad1 - rad2 : rad2 - rad1;
+        this.mod_diff = this.raw_diff % 360;
+        return this.mod_diff > 180.0 ? 360.0 - this.mod_diff : this.mod_diff;//Distance
     }
 
     static flippedSin(delta: number){

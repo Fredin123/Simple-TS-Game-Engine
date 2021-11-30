@@ -1,6 +1,6 @@
 import { iObject } from "../../objectHandlers/iObject";
 import { objectBase } from "../../objectHandlers/objectBase";
-import { roomEvent } from "../../roomEvent";
+import { roomEvent } from "../../roomEvent/roomEvent";
 import { movementDirection } from "../../action/attackDirections";
 
 export interface IBaseAttack{

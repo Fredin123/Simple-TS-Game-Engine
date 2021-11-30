@@ -9,6 +9,7 @@ dist/currentResources.txt
 src/resources/_generated_tiles/
 src/resources/
 src/objects/
+src/code/
 src/scenes/
 src/developerTools/electronApp/customAnimatedTilesMetaData_DONT_DELETE.json
 resources

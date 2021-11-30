@@ -1,4 +1,4 @@
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 import { boxCollider } from "./collision/boxCollider";
 import { iVector } from "../dataObjects/vector/iVector";
 import * as PIXI from 'pixi.js'
@@ -25,16 +25,19 @@ export interface iObject{
     weight: number;
 
     _hasBeenMoved_Tick : number;
-    _isColliding_Special: boolean;
+    _collidingWithPolygon: boolean;
     collidesWithPolygonGeometry: boolean;
 
     onLayer: number;
+    layerIndex: number;
     outputString: string;
 
     horizontalCollision: number;
     verticalCollision: number;
 
     init(roomEvents: roomEvent): void;
+
+    afterInit(roomEvents: roomEvent): void;
     
     addMoveCollisionTarget(...collNames:string[]): void;
 

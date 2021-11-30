@@ -52,9 +52,17 @@ export class fileSystemHandlerObjects{
 
         this.generateObjects.getAvailibleObjects().forEach(obj => {
             var tempObj: objectBase = obj(0, 0, "");
+            let width = tempObj.g.width;
+            let height = tempObj.g.height;
+            if(width <= 0){
+                width = 32;
+            }
+            if(height <= 0){
+                height = 32;
+            }
             let appRenderObject = new PIXI.Application({
-                width: tempObj.g.width,
-                height: tempObj.g.height,
+                width: width,
+                height: height,
                 transparent: true
             });
             

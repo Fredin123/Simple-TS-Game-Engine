@@ -1,4 +1,4 @@
-import { roomEvent } from "../roomEvent";
+import { roomEvent } from "../roomEvent/roomEvent";
 
 export class task{
     private tasksToDo: [number, (l: roomEvent)=>void][] = [];

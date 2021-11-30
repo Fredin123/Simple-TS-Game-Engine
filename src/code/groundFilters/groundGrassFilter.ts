@@ -53,15 +53,25 @@ export class groundGrassFilter{
                                 depth = (depth)/(groundHeight*4.0);
 
                                 if(randFromVec(vTextureCoord) < depth){
-                                    gl_FragColor = vec4(0.07843, 0.07843, 0.180392, 1.0);
+                                    gl_FragColor = vec4(0.1294117647, 0.1294117647, 0.30196078431, 1.0);//vec4(0.07843, 0.07843, 0.180392, 1.0);
                                 }else{
-                                    gl_FragColor = groundDarkColor;
+                                    float randomWhiteSpecks = randFromVec(vTextureCoord);
+                                    if(randomWhiteSpecks > 0.0997 && randomWhiteSpecks < 0.1){
+                                        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+                                    }else{
+                                        gl_FragColor = groundDarkColor;
+                                    }
                                 }
                             }
 
                             
                         }else{
-                            gl_FragColor = groundDarkColor;
+                            float randomWhiteSpecks = randFromVec(vTextureCoord);
+                            if(randomWhiteSpecks > 0.0997 && randomWhiteSpecks < 0.1){
+                                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+                            }else{
+                                gl_FragColor = groundDarkColor;
+                            }
                         }
                     }
                     
