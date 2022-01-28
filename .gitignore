@@ -8,9 +8,13 @@ dist/resources.txt
 dist/currentResources.txt
 src/resources/_generated_tiles/
 src/resources/
+!src/resources/.gitignore
 src/objects/
+!src/objects/.gitignore
 src/code/
+!src/code/.gitignore
 src/scenes/
+!src/scenes/.gitignore
 src/developerTools/electronApp/customAnimatedTilesMetaData_DONT_DELETE.json
 resources
 dist/resources.txt
