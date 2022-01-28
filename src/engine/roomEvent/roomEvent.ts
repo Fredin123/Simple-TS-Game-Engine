@@ -17,11 +17,14 @@ import { Filter } from 'pixi.js';
 import { calculations } from '../calculations';
 import { layer } from '../../shared/layer';
 import { roomEventFlags } from './roomEventFlags';
+import { objectFunctions } from '../objectHandlers/objectFunctions';
+import { player } from '../../objects/player';
 
 declare var LZString: any;
 
 
 export class roomEvent {
+    
     private app: PIXI.Application;
     private mouseXPosition:number = 0;
     private mouseYPosition:number = 0;
@@ -35,7 +38,8 @@ export class roomEvent {
     private gameKeysReleased: Record<string, boolean> = {};
     private gameKeysHeld: Record<string, boolean> = {};
 
-    
+    private functionsForObjects: objectFunctions;
+
     deltaTime: number = 1;
 
     private camera: gameCamera = new gameCamera();
@@ -51,12 +55,16 @@ export class roomEvent {
 
     public storedTargetScene: [string, string[]] = ["", []];
 
+    public moveObjectToNewLayerBuffer: [iObject, string][] = [];
+
     constructor(con: HTMLElement, tasker: task, app: PIXI.Application){
         this.objContainer = new objectContainer(this);
         this.container = con;
         this.tasker = tasker;
         this.keysDown = {};
         this.app = app;
+
+        this.functionsForObjects = new objectFunctions(this);
 
         this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
         document.addEventListener("keydown", this.keyDownListener.bind(this), false);
@@ -203,7 +211,9 @@ export class roomEvent {
         return keptObjects;
     }
 
-
+    getObjectsInLayer(layerName: string){
+        return this.objContainer.getObjectsInLayer(layerName);
+    }
     
     foreachObjectTypeBoolean(type: string, func: (arg0: iObject)=>boolean): boolean{
         this.objContainer.getSpecificObjects(type)
@@ -286,13 +296,20 @@ export class roomEvent {
         this.storedTargetScene = [loadRoomString, roomStartString];
     }
 
+    hoesIndex = 0;
     handleObjectsEndStep(){
-        this.objContainer.populateFromList();
+        //Move objects to new layers
+        for(this.hoesIndex = 0; this.hoesIndex < this.moveObjectToNewLayerBuffer.length; this.hoesIndex++){
+            this.moveObjectToNewLayerBuffer[this.hoesIndex][0].changeLayer(this, this.moveObjectToNewLayerBuffer[this.hoesIndex][1]);
+        }
+        this.moveObjectToNewLayerBuffer = [];
+
+        this.objContainer.populateFromList(this.functionsForObjects);
         this.objContainer.purgeObjects();
     }
 
     loopThrough(){
-        this.objContainer.loopThrough(this);
+        this.objContainer.loopThrough(this.functionsForObjects, this);
     }
 
     updateLayerOffsets(){
@@ -365,6 +382,7 @@ export class roomEvent {
         //console.log("import room: ",loadRoom);
         this.objContainer.removeObjects();
 
+        this.moveObjectToNewLayerBuffer = [];
         this.cameraBounds[0] = loadRoom.cameraBoundsX ?? 0;
         this.cameraBounds[1] = loadRoom.cameraBoundsY ?? 0;
         this.cameraBounds[2] = loadRoom.cameraBoundsWidth ?? 0;
@@ -383,10 +401,11 @@ export class roomEvent {
                 if(objMeta.type == objectTypes.userObject){
                     if(objMeta.isPartOfCombination == false){
                         let genObj:objectBase = this.generateObjects.generateObject(objMeta.name, Math.floor(objMeta.x), Math.floor(objMeta.y), objMeta.tile, objMeta.inputString);
+                        genObj.layerIndex = layer.zIndex;
                         if(genObj != null){
                             if(genObj.isTile == false){
                                 containsOnlyStaticTiles = false;
-                                this.objContainer.addObjectDirectly(genObj, layer.zIndex, layer.hidden);
+                                this.objContainer.addObjectDirectly(genObj, layer.zIndex, layer.hidden, this.functionsForObjects, false);
                             }else{
                                 if(objMeta.tile!.tiles.length > 1){
                                     containsOnlyStaticTiles = false;
@@ -406,8 +425,8 @@ export class roomEvent {
                 geom.geomPoints = geom.geomPoints.map(function(yPoint){
                     return Number(Math.round(yPoint));
                 });
-                newPolygon.setPolygon(geom.geomPoints, Math.round(geom.geomWidth), this, this.app);
-                this.objContainer.addObjectDirectly(newPolygon, layer.zIndex, layer.hidden);
+                newPolygon.setPolygon(geom.geomPoints, Math.round(geom.geomWidth), this.functionsForObjects, this.app);
+                this.objContainer.addObjectDirectly(newPolygon, layer.zIndex, layer.hidden, this.functionsForObjects, false);
             }
             
             if(parseFloat(layerSettings.blur) != 0 && false){
@@ -428,6 +447,7 @@ export class roomEvent {
                     pixiContainerLayer.filters = [];
                 }
             }
+            
             
             
 
@@ -451,16 +471,40 @@ export class roomEvent {
 
 
         let allObjects = this.objContainer.getAllObjects();
-        allObjects.forEach(obj => {
-            obj.init(this);
-        });
 
         allObjects.forEach(obj => {
-            obj.afterInit(this);
+            this.objContainer.setTargetPolygonCollisionLayer(obj);
+        });
+        allObjects.forEach(obj => {
+            obj.init(this.functionsForObjects);
+        });
+
+    
+        allObjects.forEach(obj => {
+            obj.afterInit(this.functionsForObjects);
         });
 
 
 
+    }
+
+
+    getSpecificObjectsInLayer(objectType: string, targetLayer: string){
+        let targetObjects: iObject[] = [];
+        let objectsFound = this.getObjectsInLayer(targetLayer);
+        console.log("objects in layer: ",objectsFound);
+        
+        for(var obj of objectsFound){
+            console.log("if ",obj.objectName," == ", objectType);
+            if(obj.objectName == objectType){
+                targetObjects.push(obj);
+            }
+        }
+        return targetObjects;
+    }
+
+    stageObjectForNewLayer(obj: iObject, layerName: string){
+        this.moveObjectToNewLayerBuffer.push([obj, layerName]);
     }
 
 

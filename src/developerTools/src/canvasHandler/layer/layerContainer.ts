@@ -263,7 +263,7 @@ export class layerContainer{
 
     getObjectsAtPos(mouseTestX: number, mouseTestY: number, specificType: objectTypes | null = null){
         let foundObjects: IObjectMeta[] = [];
-        if(this.selectedLayer != null){
+        if(this.selectedLayer != null && this.selectedLayer.hidden == false){
             for(let obj of this.selectedLayer?.metaObjectsInLayer){
                 if(specificType == null){
                     if(obj.isMouseInside(mouseTestX, mouseTestY, this)){

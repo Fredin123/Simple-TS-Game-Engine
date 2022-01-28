@@ -146,17 +146,17 @@ export class handleCanvas{
             }
             
         }else if(cursorData.cursorType == cursorType.eraser && this.canvasRenderPart.layerHandler.selectedLayer != null){
-            let objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+            let objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition, objectTypes.userObject);
             if(objTarget.length != 0 && objTarget[0].type != objectTypes.geometry){
                 this.canvasRenderPart.layerHandler.removeObject(objTarget[0]);
             }
         }else if(cursorData.cursorType == cursorType.geometryRemove && this.canvasRenderPart.layerHandler.selectedLayer != null){
-            let objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+            let objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition, objectTypes.geometry);
             if(objTarget.length != 0 && objTarget[0].type == objectTypes.geometry){
                 this.canvasRenderPart.layerHandler.removeObject(objTarget[0]);
             }
         }else if(cursorData.cursorType == cursorType.editor && this.canvasRenderPart.layerHandler.selectedLayer != null){
-            var objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+            var objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition, objectTypes.userObject);
             if(objTarget != null){
                 let inputTemplate = this.genObj.generateObject(objTarget[0].name, 0, 0, null, "").inputTemplate;
                 let inputString = objTarget[0].inputString;

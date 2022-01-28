@@ -1,4 +1,5 @@
 import { iObject } from "../objectHandlers/iObject";
+import { objectFunctions } from "../objectHandlers/objectFunctions";
 import { roomEvent } from "../roomEvent/roomEvent";
 import { action } from "./action";
 import { actionCreatedObject } from "./actionCreatedObject";
@@ -17,7 +18,7 @@ export class actionContainer{
 
 
     private i = 0;
-    public playCurrent(user: iObject, l: roomEvent, direction: movementDirection){
+    public playCurrent(user: iObject, l: objectFunctions, direction: movementDirection){
         this.direction = direction;
         for (this.i = this.objectsCreated.length - 1; this.i >= 0; this.i--) {
             var objMeta = this.objectsCreated[this.i];
@@ -78,14 +79,14 @@ export class actionContainer{
         return this.current().isCompleted();
     }
 
-    public cleanup(l: roomEvent){
+    public cleanup(l: objectFunctions){
         if(this.current().isCompleted() || this.stopped){
             this.removeAllCreatedObjects(l);
         }
         this._keepUserStill = false;
     }
 
-    public removeAllCreatedObjects(l: roomEvent){
+    public removeAllCreatedObjects(l: objectFunctions){
         for (let i = this.objectsCreated.length - 1; i >= 0; i--) {
             var objMeta = this.objectsCreated[i];
             l.deleteObject(objMeta.obj());

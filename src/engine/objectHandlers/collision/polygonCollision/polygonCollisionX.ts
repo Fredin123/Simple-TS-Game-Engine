@@ -6,8 +6,10 @@ import { vector } from "../../../dataObjects/vector/vector";
 import { nullVector } from "../../../dataObjects/vector/nullVector";
 import { iVector } from "../../../dataObjects/vector/iVector";
 import { player } from "../../../../objects/player";
-import { grassFilter } from "../../../../code/groundFilters/grassFilter";
-import { groundGrassFilter } from "../../../../code/groundFilters/groundGrassFilter";
+import { grassFilter } from "../../../../code/filters/groundFilters/grassFilter";
+import { groundGrassFilter } from "../../../../code/filters/groundFilters/groundGrassFilter";
+import { objectFunctions } from "../../objectFunctions";
+import { fadedSidesX } from "../../../../code/filters/fadedSidesX";
 
 
 export class polygonCollisionX extends objectBase{
@@ -17,8 +19,6 @@ export class polygonCollisionX extends objectBase{
     private width = 0;
     private edgesPoints: number[] = [];
     private pointSpacing: number = 0;
-
-    
     private filterGrass: grassFilter | null = null;
     
 
@@ -32,7 +32,11 @@ export class polygonCollisionX extends objectBase{
         
     }
 
-    setPolygon(polygon: number[], width: number, roomEvents: roomEvent, app: PIXI.Application){
+    getWidth(){
+        return this.width;
+    }
+    
+    setPolygon(polygon: number[], width: number, objFuncs: objectFunctions, app: PIXI.Application){
         //width = 4096;
         this.highestPoint = Math.max(...polygon);
         this.highestPoint = this.closestPowerOf2(this.highestPoint);
@@ -75,7 +79,8 @@ export class polygonCollisionX extends objectBase{
             
             
             let fullGroundContainer = new PIXI.Container();
-            let groundGrassF = new groundGrassFilter(polygonPosGlslAdapted);
+            
+            let groundGrassF = new groundGrassFilter(polygonPosGlslAdapted, this.highestPoint, width, objFuncs.getWindowHeight());
             
 
             fullGroundContainer.addChild(polygonGraphics);
@@ -88,8 +93,12 @@ export class polygonCollisionX extends objectBase{
             //static grass
             let spacingConst = 1.0/(polygonPosGlslAdapted.length-1);
             let staticGrassContainer = new PIXI.Container();
-            let staticGrass = new grassFilter(polygonPosGlslAdapted, spacingConst, 24, "0.0", this.width/this.highestPoint,
-                this.width, this.highestPoint, this.g.x, this.g.y);
+            let staticGrass = new grassFilter(polygonPosGlslAdapted, spacingConst, 24, 0.0, this.width/this.highestPoint,
+                this.width,
+                this.highestPoint, this.g.x, this.g.y,
+                this.highestPoint, objFuncs.getWindowHeight(),
+                this.width, objFuncs.getWindowWidth(),
+                this.layerIndex);
             staticGrass.grassFragment.grassMaxHeight = 0.0058;
             staticGrass.grassFragment.cameraSize = 100;
             staticGrass.grassFragment.time = 1.57;
@@ -105,8 +114,12 @@ export class polygonCollisionX extends objectBase{
             //Moving grass
             let grassContainer = new PIXI.Container();
             
-            this.filterGrass = new grassFilter(polygonPosGlslAdapted, spacingConst, 11, "0.001", this.width/this.highestPoint,
-                this.width, this.highestPoint, this.g.x, this.g.y);
+            this.filterGrass = new grassFilter(polygonPosGlslAdapted, spacingConst, 32, 0.001, this.width/this.highestPoint,
+                this.width,
+                this.highestPoint, this.g.x, this.g.y,
+                this.highestPoint, objFuncs.getWindowHeight(),
+                this.width, objFuncs.getWindowWidth(),
+                this.layerIndex);
             grassContainer.addChild(polygonGraphics);
             grassContainer.filters = [this.filterGrass.filter()];
 
@@ -114,12 +127,33 @@ export class polygonCollisionX extends objectBase{
             g.addChild(staticGrassContainer);
             g.addChild(grassContainer);
             
+
+
+            /*let groundFade = new fadedSidesX(128, this.width);
+            
+
+            let overlayBlendFade = new PIXI.Graphics();
+            //overlayBlendFade.blendMode = PIXI.BLEND_MODES.ADD;
+            overlayBlendFade.beginFill(0x000000, 0); // use an alpha value of 1 to make it visible
+            overlayBlendFade.drawRect(0, -this.highestPoint, this.width, this.highestPoint);
+
+            overlayBlendFade.filters = [groundFade.filter()];
+            overlayBlendFade.cacheAsBitmap = true;
+            //overlayBlendFade.filters[0].blendMode = PIXI.BLEND_MODES.MULTIPLY; 
+            app.renderer.render(overlayBlendFade);
+            overlayBlendFade.filters = [];
+            //overlayBlendFade.blendMode = PIXI.BLEND_MODES.MULTIPLY; 
+
+            g.mask = overlayBlendFade;
+            g.addChild(overlayBlendFade);*/
+
+
             return g;
         });
     }
 
     private currentTime = 0;
-    logic(l: roomEvent){
+    logic(l: objectFunctions){
         super.logic(l);
 
         this.currentTime = this.filterGrass!.grassFragment.time;
@@ -240,8 +274,9 @@ export class polygonCollisionX extends objectBase{
         this.CT_collisionTestY = obj.g.y + obj.collisionBox.y + obj.collisionBox.height;
         //console.log("if ",collisionWithPosition," > ",(this.g.y - (spaceFromTop)));
         
-        if(obj.force.Dy > 0 && this.CT_collisionTestY > this.g.y + (this.CT_spaceFromTop)-5){
-            obj.g.y = this.g.y + (this.CT_spaceFromTop) - obj.collisionBox.y - obj.collisionBox.height;
+        if(obj.force.Dy >= 0 && this.CT_collisionTestY > this.g.y + (this.CT_spaceFromTop)-5
+            /*&& this.CT_collisionTestY < this.g.y + (this.CT_spaceFromTop)+obj.force.Dy+10*/){
+            obj.g.y = this.g.y + (this.CT_spaceFromTop) - obj.collisionBox.y - obj.collisionBox.height-1;
             this.CT_collisionTestY = obj.g.y + obj.collisionBox.y + obj.collisionBox.height;
 
             this.CT_collisionLine = this.getCollisionVector(this.CT_index);

@@ -1,5 +1,6 @@
 import { iObject } from "../../objectHandlers/iObject";
 import { objectBase } from "../../objectHandlers/objectBase";
+import { objectFunctions } from "../../objectHandlers/objectFunctions";
 import { roomEvent } from "../../roomEvent/roomEvent";
 import { IBaseAttack } from "./IBaseAttack";
 
@@ -16,7 +17,7 @@ export class baseAttackNull implements IBaseAttack {
     queryAttack(): void {
         
     }
-    tickAttack(l: roomEvent): void {
+    tickAttack(l: objectFunctions): void {
         
     }
 }

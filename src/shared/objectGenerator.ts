@@ -13,6 +13,7 @@ import { dummySandbag } from "../objects/dummySandbag";
 import { fallingLeavesParticles } from "../objects/environment/fallingLeavesParticles";
 import { ladder } from "../objects/environment/interactive/ladder";
 import { textPrompt } from "../objects/environment/interactive/textPrompt";
+import { layerBridgeBack } from "../objects/environment/layerBridgeBack";
 import { roomChanger } from "../objects/environment/roomChanger";
 import { skyBackground } from "../objects/environment/skyBackground";
 import { treeGen } from "../objects/environment/treeGen";
@@ -48,6 +49,7 @@ export class objectGenerator{
 		(xp: number, yp: number, input: string)=>{return new fallingLeavesParticles(xp, yp, input);},
 		(xp: number, yp: number, input: string)=>{return new ladder(xp, yp, input);},
 		(xp: number, yp: number, input: string)=>{return new textPrompt(xp, yp, input);},
+		(xp: number, yp: number, input: string)=>{return new layerBridgeBack(xp, yp, input);},
 		(xp: number, yp: number, input: string)=>{return new roomChanger(xp, yp, input);},
 		(xp: number, yp: number, input: string)=>{return new skyBackground(xp, yp, input);},
 		(xp: number, yp: number, input: string)=>{return new treeGen(xp, yp, input);},

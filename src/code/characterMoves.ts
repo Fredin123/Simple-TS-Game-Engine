@@ -2,7 +2,9 @@ import { calculations } from "../engine/calculations";
 import { baseAttackNull } from "../engine/hitboxes/baseAttack/baseAttackNull";
 import { IBaseAttack } from "../engine/hitboxes/baseAttack/IBaseAttack";
 import { iObject } from "../engine/objectHandlers/iObject";
-import { roomEvent } from "../engine/roomEvent/roomEvent";
+import { objectFunctions } from "../engine/objectHandlers/objectFunctions";
+import { ticker } from "../engine/ticker";
+import { layerBridgeBack } from "../objects/environment/layerBridgeBack";
 
 export class characterMoves{
     private maxRunSpeed = 6;
@@ -10,7 +12,7 @@ export class characterMoves{
     private normalRunSpeed = 6;
     private jumpStrength = 8;
 
-    private jumpButtonReleased = true
+    private jumpButtonReleased = false;
 
     //ladder part
     private ladderObject : string = "";
@@ -28,23 +30,41 @@ export class characterMoves{
     //attack
     private attack: IBaseAttack = new baseAttackNull();
     private attackButtonReleased = true;
-    private airAttacks: ((l: roomEvent) => IBaseAttack) | null = null;
-    private groundAttacks: ((l: roomEvent) => IBaseAttack) | null = null;
+    private airAttacks: ((l: objectFunctions) => IBaseAttack) | null = null;
+    private groundAttacks: ((l: objectFunctions) => IBaseAttack) | null = null;
 
 
-    constructor(ladderObject : string = "", groundAttacks: ((l: roomEvent) => IBaseAttack) | null = null, airAttacks: ((l: roomEvent) => IBaseAttack) | null = null){
+    //Other
+    private walkingBridge = false;
+    private collidingWithPolygonStoredState = false;
+    constructor(ladderObject : string = "", groundAttacks: ((l: objectFunctions) => IBaseAttack) | null = null, airAttacks: ((l: objectFunctions) => IBaseAttack) | null = null){
         this.ladderObject = ladderObject;
         this.airAttacks = airAttacks;
         this.groundAttacks = groundAttacks;
     }
 
-    move(l: roomEvent, character: iObject) {
+    move(l: objectFunctions, character: iObject) {
         this.movement(l, character);
         this.climbingLadders(l, character);
         this.handleAttacks(l, character);
     }
 
-    private movement(l: roomEvent, character: iObject){
+    private movement(l: objectFunctions, character: iObject){
+
+        if(this.walkingBridge == true){
+            if(l.isCollidingWith(character, character.collisionBox, [layerBridgeBack.objectName])){
+                character.g.y -= 8;
+                character.force.Dy = 0;
+                character.force.Dx = 0;
+                character.gravity.magnitude = 0;
+            }else{
+                character.g.y -= 8;
+                this.walkingBridge = false;
+
+                l.tryStepBetweenLayers(character, false);
+            }
+            return;
+        }
         if(l.checkKeyHeld("Control")){
             this.maxRunSpeed = this.superRunSpeed;
         }else{
@@ -56,38 +76,55 @@ export class characterMoves{
 
         if(l.checkKeyHeld("a") || l.checkKeyHeld("A")){
             if(character.verticalCollision > 0){
-                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/13)*this.maxRunSpeed * l.deltaTime);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/13)*this.maxRunSpeed * l.deltaTime());
             }else{
-                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/64)*this.maxRunSpeed * l.deltaTime);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/32)*this.maxRunSpeed * l.deltaTime());
             }
         }
         if(l.checkKeyHeld("d") || l.checkKeyHeld("D")){
             if(character.verticalCollision > 0){
-                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/13)*this.maxRunSpeed * l.deltaTime);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/13)*this.maxRunSpeed * l.deltaTime());
             }else{
-                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/64)*this.maxRunSpeed * l.deltaTime);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/32)*this.maxRunSpeed * l.deltaTime());
             }
         }
-        if(this.jumpButtonReleased == true && (l.checkKeyHeld("w") || l.checkKeyHeld("W")) && (character.verticalCollision > 0 || character._collidingWithPolygon)){
-            character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime);
-            
+        
+
+        if(l.checkKeyHeld("w") || l.checkKeyHeld("W")){
+            if(l.isCollidingWith(character, character.collisionBox, [layerBridgeBack.objectName])){
+                this.walkingBridge = true;
+            }else{
+                this.jumpButtonReleased = true;
+            }
+        }
+
+        if(this.jumpButtonReleased == true){
+            if((character.verticalCollision > 0 || ticker.getTicks() - character._collidingWithPolygonTick < ticker.shortWindow)){
+                console.log("character._collidingWithPolygon: ",ticker.getTicks() - character._collidingWithPolygonTick);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime());
+                character._collidingWithPolygonTick = 0;
+            }
             this.jumpButtonReleased = false;
         }
 
         if(l.checkKeyReleased("h")){
-            character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime);
+            character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime());
             character.gravity.magnitude = 0;
         }
         
-        if(l.checkKeyHeld("w") || l.checkKeyHeld("W")){
-            this.jumpButtonReleased = true;
+        
+       
+
+        if((l.checkKeyHeld("s") || l.checkKeyHeld("S")) && (l.checkKeyReleased("j") || l.checkKeyReleased("J"))){
+            l.tryStepBetweenLayers(character);
         }
+
         character.force.limitHorizontalMagnitude(this.maxRunSpeed);
     }
 
     private CL_collisionWith: iObject | null = null;
     private CL_movedBetweenLadder = false;
-    private climbingLadders(l: roomEvent, character: iObject){
+    private climbingLadders(l: objectFunctions, character: iObject){
         if(this.ladderObject == "") return;
 
         this.CL_collisionWith = l.isCollidingWith(character, character.collisionBox, [this.ladderObject]);
@@ -123,7 +160,7 @@ export class characterMoves{
 
                 if(l.checkKeyHeld("w") && this.atLadderTop == true && this.releasedJumpKeyAtLadderTop){
                     character.g.y-=1;
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime());
                 }
 
                 console.log(l.checkKeyReleased("w"));
@@ -156,7 +193,7 @@ export class characterMoves{
                             this.CL_movedBetweenLadder = false;
                         }
                         if(this.CL_movedBetweenLadder && l.checkKeyHeld("w")){
-                            character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump * l.deltaTime);
+                            character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump * l.deltaTime());
                             this.atLadderTop = false;
                             this.canJumpLadders = false;
                             this.climbindLadder = false;
@@ -178,7 +215,7 @@ export class characterMoves{
                             this.CL_movedBetweenLadder = false;
                         }
                         if(this.CL_movedBetweenLadder && l.checkKeyHeld("w")){
-                            character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump * l.deltaTime);
+                            character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump * l.deltaTime());
                             this.atLadderTop = false;
                             this.canJumpLadders = false;
                             this.climbindLadder = false;
@@ -205,7 +242,7 @@ export class characterMoves{
             this.releasedJumpKeyAtLadderTop = false;
             if(l.checkKeyHeld("w") && Math.floor(character.gravity.magnitude) == 0
             && this.hasJumpedFromLadder == false){
-                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime());
                 this.hasJumpedFromLadder = true;
             }
         }
@@ -215,14 +252,14 @@ export class characterMoves{
 
 
 
-    private handleAttacks(l: roomEvent, character: iObject){
+    private handleAttacks(l: objectFunctions, character: iObject){
         this.attack.tickAttack(l);
-        if(l.checkKeyHeld(" ")){
+        if((l.checkKeyHeld("k") || l.checkKeyHeld("K"))){
             if(this.attackButtonReleased){
                 this.attackButtonReleased = false;
                 this.attack.queryAttack();
                 if(this.attack.isDone()){
-                    if(character.verticalCollision > 0 || character._collidingWithPolygon){
+                    if(character.verticalCollision > 0 || character._collidingWithPolygonTick){
                         if(this.groundAttacks != null){
                             this.attack = this.groundAttacks(l);
                         }

@@ -5,6 +5,7 @@ import { IBaseAttack } from "./IBaseAttack";
 import { objectBase } from "../../objectHandlers/objectBase";
 import { movementDirection } from "../../action/attackDirections";
 import { actionContainer } from "../../action/actionContainer";
+import { objectFunctions } from "../../objectHandlers/objectFunctions";
 
 
 export class baseAttack implements IBaseAttack{
@@ -34,7 +35,7 @@ export class baseAttack implements IBaseAttack{
         this.attackSeries.queryAttack();
     }
 
-    tickAttack(l: roomEvent){
+    tickAttack(l: objectFunctions){
         if(this.attackSeries.hasEnded() == false){
             this.attackSeries.playCurrent(this.creator, l, this.attackDirection);
             if(this.attackSeries.isCurrentCompleted()){

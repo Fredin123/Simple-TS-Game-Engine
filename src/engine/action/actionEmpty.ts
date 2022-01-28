@@ -1,6 +1,7 @@
 import { iVector } from "../dataObjects/vector/iVector";
 import { nullVector } from "../dataObjects/vector/nullVector";
 import { iObject } from "../objectHandlers/iObject";
+import { objectFunctions } from "../objectHandlers/objectFunctions";
 import { roomEvent } from "../roomEvent/roomEvent";
 import { movementDirection } from "./attackDirections";
 import { genericStatus } from "./genericStatus";
@@ -93,7 +94,7 @@ export class actionEmpty implements IAction{
         return true;
     }
 
-    public play(user: iObject, l: roomEvent){
+    public play(user: iObject, l: objectFunctions){
         
     }
 }

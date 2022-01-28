@@ -24,6 +24,10 @@ export class verticalMovement{
         this.objectsThatWereCollidingThisObjectWhileMoving = new Array<iObject>();
         this.collisionTarget = objectGlobalData.null;
 
+        /*if(target.objectName == "dummySandbag"){
+            console.log("Here");
+        }*/
+
         for(this.i=0; this.i<Math.abs(magnitude); this.i+=1){
             this.objectsThatWereCollidingThisObjectWhileMoving.length = 0;
             target.g.y += this.sign;
@@ -31,14 +35,17 @@ export class verticalMovement{
             if(objectGlobalData.objectsThatCollideWith[target.objectName] != null){
                 //push objects
                 objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
-                    if((this.sign > 0 && testCollisionWith.verticalCollision <= 0) || (this.sign < 0 && testCollisionWith.verticalCollision >= 0)){
-                        if(internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
-                            this.collisionTarget = moveOperationsPush.pushObjectVertical(target, testCollisionWith, this.sign, objContainer);
-                            if(this.collisionTarget == objectGlobalData.null){
-                                target.force.Dy *= 1-testCollisionWith.weight;
+                    if((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))){
+                        if((this.sign > 0 && testCollisionWith.verticalCollision <= 0) || (this.sign < 0 && testCollisionWith.verticalCollision >= 0)){
+                            if(internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
+                                this.collisionTarget = moveOperationsPush.pushObjectVertical(target, testCollisionWith, this.sign, objContainer);
+                                if(this.collisionTarget == objectGlobalData.null){
+                                    target.force.Dy *= 1-testCollisionWith.weight;
+                                }
                             }
                         }
                     }
+                    
                     
                     return false;
                 });
@@ -56,11 +63,12 @@ export class verticalMovement{
                 if(target.stickyLeftSide || target.stickyRightSide){
                     //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                     objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
-                        if(internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
+                        if((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))
+                            && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
                             if(testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()){
                                 this.objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                 testCollisionWith.g.y += this.sign;
-                                if(this.i >= Math.abs(magnitude)-1){
+                                if(this.i >= Math.abs(magnitude)-1){ 
                                     testCollisionWith._hasBeenMoved_Tick = ticker.getTicks();
                                 }
                             }
@@ -73,7 +81,7 @@ export class verticalMovement{
 
             //This has to be more optimized
             if(this.collisionTarget == objectGlobalData.null){
-                this.collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
+                this.collisionTarget = objContainer.boxIntersectionInLayerSpecific(target, target.collisionBox, collisionNames, target.layerIndex);
             }
             
             if(this.collisionTarget != objectGlobalData.null){
@@ -127,19 +135,22 @@ export class verticalMovement{
         //Sticky draging
         if(target.stickyTop || target.stickyBottom){
             objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
-                if(this.sign > 0){
-                    //Moving down
-                    if(testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y+target.collisionBox.height && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
-                        testCollisionWith.g.y = target.g.y-testCollisionWith.collisionBox.y-testCollisionWith.collisionBox.height;
+                if((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))){
+                    if(this.sign > 0){
+                        //Moving down
+                        if(testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y+target.collisionBox.height && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
+                            testCollisionWith.g.y = target.g.y-testCollisionWith.collisionBox.y-testCollisionWith.collisionBox.height;
+                        }
+                        
+                    }else{
+                        //Moving up
+                        if(testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
+                            testCollisionWith.g.y = target.g.y+target.collisionBox.y+target.collisionBox.height-testCollisionWith.collisionBox.y;
+                        }
+                        
                     }
-                    
-                }else{
-                    //Moving up
-                    if(testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
-                        testCollisionWith.g.y = target.g.y+target.collisionBox.y+target.collisionBox.height-testCollisionWith.collisionBox.y;
-                    }
-                    
                 }
+                
                 return false;
             });
         }

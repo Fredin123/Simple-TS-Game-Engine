@@ -5,6 +5,7 @@ import { horizontalMovement } from "./horizontalMovement";
 import { verticalMovement } from "./verticalMovement/verticalMovement";
 import { polygonCollision } from "./polygonCollision";
 import { nullVector } from "../dataObjects/vector/nullVector";
+import { ticker } from "../ticker";
 
 
 export class movementOperations{
@@ -26,13 +27,22 @@ export class movementOperations{
         
         target.gravity.increaseMagnitude(target.weight);
         
+        
         this.polygonCollisionTest = polygonCollision.collisionTest(target, Math.round(this.xdiff), Math.round(this.ydiff), 
                                 objContainer);
 
+        if(this.polygonCollisionTest[0]){
+            target._collidingWithPolygonTick = ticker.getTicks();
+        }
+        
+        //console.log("1");
         force.Dx += this.polygonCollisionTest[1].Dx;
         force.Dy += this.polygonCollisionTest[1].Dy;
-        
         target.gravity.magnitude = this.polygonCollisionTest[1].magnitude;
+        
+        
+        
+        
 
         
         /* if(target.gravity.magnitude < 1){

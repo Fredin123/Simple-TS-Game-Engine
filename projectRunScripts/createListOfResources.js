@@ -25,7 +25,7 @@ getDirectories(path.join(__dirname, '../')+'src/resources', function (err, res) 
         });
     
         textFile = textFile.substring(0, textFile.length-1);
-        fs.writeFileSync(path.join(__dirname, '../')+'dist/resources.txt', textFile, "utf8", function(err){
+        fs.writeFileSync(path.join(__dirname, '../')+'dist/assets/resources.txt', textFile, "utf8", function(err){
             if (err) return console.log(err);
         });
     }

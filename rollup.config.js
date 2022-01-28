@@ -7,6 +7,7 @@ const config = {
     output: {
       dir: 'dist',
       format: 'iife',
+      sourcemap: true,
       globals:{
         'pixi.js': 'PIXI',
         '@pixi/filter-glow': 'PIXI.filters',
@@ -30,7 +31,7 @@ const config = {
         //'@pixi/particle-emitter': 'PIXI.particles'
       }
     },
-    plugins: [babel({ babelHelpers: 'bundled' }), typescript()]
+    plugins: [babel({ babelHelpers: 'bundled' }), typescript({ sourceMap: true, inlineSources: true })]
 };
   
 export default config;

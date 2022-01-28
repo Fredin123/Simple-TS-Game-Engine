@@ -30,11 +30,13 @@ export class horizontalMovement{
             if(objectGlobalData.objectsThatCollideWith[target.objectName] != null){
                 //Push object
                 objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
-                    if((this.sign > 0 && testCollisionWith.horizontalCollision <= 0) || (this.sign < 0 && testCollisionWith.horizontalCollision >= 0)){
-                        if(internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
-                            this.collisionTarget = moveOperationsPush.pushObjectHorizontal(target, testCollisionWith, this.sign, objContainer);
-                            if(this.collisionTarget == objectGlobalData.null){
-                                target.force.Dx *= 1-testCollisionWith.weight;
+                    if((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))){
+                        if((this.sign > 0 && testCollisionWith.horizontalCollision <= 0) || (this.sign < 0 && testCollisionWith.horizontalCollision >= 0)){
+                            if(internalFunction.intersecting(target, target.collisionBox, testCollisionWith)){
+                                this.collisionTarget = moveOperationsPush.pushObjectHorizontal(target, testCollisionWith, this.sign, objContainer);
+                                if(this.collisionTarget == objectGlobalData.null){
+                                    target.force.Dx *= 1-testCollisionWith.weight;
+                                }
                             }
                         }
                     }
@@ -55,7 +57,8 @@ export class horizontalMovement{
                 if(target.stickyTop || target.stickyBottom){
                     //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                     objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
-                        if(internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
+                        if((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))
+                            && internalFunction.intersecting(target, stickyCheck, testCollisionWith)){
                             if(testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()){
                                 this.objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                 testCollisionWith.g.x += this.sign;
@@ -72,11 +75,13 @@ export class horizontalMovement{
             
             
             if(this.collisionTarget == objectGlobalData.null){
-                this.collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
+                this.collisionTarget = objContainer.boxIntersectionInLayerSpecific(target, target.collisionBox, collisionNames, target.layerIndex);
+                /*if(target.objectName == "player"){
+                    console.log("this.collisionTarget: ",this.collisionTarget, "    second: ",(target._collidingWithPolygonTick - ticker.getTicks() > ticker.shortWindow));
+                }*/
             }
             
-            if(this.collisionTarget != objectGlobalData.null && target._collidingWithPolygon == false){
-                
+            if(this.collisionTarget != objectGlobalData.null /*&& target._collidingWithPolygonTick - ticker.getTicks() > ticker.shortWindow*/){
                 this.sign *= -1;
                 target.g.x += 1*this.sign;
 
@@ -126,17 +131,18 @@ export class horizontalMovement{
         if(target.stickyLeftSide || target.stickyRightSide){
             
             objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], (testCollisionWith: iObject)=>{
-                if(this.sign > 0){
-                    //Moving right
-                    if(testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x+target.collisionBox.width && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
-                        testCollisionWith.g.x = target.g.x-testCollisionWith.collisionBox.x-testCollisionWith.collisionBox.width;
+                if((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))){
+                    if(this.sign > 0){
+                        //Moving right
+                        if(testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x+target.collisionBox.width && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
+                            testCollisionWith.g.x = target.g.x-testCollisionWith.collisionBox.x-testCollisionWith.collisionBox.width;
+                        }
+                    }else{
+                        //Moving left
+                        if(testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
+                            testCollisionWith.g.x = target.g.x+target.collisionBox.x+target.collisionBox.width-testCollisionWith.collisionBox.x;
+                        }
                     }
-                }else{
-                    //Moving left
-                    if(testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, this.stickyCheck, testCollisionWith)){
-                        testCollisionWith.g.x = target.g.x+target.collisionBox.x+target.collisionBox.width-testCollisionWith.collisionBox.x;
-                    }
-                    
                 }
                 return false;
             });

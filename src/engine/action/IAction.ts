@@ -1,5 +1,6 @@
 import { iVector } from "../dataObjects/vector/iVector";
 import { iObject } from "../objectHandlers/iObject";
+import { objectFunctions } from "../objectHandlers/objectFunctions";
 import { roomEvent } from "../roomEvent/roomEvent";
 import { movementDirection } from "./attackDirections";
 import { genericStatus } from "./genericStatus";
@@ -47,5 +48,5 @@ export interface IAction{
 
     isCompleted(): boolean;
 
-    play(user: iObject, l: roomEvent): void;
+    play(user: iObject, l: objectFunctions): void;
 }

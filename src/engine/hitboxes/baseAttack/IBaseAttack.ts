@@ -1,7 +1,4 @@
-import { iObject } from "../../objectHandlers/iObject";
-import { objectBase } from "../../objectHandlers/objectBase";
-import { roomEvent } from "../../roomEvent/roomEvent";
-import { movementDirection } from "../../action/attackDirections";
+import { objectFunctions } from "../../objectHandlers/objectFunctions";
 
 export interface IBaseAttack{
 
@@ -13,5 +10,5 @@ export interface IBaseAttack{
 
     queryAttack(): void;
 
-    tickAttack(l: roomEvent): void;
+    tickAttack(l: objectFunctions): void;
 }

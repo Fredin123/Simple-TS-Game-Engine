@@ -15,6 +15,7 @@ export class resourcesHand{
     
     private static audio: {[key: string] : any} = {};
     
+    private static resourceDir = "assets/resources/";
 
     constructor(app: PIXI.Application, onCompleteCallback: ()=>void, alternativePath: string = ""){
         resourcesHand.app = app;
@@ -23,7 +24,7 @@ export class resourcesHand{
  
         font.load().then(function () {
             console.log('smallburg-Regular has loaded');
-            fetch(alternativePath+'/resources.txt', {
+            fetch(alternativePath+'/assets/resources.txt', {
                 method: 'get'
             })
             .then(response => response.text())
@@ -51,7 +52,7 @@ export class resourcesHand{
             let resourceDirsSplit = resourceDir.split("/");
             let resourceName = resourceDirsSplit[resourceDirsSplit.length-1];
             console.log("Add resource ", resourceDir);
-            resourcesHand.app.loader.add(resourceName, alternativePath+"resources/"+resourceDir);
+            resourcesHand.app.loader.add(resourceName, alternativePath+resourcesHand.resourceDir+resourceDir);
         });
 
         resourcesHand.app.loader.load((e: any) => {
@@ -69,7 +70,7 @@ export class resourcesHand{
                     //console.log("Load resource: ",name);
                     resourcesHand.storeStaticTile(name);
                 }else if(name.indexOf(".mp4") != -1){
-                    resourcesHand.storeVideoAsAnimatedTexture("resources/"+resource, name);
+                    resourcesHand.storeVideoAsAnimatedTexture(resourcesHand.resourceDir+resource, name);
                 }
             });
             
@@ -84,7 +85,7 @@ export class resourcesHand{
             let dirParts = audioToLoad.split("/");
 
             resourcesHand.audio[dirParts[dirParts.length-1]] = new Howl({
-                src: ['resources/'+audioToLoad]
+                src: [resourcesHand.resourceDir+audioToLoad]
             });
         }
     }

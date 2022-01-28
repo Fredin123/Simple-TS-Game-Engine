@@ -2,6 +2,7 @@ import { roomEvent } from "../roomEvent/roomEvent";
 import { boxCollider } from "./collision/boxCollider";
 import { iVector } from "../dataObjects/vector/iVector";
 import * as PIXI from 'pixi.js'
+import { objectFunctions } from "./objectFunctions";
 
 
 export interface iObject{
@@ -25,7 +26,9 @@ export interface iObject{
     weight: number;
 
     _hasBeenMoved_Tick : number;
-    _collidingWithPolygon: boolean;
+    _collidingWithPolygonTick: number;
+    _targetLayerForPolygonCollision: string;
+    sameLayerCollisionOnly: boolean;
     collidesWithPolygonGeometry: boolean;
 
     onLayer: number;
@@ -35,9 +38,11 @@ export interface iObject{
     horizontalCollision: number;
     verticalCollision: number;
 
-    init(roomEvents: roomEvent): void;
+    changeLayer(roomEvents: roomEvent, newLayerName: string): void;
 
-    afterInit(roomEvents: roomEvent): void;
+    init(roomEvents: objectFunctions): void;
+
+    afterInit(roomEvents: objectFunctions): void;
     
     addMoveCollisionTarget(...collNames:string[]): void;
 
@@ -49,7 +54,9 @@ export interface iObject{
 
     style(newGraphics: (g: PIXI.Container) => PIXI.Container): void
 
-    logic(l: roomEvent): void;
+    preLogicMovement(l: roomEvent): void;
+
+    logic(l: objectFunctions): void;
 
     setCollision(xs: number, ys: number, width: number, height: number): void;
 

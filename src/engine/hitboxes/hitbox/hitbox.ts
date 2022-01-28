@@ -7,6 +7,7 @@ import { internalFunction } from '../../internalFunctions';
 import { iObject } from '../../objectHandlers/iObject';
 import { nulliObject } from '../../objectHandlers/nulliObject';
 import { objectBase } from '../../objectHandlers/objectBase';
+import { objectFunctions } from '../../objectHandlers/objectFunctions';
 import { roomEvent } from '../../roomEvent/roomEvent';
 
 export class hitbox extends objectBase{
@@ -48,7 +49,7 @@ export class hitbox extends objectBase{
 
     }
 
-    logic(l: roomEvent){
+    logic(l: objectFunctions){
         for(let t of this.targets){
             l.foreachObjectType(t, (obj: iObject) => {
                 if(this.haveHitThese.indexOf(obj.ID) == -1 

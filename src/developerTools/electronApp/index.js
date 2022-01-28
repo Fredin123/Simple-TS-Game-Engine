@@ -53,7 +53,7 @@
             var font = new FontFaceObserver__default['default']('CrimsonPro-Black');
             font.load().then(function () {
                 console.log('smallburg-Regular has loaded');
-                fetch(alternativePath + '/resources.txt', {
+                fetch(alternativePath + '/assets/resources.txt', {
                     method: 'get'
                 })
                     .then(function (response) { return response.text(); })
@@ -72,7 +72,7 @@
                 var resourceDirsSplit = resourceDir.split("/");
                 var resourceName = resourceDirsSplit[resourceDirsSplit.length - 1];
                 console.log("Add resource ", resourceDir);
-                resourcesHand.app.loader.add(resourceName, alternativePath + "resources/" + resourceDir);
+                resourcesHand.app.loader.add(resourceName, alternativePath + resourcesHand.resourceDir + resourceDir);
             });
             resourcesHand.app.loader.load(function (e) {
                 resourcesHand.resourcesToLoad.forEach(function (resource) {
@@ -93,7 +93,7 @@
                         resourcesHand.storeStaticTile(name);
                     }
                     else if (name.indexOf(".mp4") != -1) {
-                        resourcesHand.storeVideoAsAnimatedTexture("resources/" + resource, name);
+                        resourcesHand.storeVideoAsAnimatedTexture(resourcesHand.resourceDir + resource, name);
                     }
                 });
                 onCompleteCallback();
@@ -104,7 +104,7 @@
                 var audioToLoad = audioFiles_1[_i];
                 var dirParts = audioToLoad.split("/");
                 resourcesHand.audio[dirParts[dirParts.length - 1]] = new Howl({
-                    src: ['resources/' + audioToLoad]
+                    src: [resourcesHand.resourceDir + audioToLoad]
                 });
             }
         };
@@ -219,6 +219,7 @@
         resourcesHand.animatedSprite = {};
         resourcesHand.staticTile = {};
         resourcesHand.audio = {};
+        resourcesHand.resourceDir = "assets/resources/";
         return resourcesHand;
     }());
 
@@ -541,7 +542,9 @@
             this.force = new vector(0, 0);
             this.exportedString = "";
             this._hasBeenMoved_Tick = 0;
-            this._collidingWithPolygon = false;
+            this._collidingWithPolygonTick = 0;
+            this._targetLayerForPolygonCollision = "";
+            this.sameLayerCollisionOnly = false;
             this.collidesWithPolygonGeometry = false;
             this.onLayer = 0;
             this.outputString = "";
@@ -552,6 +555,10 @@
             this.objectName = "";
             this.collisionBox = new boxCollider(0, 0, 0, 0);
         }
+        nulliObject.prototype.changeLayer = function (roomEvents, newLayerName) {
+        };
+        nulliObject.prototype.preLogicMovement = function (l) {
+        };
         nulliObject.prototype.afterInit = function (roomEvents) {
         };
         nulliObject.prototype.init = function (roomEvents) {
@@ -618,6 +625,7 @@
             return this.ticks;
         };
         ticker.ticks = 0;
+        ticker.shortWindow = 4;
         return ticker;
     }());
 
@@ -634,6 +642,7 @@
                 objectBeingPushed.g.x += sign;
                 objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, function (testCollision) {
                     if (testCollision.objectName != pusher.objectName &&
+                        (objectBeingPushed.sameLayerCollisionOnly == false || (objectBeingPushed.sameLayerCollisionOnly == true && objectBeingPushed.layerIndex == testCollision.layerIndex)) &&
                         internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
                         && _this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
                         objectBeingPushed.g.x += sign * -1;
@@ -655,7 +664,7 @@
                     return pusher;
                 }
                 objectBeingPushed.g.y += sign;
-                if (objectBeingPushed._collidingWithPolygon) {
+                if (ticker.getTicks() - objectBeingPushed._collidingWithPolygonTick < ticker.shortWindow) {
                     objectBeingPushed.g.y += sign * -1;
                     this.collided = true;
                     return objectBeingPushed;
@@ -663,6 +672,7 @@
                 else {
                     objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, function (testCollision) {
                         if (testCollision.objectName != pusher.objectName &&
+                            (objectBeingPushed.sameLayerCollisionOnly == false || (objectBeingPushed.sameLayerCollisionOnly == true && objectBeingPushed.layerIndex == testCollision.layerIndex)) &&
                             internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
                             && _this.pushObjectVertical(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null) {
                             objectBeingPushed.g.y += sign * -1;
@@ -698,11 +708,13 @@
                 if (objectGlobalData.objectsThatCollideWith[target.objectName] != null) {
                     //Push object
                     objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                        if ((_this.sign > 0 && testCollisionWith.horizontalCollision <= 0) || (_this.sign < 0 && testCollisionWith.horizontalCollision >= 0)) {
-                            if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                _this.collisionTarget = moveOperationsPush.pushObjectHorizontal(target, testCollisionWith, _this.sign, objContainer);
-                                if (_this.collisionTarget == objectGlobalData.null) {
-                                    target.force.Dx *= 1 - testCollisionWith.weight;
+                        if ((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))) {
+                            if ((_this.sign > 0 && testCollisionWith.horizontalCollision <= 0) || (_this.sign < 0 && testCollisionWith.horizontalCollision >= 0)) {
+                                if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                    _this.collisionTarget = moveOperationsPush.pushObjectHorizontal(target, testCollisionWith, _this.sign, objContainer);
+                                    if (_this.collisionTarget == objectGlobalData.null) {
+                                        target.force.Dx *= 1 - testCollisionWith.weight;
+                                    }
                                 }
                             }
                         }
@@ -720,7 +732,8 @@
                     if (target.stickyTop || target.stickyBottom) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                         objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                            if (internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
+                            if ((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))
+                                && internalFunction.intersecting(target, stickyCheck_1, testCollisionWith)) {
                                 if (testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()) {
                                     _this.objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                     testCollisionWith.g.x += _this.sign;
@@ -734,9 +747,12 @@
                     }
                 }
                 if (this_1.collisionTarget == objectGlobalData.null) {
-                    this_1.collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
+                    this_1.collisionTarget = objContainer.boxIntersectionInLayerSpecific(target, target.collisionBox, collisionNames, target.layerIndex);
+                    /*if(target.objectName == "player"){
+                        console.log("this.collisionTarget: ",this.collisionTarget, "    second: ",(target._collidingWithPolygonTick - ticker.getTicks() > ticker.shortWindow));
+                    }*/
                 }
-                if (this_1.collisionTarget != objectGlobalData.null && target._collidingWithPolygon == false) {
+                if (this_1.collisionTarget != objectGlobalData.null /*&& target._collidingWithPolygonTick - ticker.getTicks() > ticker.shortWindow*/) {
                     this_1.sign *= -1;
                     target.g.x += 1 * this_1.sign;
                     this_1.objectsThatWereCollidingThisObjectWhileMoving.forEach(function (updaterObject) {
@@ -781,16 +797,18 @@
             }
             if (target.stickyLeftSide || target.stickyRightSide) {
                 objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                    if (_this.sign > 0) {
-                        //Moving right
-                        if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
-                            testCollisionWith.g.x = target.g.x - testCollisionWith.collisionBox.x - testCollisionWith.collisionBox.width;
+                    if ((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))) {
+                        if (_this.sign > 0) {
+                            //Moving right
+                            if (testCollisionWith.g.x + testCollisionWith.collisionBox.x + testCollisionWith.collisionBox.width < target.g.x + target.collisionBox.x + target.collisionBox.width && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
+                                testCollisionWith.g.x = target.g.x - testCollisionWith.collisionBox.x - testCollisionWith.collisionBox.width;
+                            }
                         }
-                    }
-                    else {
-                        //Moving left
-                        if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
-                            testCollisionWith.g.x = target.g.x + target.collisionBox.x + target.collisionBox.width - testCollisionWith.collisionBox.x;
+                        else {
+                            //Moving left
+                            if (testCollisionWith.g.x > target.g.x && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
+                                testCollisionWith.g.x = target.g.x + target.collisionBox.x + target.collisionBox.width - testCollisionWith.collisionBox.x;
+                            }
                         }
                     }
                     return false;
@@ -817,17 +835,22 @@
             this.sign = magnitude > 0 ? 1 : -1;
             this.objectsThatWereCollidingThisObjectWhileMoving = new Array();
             this.collisionTarget = objectGlobalData.null;
+            /*if(target.objectName == "dummySandbag"){
+                console.log("Here");
+            }*/
             for (this.i = 0; this.i < Math.abs(magnitude); this.i += 1) {
                 this.objectsThatWereCollidingThisObjectWhileMoving.length = 0;
                 target.g.y += this.sign;
                 if (objectGlobalData.objectsThatCollideWith[target.objectName] != null) {
                     //push objects
                     objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                        if ((_this.sign > 0 && testCollisionWith.verticalCollision <= 0) || (_this.sign < 0 && testCollisionWith.verticalCollision >= 0)) {
-                            if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                                _this.collisionTarget = moveOperationsPush.pushObjectVertical(target, testCollisionWith, _this.sign, objContainer);
-                                if (_this.collisionTarget == objectGlobalData.null) {
-                                    target.force.Dy *= 1 - testCollisionWith.weight;
+                        if ((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))) {
+                            if ((_this.sign > 0 && testCollisionWith.verticalCollision <= 0) || (_this.sign < 0 && testCollisionWith.verticalCollision >= 0)) {
+                                if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                    _this.collisionTarget = moveOperationsPush.pushObjectVertical(target, testCollisionWith, _this.sign, objContainer);
+                                    if (_this.collisionTarget == objectGlobalData.null) {
+                                        target.force.Dy *= 1 - testCollisionWith.weight;
+                                    }
                                 }
                             }
                         }
@@ -845,7 +868,8 @@
                     if (target.stickyLeftSide || target.stickyRightSide) {
                         //console.log("objectBase.objectsThatCollideWithKeyObjectName[target.objectName]", objectBase.objectsThatCollideWithKeyObjectName[target.objectName]);
                         objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                            if (internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
+                            if ((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))
+                                && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
                                 if (testCollisionWith._hasBeenMoved_Tick < ticker.getTicks()) {
                                     _this.objectsThatWereCollidingThisObjectWhileMoving.push(testCollisionWith);
                                     testCollisionWith.g.y += _this.sign;
@@ -860,7 +884,7 @@
                 }
                 //This has to be more optimized
                 if (this.collisionTarget == objectGlobalData.null) {
-                    this.collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, collisionNames);
+                    this.collisionTarget = objContainer.boxIntersectionInLayerSpecific(target, target.collisionBox, collisionNames, target.layerIndex);
                 }
                 if (this.collisionTarget != objectGlobalData.null) {
                     this.sign *= -1;
@@ -903,16 +927,18 @@
             //Sticky draging
             if (target.stickyTop || target.stickyBottom) {
                 objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
-                    if (_this.sign > 0) {
-                        //Moving down
-                        if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
-                            testCollisionWith.g.y = target.g.y - testCollisionWith.collisionBox.y - testCollisionWith.collisionBox.height;
+                    if ((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))) {
+                        if (_this.sign > 0) {
+                            //Moving down
+                            if (testCollisionWith.g.y + testCollisionWith.collisionBox.y + testCollisionWith.collisionBox.height < target.g.y + target.collisionBox.y + target.collisionBox.height && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
+                                testCollisionWith.g.y = target.g.y - testCollisionWith.collisionBox.y - testCollisionWith.collisionBox.height;
+                            }
                         }
-                    }
-                    else {
-                        //Moving up
-                        if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
-                            testCollisionWith.g.y = target.g.y + target.collisionBox.y + target.collisionBox.height - testCollisionWith.collisionBox.y;
+                        else {
+                            //Moving up
+                            if (testCollisionWith.g.y > target.g.y && internalFunction.intersecting(target, _this.stickyCheck, testCollisionWith)) {
+                                testCollisionWith.g.y = target.g.y + target.collisionBox.y + target.collisionBox.height - testCollisionWith.collisionBox.y;
+                            }
                         }
                     }
                     return false;
@@ -952,12 +978,14 @@
         polygonCollision.collisionTest = function (target, xTest, yTest, objContainer) {
             var _this = this;
             if (target.collidesWithPolygonGeometry == true) {
-                this.collisionObjects = objContainer.filterObjects(["polygonCollisionX"], function (testCollisionWith) {
-                    if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
-                        return true;
+                this.foundPolygonsTest = objContainer.getSpecificObjectsInLayer(target._targetLayerForPolygonCollision, "polygonCollisionX");
+                this.collisionObjects = [];
+                for (var _i = 0, _a = this.foundPolygonsTest; _i < _a.length; _i++) {
+                    var polygon = _a[_i];
+                    if (internalFunction.intersecting(target, target.collisionBox, polygon)) {
+                        this.collisionObjects.push(polygon);
                     }
-                    return false;
-                });
+                }
                 //var collisionTarget = objContainer.boxIntersectionSpecific(target, target.collisionBox, ["polygonCollisionX"]);
                 if (this.collisionObjects.length == 0) {
                     //target._hasCollidedWithPolygon = false;
@@ -979,6 +1007,25 @@
                 });*/
                 //let collisionHighestPoint = collisionResults[0];
                 //target._hasCollidedWithPolygon = false;
+                if (this.collisionResults.length == 0) {
+                    return [false, target.gravity];
+                }
+                //Vertical push if collision
+                /*if(target.objectName == "player"){
+                    console.log(this.collisionResults[0][1].Dy);
+                }*/
+                if (this.collisionResults[0][0] && this.collisionResults[0][1].Dy > 0) {
+                    for (this.i = 0; this.i < Math.round(this.collisionResults[0][1].Dy) + 1; this.i += 1) {
+                        objContainer.loopThroughObjectsUntilCondition(objectGlobalData.objectsThatCollideWith[target.objectName], function (testCollisionWith) {
+                            if ((target.sameLayerCollisionOnly == false || (target.sameLayerCollisionOnly == true && target.layerIndex == testCollisionWith.layerIndex))) {
+                                if (internalFunction.intersecting(target, target.collisionBox, testCollisionWith)) {
+                                    moveOperationsPush.pushObjectVertical(target, testCollisionWith, -1, objContainer);
+                                }
+                            }
+                            return false;
+                        });
+                    }
+                }
                 return this.collisionResults[0];
                 /*if(collisionTarget != objectGlobalData.null){
                     return (collisionTarget as polygonCollisionX).collisionTest(target);
@@ -988,8 +1035,10 @@
             return [false, target.gravity];
         };
         polygonCollision.collisionObjects = [];
+        polygonCollision.foundPolygonsTest = [];
         polygonCollision.collisionResults = [];
         polygonCollision.currentFlatestCollision = new nullVector();
+        polygonCollision.i = 0;
         return polygonCollision;
     }());
 
@@ -1005,6 +1054,10 @@
             this.ydiff = force.Dy;
             target.gravity.increaseMagnitude(target.weight);
             this.polygonCollisionTest = polygonCollision.collisionTest(target, Math.round(this.xdiff), Math.round(this.ydiff), objContainer);
+            if (this.polygonCollisionTest[0]) {
+                target._collidingWithPolygonTick = ticker.getTicks();
+            }
+            //console.log("1");
             force.Dx += this.polygonCollisionTest[1].Dx;
             force.Dy += this.polygonCollisionTest[1].Dy;
             target.gravity.magnitude = this.polygonCollisionTest[1].magnitude;
@@ -1038,9 +1091,11 @@
             this.gravity = nullVector.null;
             this.weight = 0.4;
             this._hasBeenMoved_Tick = 0;
-            this._collidingWithPolygon = false;
+            this._collidingWithPolygonTick = -1;
+            this._targetLayerForPolygonCollision = "";
             this.collidesWithPolygonGeometry = false;
             this._hasCollidedWithPolygon = false;
+            this.sameLayerCollisionOnly = false;
             this.inputTemplate = "";
             this.outputString = "";
             this.onLayer = 0;
@@ -1103,6 +1158,30 @@
             enumerable: false,
             configurable: true
         });
+        objectBase.prototype.changeLayer = function (roomEvents, newLayerName) {
+            //THIS ISNT WORKING
+            console.log("Change layer: ", this.layerIndex);
+            var objectsInLayer = roomEvents.objContainer.getObjectsInLayerFromIndex(this.layerIndex);
+            console.log("objectsInLayer: ", objectsInLayer);
+            var indexOfObjInLayer = objectsInLayer.indexOf(this);
+            console.log("indexOfObjInLayer: ", indexOfObjInLayer);
+            if (indexOfObjInLayer != -1) {
+                console.log("old obj.layerIndex: ", this.layerIndex);
+                objectsInLayer.splice(indexOfObjInLayer, 1);
+                console.log("roomEvents.objContainer.getLayerNamesMap(): ", roomEvents.objContainer.getLayerNamesMap());
+                var newLayerNumber = roomEvents.objContainer.getLayerNamesMap()[newLayerName];
+                /*console.log("this.layerNames: ",this.layerNames);
+                console.log("targetLayer: ",targetLayer);*/
+                this._layerIndex = newLayerNumber;
+                var netObjectContainer = roomEvents.objContainer.getObjectsInLayerFromIndex(this.layerIndex);
+                console.log("newLayerNumber: ", newLayerNumber);
+                netObjectContainer.push(this);
+                //Move pixijs graphics to new container here
+                this.g.parent.removeChild(this.g);
+                var newLayerGraphicsContainer = roomEvents.objContainer.getLayerGraphicsContainerFromIndex(this.layerIndex);
+                newLayerGraphicsContainer.addChild(this.g);
+            }
+        };
         objectBase.prototype.afterInit = function (roomEvents) {
         };
         objectBase.prototype.init = function (roomEvents) {
@@ -1245,8 +1324,10 @@
                 this.gSprites[id].animationSpeed = speed;
             }
         };
-        objectBase.prototype.logic = function (l) {
+        objectBase.prototype.preLogicMovement = function (l) {
             movementOperations.moveByForce(this, this._force, this.collisionTargets, l.objContainer, l.deltaTime);
+        };
+        objectBase.prototype.logic = function (l) {
         };
         objectBase.prototype.setCollision = function (xs, ys, width, height) {
             this.collisionBox.x = xs;
@@ -1454,15 +1535,16 @@
             _this.switch = false;
             _this.friction = 0.986;
             _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
-            _super.prototype.style.call(_this, function (g) {
-                var newGraphics = new PIXI.Graphics();
+            return _this;
+            /*super.style((g: PIXI.Container) => {
+                let newGraphics = new PIXI.Graphics();
+
                 newGraphics.beginFill(0x000000);
                 newGraphics.drawRect(0, 0, 32, 32);
                 newGraphics.endFill();
                 g.addChild(newGraphics);
                 return g;
-            });
-            return _this;
+            });*/
             /*setInterval(()=>{
                 this.switch = !this.switch;
             }, 700);*/
@@ -1521,14 +1603,14 @@
             _super.prototype.setCollision.call(_this, 0, 0, 32, 32);
             return _this;
         }
-        gameStartController.prototype.init = function (roomEvents) {
+        gameStartController.prototype.afterInit = function (roomEvents) {
             roomEvents.loadRoom(r1_scene_lake1, ["dream_with_dad_1"]);
         };
         gameStartController.objectName = "gameStartController";
         return gameStartController;
     }(objectBase));
 
-    var scene_home = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALgFoAOAJgAYAacaeJNLbATUKLIEYLrbYEUMOAOoBLTABcAFoQDsMyjUh8Gg7AAkYIgOaTxhMgDYArDwBGEMAGstcRpgDCyADbI4hEAGIYJb95A0nCABPeAARCHEIQgBtUFhIgHlTACsYMHFsAEl0ABlg+BjQcREnGEJ0VCcnGhFsRyhTEXQIkWR0BIAzABUSmGxCDognbBgazE6AZUjisB7S+sbm4rb3fxBagAUIOHFOhaaWlYJB4dGQcSCABzKCHibL1HEpuCatVZotGGQoDeQmjJiAF0aFBathXpkoBBPoRgABfGgAD0IHHkJBoQTYAGYFCBmrB3NhLEFEBZrLZBCA4cCQJ9vjBxC8+tk8iE3ARojTJGJMDB0AMhiMaCNxMV0Fp+gQQMAADogbBgWxVCbXGCYXByggAAg4VC1coVSqcKpgauYmp1cLWgTZADk6O5zFYbHYJsS1gAvbK85G3BFxBkQJKpdJZXL5dmxc69cqVarrOrfRaHdrdXqSk5C9bjDpTFqzXr7JatflStabba7DpFlMC040C7XQh3dAPJ6M17vWlfH5-dAAjk00HYcHiyHQm7wpH6DgAFlnGJRHDINHxN3OcFNAHE+VSqEUYwQKlUaomGgdlqm5n061mxJNpiIC-MkxeS12Kzs9q-i0dM2dGxuFs22eTsyw+Htfn+SVORBMEIShGECCnEBfTIMh5EXAgOGXAA6bgCMIwiDFXB0pUZbdd39aNSljE8ExrS9OmvDNBTOe9c0fZ8YEY99wITLYv2rH9a2ONiGyuICalbR5QPFLs6V7aCgTgkcEInWEEVQlEAE4sRIkBMWw5dSIJcjNxgHd+Wo4paKPONT14tpmPTW92JzPMZmvJzSxActsEEqsfLciSm1uaSQI7eT+MUqD+xgod4LHRDJy030OD0gyjJwlc8TIjdKOs-caJuY941qHyXNKVj62zB9828kTLw-ALK2-c9f1Lf9Qqk9YZPbF5or8iDvjigdYJAYdRy0cckJQ9KDFndFDJRAy13cCjLKo4rbNKhyGKaksqpvMTao4zyn0ajrROGgS2uE67mtOrNAObCLZKit4YsgvtxsStTko05C0tWpasI4Nb8s2qy9wPOyyscw7nLTaqQrqziGsLJHfP8wL2uTJ7uvOSS3r6yLBq+27Yt+hLVOm2bUunbCDG4LCiDBvKzIKrairhvb6Iq7Hjpqu8PK4q6Cb427PyC7G0de8KyY+imFJ+5TBzp9S5pB7CsR03KjKIZdlvW8zCthkq6PKs9JeRli0fO8WsceqXcfu4LnoAknFfuZWwKptX4pUyakpmlLNKZ5cIbZ9CF059doe2vmrcRl27dcz2xnqrzndtnHTzxh68-l73gL9oa1mp9WJqmrXGe07CKBIZbDZxHhTe5mGbMPBGDrTq8M6Jx3MZffuWsLj2iYVsuBv9yvA7+zXAe1pmSBxNn5xNqGLK7nae-2wX++Fh2xZHni5f4mX8bfP9xOJsKZ7kyn59Gmng9r5f699GQSDjw2lvbtvc23d4YHxtjfAeqNM7owutxD20tWpCUnnfae71Z4VxGkpIOGsQ4AzDkDeahBFo8ENkYfWpkE47yTpbeyAtwGdWPtA4eOdR7F0vog2WY9oGoKVug5+mCxq01wfTcOwMmazmjitYg8hAFc0TrzGhvdD550YUPU+LDz5cIQRPC+U9S5oKfqrV+1d-oiIITrHKbMSCs3jhtKhCjdopz7iolGJ01HZ0urnCB493a6JQfo3hhjvrGOwTXUODMI4NyIFiX+bMuBNwoXY4Be9QF0Mqq4kW7kPFwIvto3xXC9EPwMZ9IxWDF7CLrpE30RAjBkBbmwHS85Elmx5hbRxtDrbpPtkw9RnjWHePYTogp-iimBJKcEspQiP74JXlEgwZA-4NPIbYlpu9k4dNTi47p7iMYaPgW7JBfjao8N9nw0pgj37hNEYQ4gRgZBZQaSzZpncqI0kUgyJkYZWQFBwdyTAvIup3xFGKCU7hZTykVM4Y0qp1QWl1PqCFRoTRmjhVaAIEZ7RcydOSOwnpvQwHStReIQYUhpAyCyCMhRFFgK6YPO+zC+maLYXkw5wzjkBNOUEgOITynTIiWIhunBlmG2Ns8y4NoCggP5p0oWGST7ZIlgMllnC2GFN6py8Z3LJmXLwfym5BhrEkLYBlXKHcxQkhcFYHEbT95pNlds+lvSclaIOSqgZarSYapVhMi5OC+XXJ1mQRpiziCWJWSAXkUA2gAEERAcCpG8nsHyRDMnDGyYOfyAVo2Ba8SU0oDSQuVDCjUhAdR6gLUimF5pS0cDRSACVcBMXrm+XAHUeKsAEv0ESwMwYyVfMpTg95HZU0tozTyXc0Cc3ijzeCw0ULkWwpreWxF86q2outBioBMAcgwAgAANz6I4fsEAmgFBoF6DtvpZzdsSKS0MFL02DqTcO-tj6ozVN-vUggZCOC4R0v+gDgGAOYNEBIaQBASAmoEW-DkEMOBGCoPBnSCGkMobIWhmQOlEMGC4NhigaGSAyEQ0YEjxHZwkXg7U4j9y8NEYhhQXU8GDXUcY0YMG8GsR0dqYxpadHyN8cMIhvWWG5wUBXBwTjdG9bib1tQCTMgFwSdnFiITymhNYhUxJucQmFASbIJpnEjGsT4cQ3UujhhxP6c0xlCjHASAiaQ4h5c4mm4iYoMxrg5HENiZc+5qgOkZAIeQyRfWRG9K6h0hlKghGVwkFI+QBDP8Fz3JIoF6gMgsSJaDVQGQJkDA6WoMYLDxgiOLRIvMhDZD0RGGY0YdeJgsOznIU13UTWiNNfRE1hcTXqBNZXD1qgTWEMtcGwV0brXmuNPG6N7ryGZvTZG0tTrhGqAmCI7UkidWFx1ZXLU6gJheuYcG7lwbkHTvdbO4ty75BjuNZo7OH+t3judaO0tVr93AvHZIg977r2Pvvfe794b-3jsA9B+Dh772VOQ4hyDh7wP3v9ZOzDlHyPPuo+h2jsHP3juY+x1j2H+OieE5J6j-Hy3+tjYO6tigWGjB2dW9ltjuo2PVfmat-Lq2Vss0K3lhnBh17GBUwYdnBhMIGpXAahDBqFwy6oAaojMhWa5ZU-IFcGXEsPZy3cnLnO5CK5W5h1XekcuRZy3F83w3dMi7oyLuTxhxOLU0zh7DjGXdwdd1QHEgJqQ0EzROomU7QVSlnYW6FppF3anhRW1dEfq1R7rQ2pt7gXSUnPfi30Rgb0kpDOStNPyJpDs+Q+gvXJx2AtqkHmdMei0R5LVH5dc7a8oprYnzdXMbAQBHO2n0RDs+9vvfnyMib6QvpL8Pv35fs0MhBdXldzfI9loRU38PLeE8brtPlLcABVTIo70+XtkNSOEQA";
+    var scene_home = "N4IgxghgtgpgThAQgewK4DsAmBnAGiALgFoAOAJgAYAacaeJNLbATUKLIEYLrbYEUMOAOoBLTABcAFoQDsMyjUh8Gg7AAkYIgOaTxhMgDYArDwBGEMAGstcRpgDCyADbI4hEAGIYJb95A0nCABPeAARCHEIQgBtUFhIgHlTACsYMHFsAEl0ABlg+BjQcREnGEJ0VCcnGhFsRyhTEXQIkWR0BIAzABUSmGxCDognbBgazE6AZUjisB7S+sbm4rb3fxBagAUIOHFOhaaWlYJB4dGQcSCABzKCHibL1HEpuCatVZotGGQoDeQmjJiAF0aFBathXpkoBBPoRgABfGgAD0IHHkJBoQTYAGYFCBmrB3NhLEFEBZrLZBCA4cCQJ9vjBxC8+tk8iE3ARojTJGJMDB0AMhiMaCNxMV0Fp+gQQMAADogbBgWxVCbXGCYXByggAAg4VC1coVSqcKpgauYmp1cLWgTZADk6O5zFYbHYJsS1gAvbK85G3BFxBkQJKpdJZXL5dmxc69cqVarrOrfRaHdrdXqSk5C9bjDpTFqzXr7JatflStabba7DpFlMC040C7XQh3dAPJ6M17vWlfH5-dAAjk00HYcHiyHQm7wpH6DgAFlnGJRHDINHxN3OcFNAHE+VSqEUYwQKlUaomGgdlqm5n061mxJNpiIC-MkxeS12Kzs9q-i0dM2dGxuFs22eTsyw+Htfn+SVORBMEIShGECCnEBfTIMh5EXAgOGXAA6bgCMIwiDFXB0pUZbdd39aNSljE8ExrS9OmvDNBTOe9c0fZ8YEY99wITLYv2rH9a2ONiGyuICalbR5QPFLs6V7aCgTgkcEInWEEVQlEAE4sRIkBMWw5dSIJcjNxgHd+Wo4paKPONT14tpmPTW92JzPMZmvJzSxActsEEqsfLciSm1uaSQI7eT+MUqD+xgod4LHRDJy030OD0gyjJwlc8TIjdKOs-caJuY941qHyXNKVj62zB9828kTLw-ALK2-c9f1Lf9Qqk9YZPbF5or8iDvjigdYJAYdRy0cckJQ9KDFndFDJRAy13cCjLKo4rbNKhyGKaksqpvMTao4zyn0ajrROGgS2uE67mtOrNAObCLZKit4YsgvtxsStTko05C0tWpasI4Nb8s2qy9wPOyyscw7nLTaqQrqziGsLJHfP8wL2uTJ7uvOSS3r6yLBq+27Yt+hLVOm2bUunbCDG4LCiDBvKzIKrairhvb6Iq7Hjpqu8PK4q6Cb427PyC7G0de8KyY+imFJ+5TBzp9S5pB7CsR03KjKIZdlvW8zCthkq6PKs9JeRli0fO8WsceqXcfu4LnoAknFfuZWwKptX4pUyakpmlLNKZ5cIbZ9CF059doe2vmrcRl27dcz2xnqrzndtnHTzxh68-l73gL9oa1mp9WJqmrXGe07CKBIZbDZxHhTe5mGbMPBGDrTq8M6Jx3MZffuWsLj2iYVsuBv9yvA7+zXAe1pmSBxNn5xNqGLK7nae-2wX++Fh2xZHni5f4mX8bfP9xOJsKZ7kyn59Gmng9r5f699GQSDjw2lvbtvc23d4YHxtjfAeqNM7owutxD20tWpCUnnfae71Z4VxGkpIOGsQ4AzDkDeahBFo8ENkYfWpkE47yTpbeyAtwGdWPtA4eOdR7F0vog2WY9oGoKVug5+mCxq01wfTcOwMmazmjitYg8hAFc0TrzGhvdD550YUPU+LDz5cIQRPC+U9S5oKfqrV+1d-oiIITrHKbMSCs3jhtKhCjdopz7iolGJ01HZ0urnCB493a6JQfo3hhjvrGOwTXUODMI4NyIFiX+bMuBNwoXY4Be9QF0Mqq4kW7kPFwIvto3xXC9EPwMZ9IxWDF7CLrpE30RAjBkBbmwHS85Elmx5hbRxtDrbpPtkw9RnjWHePYTogp-iimBJKcEspQiP74JXlEgwZA-4NPIbYlpu9k4dNTi47p7iMYaPgW7JBfjao8N9nw0pgj37hNEYQ4gRgZBZQaSzZpncqI0kUgyJkYZWQFBwdyTAvIup3xFGKCU7hZTykVM4Y0qp1QWl1PqCFRoTRmjhVaAIEZ7RcydOSOwnpvQwHStReIQYUhpAyCyCMwd3kdmZOGNkwc-kArRsC14kppQGkhcqGFGpCA6j1BypFMLzS8o4GikANp4CYvXN8uAOo8VYAJfoIlgZgxkq+ZSjk6ylH0JTKou+zC+maLYXkw5wzjkBNOUEgOITynTIiWIhunBlmt1yh3S4Eq3AgP5p0oWGST7ZIlgMk1nC2GFN6pa8Z1rJmXLwfam5GEDD1OINY55vIoBtAAIIiA4G0-eaTfXbP1b0nJWiDkhoGWG0mEaVYTIuTgu11ydYGB0iZKR7AEkrOjOgEkLgrA4lzakn1R8-U9IDV4zqPjTWhpGeG-qVqX7RvrVc8xTNm2tsNrHZ5Yoe3ID7WQAd3rNkQL1WdYtgaJ2DPydO81ozq1zwEW-JdsbG2rpbQbNgm7O3bsQL2yw-avVOOUcekdOzYHnpumW6+F7K0+znZGhddawnPpXQ3Nd77iCfo7t+39-6UmHuccBwtp6x39IvcGqDokYOP3gw+kxS8ZlfyIW+mOCyt1NB3Xug9gGdVMRA0WkjRqg2QaLhWmdVa4M1qjYh0xlSHW+jQyxuOWH2M-t3X+-dAGNkEYYXx4juzDX7ILle0TN7Z3k3vd2G1Uzl2zPk8xttmGoYqZwxpvD3GumD34-pktxrhPINM+J8zGDLOLqQ2Y2zTH10ftY1+5zancNarAR5qBoGnakYg0ZqdJmXoWokxZquoSZOfyqZF9D7AYvKe7apzjmntXJbcV5sD46Mt3Sy9BsTsGgv8JC9J+jcam32Y3RVpzVWXNca00BnTRHRYCcM618t7WAudfLt1grtqbOMYIAphzw25FxZq25ibPGjq6Zm958DT1yMicWzl29eXgtres8hiLW3BsfqMJDPbo34uucS-m4d02snnea5dvzRzbtmZW+cx9YXZM3O2xuj7bHvsHb+0OrZnm9NNfS6DzLC3KMdeo5JhDMOisMZK69qLGGkexZR+p8bdWC2Y7O9jwTZGwdmoh4FqHtbSd9Zfaht71PPsJ32-T2rSWmcpca2ltnLWr7XYJ0ton+WF5PfC5thH72RcbTFwlxRkuAfM6B6zubCv-Nc+W2c3ndGKnFbk6VmONPKscfF4dxnRvpdY9l2bjhFHCaE+KcT2jhX+cobs1T9gzuRuu-1+0j3GOvcs597kjn17Lcq4e2rmNGuKda+F8j2Pv2Df-cTw173Z9fdDPT17O7XXoe24beHx3Dno9faLwzw3ZfMlZ2Bzj12eP-d8So0H1XVmc9w4G5HupW92-Vbd2jo9U3je99N6nwfiuA-K9H1n8fT7c8O8p2Vmfhf59x7zejwjK+YEp9LRvi3tfIfW6k3zu35PD-5-YM3U-Y2Jel6v0nibrfr5vfuDo-tzs-iTo3htnnkLl-rPqLnTufoOkvrqqdkAZXuvvNkPrfNvmMsHj1q-k3i9p-ifrTh3n-pfsvoAavsAUJqAZzuAVbvOiHuts9prnAWQS7mfsXvHl3gAeXsnpgXftgZvsPoHvgWPqFmTv1q+tPt-uQTwZ3v-tQYIRgXslgebmAT1BASwYQdAewbAfIQgbrkgbwRfqgbxoDrQcISAaIQ-jocwTRvoaHm-rIYLsYT-j9soVQWgdYTfrYfQfYdoffE-noY9hPvbvDpwQodwb-u7vwaoT3gERoSIVoYwY4ZnqttnvvpPnIcfrETHkoZQZYSdv4Qaj5kEekTXpkTvtkXvrDlEVPgUSYeRHruYSgdpn4dfhURdgPsERkaEboc4REbkU0fkTHIUXPvEYvl0VYT0WeiDv0dUdlkwVkQ3q4cQRwZ4YoTMSXr4fMTQSkQZpoX7mIbgRnnURsWwQftEZHm3F4ajvsaUenEcb0UsUcFdg4UMU4QQaMY0e-ncWVg8bsd4SUXMWUQsbNqcdXqsbUZIbvtIWHiQXASCXEWCQkSod0W8Ysf3p8WnnCT8esTbpsTAR-qibiOiU8XwViYcWoTYakXYSsTdmsVcSSTcXkR4cCZSUUXsTSQcZCTidCWkWcd8ScvdvUUiW4QLhHtybIogRQZiQKa8fSccZUezgwTUUSWyS-gYbcc0WzGibyRibMZNtiaqe8XifnAMVqeKfXuyerpybKYaTydMSac8RCSqckZaXLrjjaYSXaTzrqaSYYeSfca6QqcUUqS8ZAhabib6csaKSEYGZAawY6eMVyS6fKaYYqaacdl6f6n3gmfiZqQGblvacGRyRmc6W2kaW6dSRYZ6bGd6fGVXsZiyfCXeoib1tKc3kflmY8Qvh6WaXSS2cKUyUmYMSmeETkQCe4TWS6tmW0WYT4TGSekIYyVUZObaeWUGVASGfqRMbWbUoOcgfhiOYKXGeOVubCR2dqQiZKT2VsUYcCSeaCQ2Z0ReQWaOkWW2W1krpcQ+dcemYCQacea6saR+eefmc2YWWviKbeQBayUBQ6ZEaBUea3G+VSUOfyWuegQyScQhe2UhZ2RKcBWhfOS3phRBfWThY2V+bBT+fBROYhVvoBV2Y+UQWSUCYaVhZBXRZ+TBeueoYRSxcRWxchRxeRWMehZmeBaeR0dBfVmOb+TCeJeIXgVJahTJZRf2fJe+QJUpVLleapURf+RJaRRWfuVWbJQudiHxbRWee5sZSpcxTeepRcZJWRdpXOTKVRdiLEgZU5UdspXBXQRqf6XedOSMbOTIX5Xpa3IFdhcFQngIa5eFfLtuWWXXnuWmRRfFZ-jEkpvxSlYkeaelYERFcySRfeVpZWSBbpYVUlSVYpc5Z7iZW5VVVlVFbuamS4TZY1aic1Y5a1SFS5WFZVZlaxRpexd5fVflX2U1cVSNauU2cJQReqVNR5YCppXNdZQ1QVUNctZGXyfRUJfhWqX0SWZFTVdFX8bFcidsWVhIjrsubmcOedeUa2WpeZTNV5VZXlTpYdZHi9QpatQxetZdR8dadVRZbVXtYDb5YtXAaDUFaNalUkRNZuV1dNZ5ZZblf1QdcjSDZIslejWVaOVjaJe5b9XjfDQDYTQtSiSTa9V2u9bhWtRdT6X+fjnDXdVIU+dxWBf-KTS1eDZ9VCaZWJbTTtbNQzf8XFcTc9aLSteCRDVzd9WZbzX9fjX1QrY9S+RvCrSde6RzerV9deTjdtSXDlXrQ9b2czcrazdhqbWdaFUxRlX6bDTrfTQTfrQ7U9Ubc7e0eLe7alpNV7d1bdb1TOQ0YrY7UHWDWrRLUKVLTTdrXTfzd2VxaGTxW2qjWTaHeNR7RHYmbjbLf9X7fbc+WGU7UndGZzRbWnVbTLTbWETFXHQbbXYnWjUXe1RVdjVta3dwjHR3VKTXXnSLcHSucnWHTLqXddd7ZnaPfdZ3QHYbfncbTmVGXmXPRXoPZHeXW3cMavePULRhWwAXWLbPcXeHQfWXdbSPbbbHWfbncLZfRzIXTff3VTZtYfY-SPihfNUDUrRvJ-dfQ3ebZLZ1UPRnRXbrS-YLW-RfcQJvPXbvbffPffYvVHXzSvQLTnYeXJf-OA6rZAynR1Z7Q-cPYA3VftUzYHfnaQybVBW1d3r-VdTDbgz7VnZxXqU6f5ag8w9vadYJXvRudTS3XA8fb8QQ-w9WYI+zMI29TvR9eIyJX-dQ9I0-e3afUg0Q3ZUI60Wzao2bRQwPZI7AzgfA77XbWvRPe-UY+g2o5g-vZY--TQxIXQ4jfHYwyQ8Yy7aw2NT-SXdg1w0fToyfXIweQIwlZfSmr3d-ew6E+41o9YzI8ScA0jQnfnQk1-eQ+oxtZw5Oto7QwjYzSAzk--HkxAxgyE3fakzgxE2U-LdXefcQ-E0uSY6I0ZfU1g40+EwA14+U-7Q4ygzUq2vk3U8kw05o000M7ta0-Y+04YxMzRSw4ZWw2lRw9DSU+k5E7I9nfI7ZYo0YJM7Uy430243M4M544s1Xcs8gx07ck0okwU64xIzc3s+cTY7w9Jdk342wEYK81M5czM-0185enc3LQ86-QY6cyCxc2Y4U1DVad82Kfg0czEwo3Ey88dSI67WIx8xo8U1C6U8M0s3C7E5-sC-iyoz01s5jSk5C18cmZi3w9iyc7izUoi2Q9M9s8y6S6y1Oey-874xvaQryxs6VbSZeRYyywST1c-WPfo9S3AXctPezW7cS0U7s2S-sy07C6qzizS-cs48izq6i8Wbc+S-c3Y1Sya+q2a28-y0y7M0K4q9Hcq3o4Q2q5Hhq+a9q1c58x66WUq7o9EwNcDWVgGy62CwK+63q8Kzud65G0TVU0C866Cxa8GyS0m563g6m1i1G6A22rG9m0G+C9c6GzdYWxG8W+m4C8QCzAEyHUkwmxCzW0vb86Kz5eK93W2i24G0S7m7q2i-qz8xkzqfQ5U020QEO3Gzm1WyG-m2G16-WxyyWxm82x2hWyO8u3m+O8m9lRu2K13ZPWwAu3u70we2O9a+i2y0W5u42xK5e7u0i5Wx29W6u7Wzw721k-2xezu62zPe86O1azzQaxS0a76465HsQsOze1+yu0ewW3+0+2e+vQO4bAh4u5+2652z+921O0AzOwC6+827OF04E5s8E7exBz9bazC-a8a1y5-rh9e4y+VTs6h2u3W1Ew2wwxR-O1R4h1x5TYK0R9w8vRh32+e44yJ9R222B-R9zYx1B3a4g7B2x3AQYJhHh-u8h4e-exOxi7JwB-J+M3p+swS0Exjdx5J7x7+zJ6e3J1h0B-O-p5x3R0Z3e5B5Owc5k2R4Bwp9Z2Jz5wR9+058R4F9Oz45Z8855zZ-S4S0h5FyhyZ8e+GwJ8+0J9h2wDIBQHS906l+J3Kzx5l2hy5zl5h2M4l4V8VzRzK8qYxYm9F9Jz2+Z8Fwl6sw1+F-ZxJ215V3x+h65xZ+5wp31wZ2lw50N-52Z2N91xN+M1N95wN+V458N85514t-F8t-V0V-1xTRt3N+pwF4ayx9p4NZHjIPpEd7K9+ad1rRp8x1p8c9d2Vrd5q6Y-h7N4R+1809B5d+99G2zF9-dy15DWp89+d0D295yx92D3d9N2V49-91tzFxd-D1u3O+DyjxF391Fxjx1yR94xU+Rx-s3CQgV4mhD3hU3TAx40x5XcDwjwVVT2D7T-j+t2j0T-N4+7t+TyF6uhz22vciB1q4Z+l8Z-zyK113t3V-JqL4bOL3T43dA1Q-M9Cyz9jy+5TxzCr1z2t8d7zxl7Lym4L6Mys0Qr-EmkQKr9zyb61+j+byezV254rzbwbzTxLz91L4T2b2dwt+7+N571trb5z77wywT4Ny70HwLyH0t2H4mt79Ikbx+-77H3z-H3L5b20080r5Iob1H6VzHyd3HzD8H4c7l7O3niQEXz72r1A6nYz2k7D5pyq1d+zw32nyX3Z071D5rdLczwg53yD4tfXw8r303+YxV679l9X7V9b+Hz3-b+n3y-G9L35znxb4nwr8v4mqvw78bw9879n5Xwn4vx7wf5P5HzPyi9D8Py9zr2P2zxP0f+v9K+Taf4P5bVY+3691f4486+H-PvrRx55n9A+F-XPnvyF49cbeoA+-pa0f7p1n+o-H1uPxIK38xen-WzuAIH4a0-+TPNAbY1155d4c2A4vkgPA4oCpGJAv5tfwL4ICp+a-MAc13p4a8F6Nregf+yT439EBjvH-oQObr-8q+QXffkwJX4sDj+GfGblnygFP8ABL-DAW-ywECCT+kPYQa3y14j9SBQAvXhQPUGyDUekAmXjvzd5X9Q+-A6QbgJS798hBDPTXtwKUHoC025AptJQMb6CDNBjgrgQ+xgGWC+Bkg0gItDiQUBdsX-PuqpyH6oCXBeglQcAMPwhDFkxALgBELwHsD1eLfJwf4N36BCJB8LZNKELbRpDGuynV1gHzMHQC8h4guAft2qQkBihhsUodQOiFEC2+YguLnULD7JCwhbeSIe2y34MdqhFg2oVb2CGNCUhRsCgP0IyHf8fBnAsJrkNGFdDxhhQ3oSUJmHfdo+EA3-iIOIFxCGBVgiYU0LYBcBZhdg-AQ4MWEDNlhC-MYfn3WGTC+h2w0vrsK0E5DTOl-B4Y8yeGnDUhWw1ob52GGKDOhpHAobEw2HNCm4bA+YRwOyF+CvhAQn4Q6y5ZQizhMIoEUMNoGiDvhqwx4ZCOeGbCpiAwlTsCJxEHCwRZPNYYSP+HTCSRcwqIeSJiF0DDhvAiETi3RGpDlwSnUDhUPkFVDQReI8Ed0OX5cijYPIrEZUO34jD7h+I34bSKmE5ReRkvOQeX3P5CjkR8o1EbpXFHKipRAomUZqJqHajWOuookc0I4AOVSR-I9UQoNiFUiRmBIzkRaLOFWjkuJXewQsIRFLCkRJokUTSJdF0icI1oxkYMOlEgiHRwo6kc6LRGujuRoYy4ZkOb6UNERWXddrAMDFxjgx7og0XaMFFRitRAY2MeaJzGJjPRVw70amN9Hpj+O+Q0UScKVG5jvB8I6sbcL9ErDixCooMU2PLFNc4RWQtsQqxG7Vd6xWY0sU2OGo2jN+EYikR0OjFOjux2YycWUL5EzjDRkY1kY6MpZmj4qeojgFOLDFkjsRLI3EUWJjFLiJxcSA8auNVEmC9h2g5wduJg6YDNs+4w8UmIHEpj5WXbEnrFy7E6i9x8YiUR+IrHJjZ+m3efhmLHEligJOY0Cf2KZEnj2hOgngfLwbF-CVxeY03gWK3ELidxXfPsu+NvF+81ROEo0YWP9EXjAJRE4CThAQnlD1x+YiiXhPPGLiaJL2YidhNMEsSzxVE9ibuNonwSSJOwggb4JrFVcdumY2CUJKwktjBxP4qToDw74JCDBOsLifJO-Fz9zBcogCYJM4l0TOArwr0a2MUkA8FmgA1Se4KZh6ijJ3Eh8Z8NrGjdpJl4uCUqLsmaSIJT3Y0Z2Oon6S3xhkrep+KQmzjTxlI-CS+NUEBTgxHkjQaZO0myjoJKI-yRTlsnKMwJX4ryRXx8m6S-JhEgyTFPSmITwxG4ucahLZHoTxxbkuJAslhEhTSpYU+cWxIImvjUphkoqYxKXbMiUJT4iKaz0SE3I0pdUkqcxM3F8TfJAk-KdFPck1MN+XU5CfsKan8SWpUUtqTFNmnTj5poUnqXcKSmmippa0maSqNIn3iPhaYySaT0mmtSkhhkjaUeNtHkSxp4U5qZFIGnqS6JWIc5nNN+4NSdpHY3KVdNWk3Tgxn0j0cVOPHbTFp5U58f1LUk2SPpUre6UxMellTepL02GdZKiQIyRJbwsSTcOHHbdLpK0t6fDJBmIzgpI0lGY1Ohl9SyBtfYGUqKxDkyMp9U0aajN2l1jkpB0hmXEiZk4yTJCkhKTlL2l6TuZg0j6Vm2MFl8qZf0pyaOK5nXTxZIMyWd9Mz5szqZaM5aa9LhlYzlZxkysfFMgk6SRZeUxWe9L1n2SzpEkkcVJJgmuTZJvMlWZtJ+nqzZZF0-8abKBlKzGZTspGVtN+lQzNZE04mTrIaEWzPJD-DWRzOcl2yOJ00uJFR2GkQyA5j46OfLP2lmzSZSoxOZbPEnti5ZtshWV7PNnZz32qssiTxKelLTg52szGWHNLlJyHplc9mf9JNmAySZushubnPxm-jlJlktwfTO9kJyy5zstWTLMDlpzC5Gc4uVnITmicI5yAqOa3M5nTyO59cuecdNEnXCfR+c92Vj30F1y2AdE+cJvNxnbyhxvciycoIHkU8h5JQk+d3J3kEzMecPA+YPJLkbzH5F8pSVfNcGCd35s8++fPLimCyjZiUleaLMzmdzP5C8mgUvILlEza5AC6BUAtPkCytJYC4WRAs9lryj5wYh+bAraETzl5McoubgqKHZzgFUs94XnOfl-j95Vk5BevPvledqFeMp+ZfO15-ya+t8j+SwrBmdSXZ481OSQvTmQKZ5KC5obOFYXlzTptCzhboKOFBDMJCcmRaPIrkOTzpNsxBRjKYV4KlRJgfmQbNAXeTKJNc3RbwsAXNDDFX8sycTz7nXz-5liyRWcJsWELupxChBR7Pbmhz9FcSNxSAowWmLWJWsixcLyxnrwShRgZHoEqykaizFAMkOYfOTSRLrFMSthefLsVQTsFPi5JaQFSWuL0lsi6Wc3PgV7zX5jC5xQ0IKWpDol+s8CZHLdnaLvFSSvRSkrKxWiil6iuRT3J-lcL4hN88JdUo6V1LbFQshJW3NaVVKj5NSo2KMvcULSRFXihhYMvgHtL-FXSv2UItKVNLCZLSpBdMuTQ2I0l9SzKY0s8XlKVJqy+oUfOOWFLTlrM4RY5MuX9ynFQy25dT1qWbKKZyc12RcuaUrK3lay0gHcq+UPLKZOy-5XssBU8L3lRyz5XMu+UsyIVmi62dCoqXXKeh1iBFZ0vBW-KnlWi9FVcqBU3Lp+USpFeDKbmord5AKjFSSp6EO8TlYyzBRMpyVTK4VrAjZXiqpVWyaVRK15bCuBWMr7lzK4JeNMSUHKOVePJlQsshlLKXljiwVaSvt7I8ZVsS85fKtpXEqlVDK1VSKtlUpznlWqgVUv2CHSr9V6qxebspfnarTV6w81WCtFXZTWVpC1eb4ukR6rHVBqv5Zqv5WKq7VkIh1Yiu5XIzIVvqm1SasYH2rPVwapOm8h7AfIRAtKGVAyh5C7hoELKcUGynBSGgoUyKWFCKn5SIo81QqVFNaAxT5QtApgHNDQC9AKpfQRgZVIkFJShgKU9KHBNSk+RtqfkUYBoanzIQcBcIOkYdSOtHUjrMEogCQNIAID19lk-xCGFaKoBWidIRgJdWQlXXLqN1dyHSEuoMBcBd1MwtdSQBkBrqjAW62cCRCtEnkrRZrCGBQBPV3rdQVo2njeqfXAt0QnSh9bUifVLQH1F6v9YYCXV6wd1c4cIUBrkBAbyEHAPWNQGg0yAFw0G2cFiCA1IagNWIZDdBrnBAaFA0GsgBhpxBPqsQh642A+sMArhlw6GpdRlEvUHiQNy6qjehCXVNwQNFAF9UV0vXhDyN3AEiDpBkCrqV1PGjCFQD0i6gW0O649SuBIBnqqA5AVdT-AXD3ISIfG6gLdzk1kAd1MgEyM2moDGAd1xgE9YtBIjzJV1ZCdEB9jM3rwTAO62cOQhs26gbNJ6mzeiBs0LgbN1AGzSuDc1UAbNq6uzd5p0juaW0-mzzY0n832bQtPm-za5qC1+alozm49VQBMAnrakJEaJQuGiUrhak1AEwO5pkDWbNN3m+voVtc1FbYtpW8gN5ry2VaSI0i5zVVtq2VbrNpWs1tIt80tb2t+WmrQVukX2b2tbWrrb1sG2VahtPWyrchtG0Tb2tvWtrb1s83db5tI2vjcNrG3LbJtvWrreNoW2ratta27bYtv217bDtDWpaCFuy2swrNiWg8YlvU2JaJEt2szfMkS3NpEtCWlmDpq01XaDA68YwMhoMCPawuiaFcImlXUp8qAoOxNCesK4qboNVAeQCuFU2w7pFsOu5LDue1yBIdCWvLchqx2w6gtP8OTVJu804a-tD6v7bBuMDkbFoGGvdbuqfU06F1tOqgDiEBDUgaAjKdNUTEzWgopQOazlNClNAFrtQ8KAVCWoF3CohdYqD1FKncAuhKQta-FPJibUkoQw5KOlD2p5XyK+lii9kRhNiaohnUukARWuP9k+qjVfq7hQGpxb670Md6p1fEpCXmK6Zhy63eDDqR277RDuiVWErWUu6pEOkENSboJVoqI1-qqNXrry3oZihlquBdavoV0qdVy-X3UZEiXR6iF4auPbarD1W6I9WENBcYqCXOrPdkyyVT7pz21kjdd4kpdSroUOKLdWerlknsvZGKGlVqqFSHrr3HDChje4gP7vd24TxVxe73aSu71Gw3d3qoPXyvb0DL6Viesvc0KeTj6w1ZuqfUoo5EN659Zw5ZKno8Xp7a90+hPZIIPExZmhW+jJVWKyXGy2VJe4fVJpYEZQK9J0qvbypr2-z99lurljEn07ZRfZPyjXb0vMn9LV9uunFp-pt1fTulT+zXQAe12VSZJL2UA1hDum-7Q11ehRWhLz72z4DEmrCB1ON3bLUDWu9Ay5LjkU4EDUiIKcivxVL7CVK+nXVVL7JkH59fe3ic9NCVO64VjB+Jswark0z0Z7BtZZwaOXcGW5yy+Pe-t0qCGJRD+reefvGVF6r9Q+sPpIbnDN6zlre3fa-qAP0GsDX+s4T-soN-6OFhBiqRgZIOH4YkNODdCPK2VjzqDwejPZGs72xMYkx+j9NYeQOB67Dk+hw6HqcMgGN9GGdwwYZQPP60DJh4gylPMPYHyDzMylSEagP2LNDdBuA5tidRJouAyGztB6kQAvBMAnwUkFYCpDxr6QNKdVO2omjs6bGXO7NSLq5QC6eUQuotbmrqMooRUkuitVzCrX7p5d9a2QErtVStq1dkYYo-EC7VDHCgDcI-SkLOZkB8IREeY7qBCyTqpA+gIrstH+JEaT1ZAaJVQG2Orq9jux2nmRt2M-xDjK4OpAuCI0rhPp6IHENcc4BM6sQJ6rECeX0g7qYktxxoUzoS0vHV1n06gIYC2PbHdjFAZDZQC2Mw6Fk5xnYxhABOxI6kO69TQCaq0n46k5xteLsdC3qbdQn0-Y9-nU23H71ux7-ERuQ2kmmdJkT6e8dYxUmmd6EFnVyDTVVGGQIKGo8WpaOC6+UCKZo-ztaMS7y1doStRSCwDdGQAdan0IQBID9GW1qulNR2oTWlHu1wxtnUyeZQsnWUYKWo7yc5PC72T2p8XZaAFOSogEMAHIDAAgAAA3PoI4H7AQAmgBQHoxKYIA6RpTKusoz2pGOJrk1GqCo6qYzXqms1mpvU-moaNcmtT+ag06KiNNwBpdUoGwBABHDyonTXAV02qiVNUoFTYxuU76f+Qc6gUAZ7neymDPco4UTRvnRGbLXopBTXMLcAAFVMgKax04qmMjUg4QQAA";
 
     var vectorFixedDelta = /** @class */ (function () {
         function vectorFixedDelta(delta, inputMagnitude) {
@@ -2154,6 +2236,7 @@
             _this.weight = 0.037;
             _this.life = 1000;
             _this.collidesWithPolygonGeometry = true;
+            _this.sameLayerCollisionOnly = true;
             _super.prototype.setCollision.call(_this, 0, 0, 64, 98);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI.Graphics();
@@ -2181,17 +2264,17 @@
                 return creator.facingRight;
             };
             _this.attackSeries
-                .newAction().vector(0, 1).userStill(true)
-                .create(function () { return hitbox.new([36, 24], 87, 1, attackTargets, returnUserFacing); }).objOffset([32, -5]).objLife(3)
+                .newAction().vector(0, 3).userStill(true)
+                .create(function () { return hitbox.new([64, 80], 87, 1, attackTargets, returnUserFacing); }).objOffset([48, -5]).objLife(3)
                 .startupWait(3)
-                .newAction().vector(0, 1).userStill(true).continueWindow(15).removePrevObjsOnCreate()
-                .create(function () { return hitbox.new([36, 24], 40, 5, attackTargets, returnUserFacing); }).objOffset([32, -5]).objLife(5)
+                .newAction().vector(0, 3).userStill(true).continueWindow(15).removePrevObjsOnCreate()
+                .create(function () { return hitbox.new([64, 80], 40, 5, attackTargets, returnUserFacing); }).objOffset([48, -5]).objLife(5)
                 .startupWait(5)
-                .newAction().vector(60, 4).userStill(true).continueWindow(19)
+                .newAction().vector(50, 6).userStill(true).continueWindow(19)
                 .startupWait(5)
                 .endWait(16)
                 .newAction().userStill(true).removePrevObjsOnCreate()
-                .create(function () { return hitbox.new([52, 64], 40, 5, attackTargets, returnUserFacing); }).objOffset([32, 8]).objLife(12)
+                .create(function () { return hitbox.new([80, 80], 40, 5, attackTargets, returnUserFacing); }).objOffset([48, 8]).objLife(12)
                 .startupWait(0)
                 .endWait(10);
             return _this;
@@ -2226,11 +2309,11 @@
             };
             _this.attackSeries
                 .newAction().vector(0, 16).userStill(true)
-                .create(function () { return hitbox.new([36, 24], 20, 3, attackTargets, returnUserFacing); }).objOffset([32, 5]).objLife(10)
+                .create(function () { return hitbox.new([64, 48], 20, 3, attackTargets, returnUserFacing); }).objOffset([32, 5]).objLife(10)
                 .startupWait(6)
                 .endWait(20).userFriction(1)
                 .newAction().vector(40, 12) //.continueWindow(19)
-                .create(function () { return hitbox.new([40, 40], 80, 7, attackTargets, returnUserFacing); }).objOffset([20, -10]).objLife(20)
+                .create(function () { return hitbox.new([80, 80], 80, 7, attackTargets, returnUserFacing); }).objOffset([48, -10]).objLife(20)
                 .startupWait(0)
                 .endWait(3);
             return _this;
@@ -2253,11 +2336,11 @@
                 .startupWait(3)
                 .endWait(3)
                 .newAction().resetGravity().removePrevObjsOnCreate()
-                .create(function () { return hitbox.new([20, 48], 280, 3, attackTargets, returnUserFacing); }).objOffset([32, 5]).objLife(4)
+                .create(function () { return hitbox.new([55, 98], 280, 3, attackTargets, returnUserFacing); }).objOffset([41, 5]).objLife(4)
                 .startupWait(2).repeat(2)
                 .endWait(8)
                 .newAction().resetGravity().removePrevObjsOnCreate()
-                .create(function () { return hitbox.new([32, 48], 10, 4, attackTargets, returnUserFacing); }).objOffset([32, 5]).objLife(10)
+                .create(function () { return hitbox.new([55, 98], 10, 4, attackTargets, returnUserFacing); }).objOffset([41, 5]).objLife(10)
                 .startupWait(6)
                 .endWait(10);
             return _this;
@@ -2273,11 +2356,11 @@
                 return creator.facingRight;
             };
             _this.attackSeries
-                .newAction().vector(90, 2).resetGravity()
+                .newAction().vector(90, 7).resetGravity()
                 .startupWait(2)
-                .endWait(6)
-                .newAction().vector(270, 18).resetGravity()
-                .create(function () { return hitbox.new([82, 32], 80, 8.5, attackTargets, returnUserFacing); }).objOffset([0, 5]).objLife(60)
+                .endWait(8)
+                .newAction().vector(270, 16).resetGravity()
+                .create(function () { return hitbox.new([90, 32], 80, 8.5, attackTargets, returnUserFacing); }).objOffset([0, 38]).objLife(60)
                 .startupWait(3)
                 .endWait(10);
             return _this;
@@ -2294,17 +2377,40 @@
             };
             _this.attackSeries
                 .newAction().resetGravity()
-                .create(function () { return hitbox.new([64, 48], 10, 4, attackTargets, returnUserFacing); }).objOffset([32, 0]).objLife(8)
+                .create(function () { return hitbox.new([64, 75], 10, 4, attackTargets, returnUserFacing); }).objOffset([32, 0]).objLife(8)
                 .startupWait(2)
                 .endWait(4)
                 .newAction().resetGravity()
-                .create(function () { return hitbox.new([40, 48], 170, 4, attackTargets, returnUserFacing); }).objOffset([-32, 0]).objLife(8)
+                .create(function () { return hitbox.new([40, 75], 170, 4, attackTargets, returnUserFacing); }).objOffset([-32, 0]).objLife(8)
                 .startupWait(4)
                 .endWait(10);
             return _this;
         }
         return neutralAir;
     }(baseAttack));
+
+    var layerBridgeBack = /** @class */ (function (_super) {
+        __extends(layerBridgeBack, _super);
+        function layerBridgeBack(xp, yp, input) {
+            var _this = _super.call(this, xp, yp, layerBridgeBack.objectName) || this;
+            _super.prototype.setCollision.call(_this, 0, 0, 64, 98);
+            _super.prototype.style.call(_this, function (g) {
+                var newGraphics = new PIXI.Graphics();
+                newGraphics.beginFill(0x00BB50);
+                newGraphics.drawRect(0, 0, 64, 98);
+                newGraphics.endFill();
+                g.addChild(newGraphics);
+                g.calculateBounds();
+                return g;
+            });
+            return _this;
+        }
+        layerBridgeBack.prototype.logic = function (l) {
+            _super.prototype.logic.call(this, l);
+        };
+        layerBridgeBack.objectName = "layerBridgeBack";
+        return layerBridgeBack;
+    }(objectBase));
 
     var characterMoves = /** @class */ (function () {
         function characterMoves(ladderObject, groundAttacks, airAttacks) {
@@ -2315,7 +2421,7 @@
             this.superRunSpeed = 11;
             this.normalRunSpeed = 6;
             this.jumpStrength = 8;
-            this.jumpButtonReleased = true;
+            this.jumpButtonReleased = false;
             //ladder part
             this.ladderObject = "";
             this.climbindLadder = false;
@@ -2332,6 +2438,9 @@
             this.attackButtonReleased = true;
             this.airAttacks = null;
             this.groundAttacks = null;
+            //Other
+            this.walkingBridge = false;
+            this.collidingWithPolygonStoredState = false;
             this.CL_collisionWith = null;
             this.CL_movedBetweenLadder = false;
             this.ladderObject = ladderObject;
@@ -2344,6 +2453,20 @@
             this.handleAttacks(l, character);
         };
         characterMoves.prototype.movement = function (l, character) {
+            if (this.walkingBridge == true) {
+                if (l.isCollidingWith(character, character.collisionBox, [layerBridgeBack.objectName])) {
+                    character.g.y -= 8;
+                    character.force.Dy = 0;
+                    character.force.Dx = 0;
+                    character.gravity.magnitude = 0;
+                }
+                else {
+                    character.g.y -= 8;
+                    this.walkingBridge = false;
+                    l.tryStepBetweenLayers(character, false);
+                }
+                return;
+            }
             if (l.checkKeyHeld("Control")) {
                 this.maxRunSpeed = this.superRunSpeed;
             }
@@ -2355,30 +2478,42 @@
             }
             if (l.checkKeyHeld("a") || l.checkKeyHeld("A")) {
                 if (character.verticalCollision > 0) {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 13) * this.maxRunSpeed * l.deltaTime);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 13) * this.maxRunSpeed * l.deltaTime());
                 }
                 else {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 64) * this.maxRunSpeed * l.deltaTime);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1 / 32) * this.maxRunSpeed * l.deltaTime());
                 }
             }
             if (l.checkKeyHeld("d") || l.checkKeyHeld("D")) {
                 if (character.verticalCollision > 0) {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 13) * this.maxRunSpeed * l.deltaTime);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 13) * this.maxRunSpeed * l.deltaTime());
                 }
                 else {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 64) * this.maxRunSpeed * l.deltaTime);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1 / 32) * this.maxRunSpeed * l.deltaTime());
                 }
             }
-            if (this.jumpButtonReleased == true && (l.checkKeyHeld("w") || l.checkKeyHeld("W")) && (character.verticalCollision > 0 || character._collidingWithPolygon)) {
-                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime);
+            if (l.checkKeyHeld("w") || l.checkKeyHeld("W")) {
+                if (l.isCollidingWith(character, character.collisionBox, [layerBridgeBack.objectName])) {
+                    this.walkingBridge = true;
+                }
+                else {
+                    this.jumpButtonReleased = true;
+                }
+            }
+            if (this.jumpButtonReleased == true) {
+                if ((character.verticalCollision > 0 || ticker.getTicks() - character._collidingWithPolygonTick < ticker.shortWindow)) {
+                    console.log("character._collidingWithPolygon: ", ticker.getTicks() - character._collidingWithPolygonTick);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime());
+                    character._collidingWithPolygonTick = 0;
+                }
                 this.jumpButtonReleased = false;
             }
             if (l.checkKeyReleased("h")) {
-                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime());
                 character.gravity.magnitude = 0;
             }
-            if (l.checkKeyHeld("w") || l.checkKeyHeld("W")) {
-                this.jumpButtonReleased = true;
+            if ((l.checkKeyHeld("s") || l.checkKeyHeld("S")) && (l.checkKeyReleased("j") || l.checkKeyReleased("J"))) {
+                l.tryStepBetweenLayers(character);
             }
             character.force.limitHorizontalMagnitude(this.maxRunSpeed);
         };
@@ -2411,7 +2546,7 @@
                     }
                     if (l.checkKeyHeld("w") && this.atLadderTop == true && this.releasedJumpKeyAtLadderTop) {
                         character.g.y -= 1;
-                        character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime);
+                        character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime());
                     }
                     console.log(l.checkKeyReleased("w"));
                     if (l.checkKeyReleased("w") && this.atLadderTop == true) {
@@ -2440,7 +2575,7 @@
                                 this.CL_movedBetweenLadder = false;
                             }
                             if (this.CL_movedBetweenLadder && l.checkKeyHeld("w")) {
-                                character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump * l.deltaTime);
+                                character.addForceAngleMagnitude(calculations.degreesToRadians(135), this.ladderSideJump * l.deltaTime());
                                 this.atLadderTop = false;
                                 this.canJumpLadders = false;
                                 this.climbindLadder = false;
@@ -2461,7 +2596,7 @@
                                 this.CL_movedBetweenLadder = false;
                             }
                             if (this.CL_movedBetweenLadder && l.checkKeyHeld("w")) {
-                                character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump * l.deltaTime);
+                                character.addForceAngleMagnitude(calculations.degreesToRadians(45), this.ladderSideJump * l.deltaTime());
                                 this.atLadderTop = false;
                                 this.canJumpLadders = false;
                                 this.climbindLadder = false;
@@ -2482,19 +2617,19 @@
                 this.releasedJumpKeyAtLadderTop = false;
                 if (l.checkKeyHeld("w") && Math.floor(character.gravity.magnitude) == 0
                     && this.hasJumpedFromLadder == false) {
-                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime);
+                    character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.ladderTopJump * l.deltaTime());
                     this.hasJumpedFromLadder = true;
                 }
             }
         };
         characterMoves.prototype.handleAttacks = function (l, character) {
             this.attack.tickAttack(l);
-            if (l.checkKeyHeld(" ")) {
+            if ((l.checkKeyHeld("k") || l.checkKeyHeld("K"))) {
                 if (this.attackButtonReleased) {
                     this.attackButtonReleased = false;
                     this.attack.queryAttack();
                     if (this.attack.isDone()) {
-                        if (character.verticalCollision > 0 || character._collidingWithPolygon) {
+                        if (character.verticalCollision > 0 || character._collidingWithPolygonTick) {
                             if (this.groundAttacks != null) {
                                 this.attack = this.groundAttacks(l);
                             }
@@ -2515,11 +2650,16 @@
     }());
 
     var grassFilter = /** @class */ (function () {
-        function grassFilter(polygonPosGlslAdapted, spacingConst, grassPerLine, minGrassHeight, aspectRatio, filterAreaWidth, filterAreaHeight, filterAreaX, filterAreaY) {
-            this.grassShader = "\n    precision lowp float;\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n\n    uniform float yPolPos[{yPolPosArrayLength}];\n\n    uniform float time;\n    uniform float windWidth;\n    uniform float aspectRatio;\n    uniform float cameraPosition;\n    uniform float cameraSize;\n    \n\n    uniform float grassMaxHeight;\n\n    uniform vec2 collisionPoints[2];\n\n    const int grassPerLine = {grassPerLine};\n    const float SPACING = {spacing};\n    const float MINGRASSHEIGHT = {MINGRASSHEIGHT};\n    const float SPACEBETWEENEACHBLADE = {SPACEBETWEENEACHBLADE};\n    const float grassWidth = 0.00015;\n\n    float randFromVec(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    float distSquared(vec2 A, vec2 B){\n        vec2 C = (A - B) * vec2(aspectRatio, 1.0);\n        return dot( C, C );\n    }\n\n    vec4 generateGrass(float polygonYPos, int lineIndex, float lineStart, float topYPos, float heightDifference){\n        \n        for(int b=0; b<grassPerLine; b++){\n            float grassBladeX = lineStart+(float(b)*SPACEBETWEENEACHBLADE);\n            if(vTextureCoord.x > grassBladeX-grassMaxHeight && vTextureCoord.x < grassBladeX+grassMaxHeight){\n                float grassBladeRandomVal = randFromVec(vec2(lineIndex, b));\n                float randomBladePosition = grassBladeRandomVal * SPACEBETWEENEACHBLADE;\n                grassBladeX += randomBladePosition;\n\n                float relativePosition = (grassBladeX - (float(lineIndex)*SPACING))/SPACING;\n                float grassBladeY = polygonYPos + (relativePosition*heightDifference);\n                \n                float collisionForce = 0.0;\n                for(int i=0; i<2; i++){\n                    \n                    float distanceFromGrassBladeToCollider = abs(grassBladeX - collisionPoints[i].x);\n                    \n                    //Alternative WIP formula for collision(go to desmos.com): 1-(cos(log((x+0.008)^3)*1)*0.5)-0.5\n                    if(distanceFromGrassBladeToCollider < grassMaxHeight/3.5){\n                        float distancePercentage = (distanceFromGrassBladeToCollider/(grassMaxHeight/3.5));\n                        float distanceToCollider = grassBladeX - collisionPoints[i].x;\n\n                        float distanceToColliderY = abs(grassBladeY - collisionPoints[i].y);\n                        float distanceToColliderYPercentage = 0.0;\n                        if(distanceToColliderY < 0.02){\n                            distanceToColliderYPercentage =  1.0-(distanceToColliderY / (0.02));\n                        }\n\n                        if(distanceToCollider < 0.0){\n                            collisionForce = -2.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }else{\n                            collisionForce = 1.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }\n                        collisionForce = collisionForce * distanceToColliderYPercentage;\n                        break;\n                    }\n                }\n                \n                \n                float grassBladeHeight = grassMaxHeight * grassBladeRandomVal;\n                if(grassBladeHeight < MINGRASSHEIGHT){\n                    grassBladeHeight += 0.01;\n                }\n                float grassHeightStrengthModify = grassBladeHeight/grassMaxHeight;\n                float grassTop = polygonYPos - grassBladeHeight + topYPos;\n    \n                \n                float yPosOfGras = ((vTextureCoord.y - grassTop)/(grassBladeHeight));\n                \n                //Apply wind effect\n                //Wave from top to right\n                float windStrength = collisionForce + pow(cos(time), 2.0);\n                float steepSlopeSwayLimit = 1.0;\n                if(heightDifference > 0.01){\n                    steepSlopeSwayLimit = 0.3;\n                }\n                float offsetCurve = (1.0-yPosOfGras) * 0.00085 * (0.9+windStrength);\n\n\n                \n                vec2 grassBladePoint = vec2(grassBladeX, grassBladeY);\n                    \n                float distanceToBladeStartSquared = distSquared(grassBladePoint, vec2(vTextureCoord.x, vTextureCoord.y));\n                float extraCurve = (distanceToBladeStartSquared/(grassBladeHeight*grassBladeHeight)) * 0.0015 * windStrength *  grassHeightStrengthModify * steepSlopeSwayLimit;\n                \n\n                \n                \n                float bladePosition = lineStart+(float(b)*SPACEBETWEENEACHBLADE) + randomBladePosition;\n\n                float grassBladeLeftSideStart = bladePosition + offsetCurve + extraCurve;\n                float grassBladeRightSideStart = bladePosition + offsetCurve + extraCurve;\n\n                float alpha = 0.0;\n                \n                if((vTextureCoord.x) > grassBladeLeftSideStart - grassWidth\n                && (vTextureCoord.x) < grassBladeRightSideStart + grassWidth\n                && distanceToBladeStartSquared < (grassBladeHeight*grassBladeHeight)){\n                    alpha = 1.0;\n                }\n\n\n                if(alpha != 0.0){\n                    if(grassBladeRandomVal < 0.2){\n                        return vec4(0.12, 0.42, 0.01568627, alpha);\n                    }else if(grassBladeRandomVal < 0.4){\n                        return vec4(0.4196, 0.6078, 0.1176, alpha);\n                    }else if(grassBladeRandomVal < 0.6){\n                        return vec4(0.5529, 0.749, 0.2235, alpha);\n                    }else if(grassBladeRandomVal < 0.8){\n                        return vec4(0.448, 0.5509, 0.2019, alpha);\n                    }else if(grassBladeRandomVal <= 1.0){\n                        return vec4(0.425, 0.6509, 0.1019, alpha);\n                    }\n                }\n\n                /*if(distanceToBladeStartSquared < 0.000001){\n                    return vec4(0.0, 0.0, 1.0, 1.0);\n                }*/\n                \n            }\n            \n            \n        }\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n    void main(void)\n    {\n        /*float distToPlayer = distSquared(vTextureCoord, collisionPoints[0]);\n        if(distToPlayer < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer2 = distSquared(vTextureCoord, collisionPoints[1]);\n        if(distToPlayer2 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer3 = distSquared(vTextureCoord, collisionPoints[2]);\n        if(distToPlayer3 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }*/\n\n        float distanceToCamera = abs(vTextureCoord.x - cameraPosition);\n        if(distanceToCamera < cameraSize){\n            for (int lineIndex = 0; lineIndex < {yPolPosArrayLength}; ++lineIndex){\n\n            \n                float heightDifference = yPolPos[lineIndex+1] - yPolPos[lineIndex];\n    \n                float relativePosition = (vTextureCoord.x - (float(lineIndex)*SPACING))/SPACING;\n    \n                float topYPos = (relativePosition*heightDifference);\n    \n                float grassTop = yPolPos[lineIndex] - grassMaxHeight - abs(heightDifference);\n                float groundY = yPolPos[lineIndex] + topYPos;\n                if(vTextureCoord.y > grassTop\n                && vTextureCoord.y < groundY){\n\n                    float lineStart = float(lineIndex)*SPACING;\n                    \n                    if(vTextureCoord.x > lineStart - SPACING && vTextureCoord.x < lineStart+SPACING*2.0){\n                        vec4 grassResult = generateGrass(yPolPos[lineIndex], lineIndex, lineStart, topYPos, heightDifference);\n\n                    \n                        if(grassResult != vec4(0.0, 0.0, 0.0, 0.0)){\n                            gl_FragColor = grassResult;\n                        }else{\n                            //gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);\n                        }\n                    }\n                    \n                }\n\n            }\n        }\n        \n        //gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);\n    }";
+        function grassFilter(polygonPosGlslAdapted, spacingConst, grassPerLine, minGrassHeight, aspectRatio, filterAreaWidth, filterAreaHeight, filterAreaX, filterAreaY, height, windowHeight, width, windowWidth, myLayerIndex) {
+            this.grassShader = "\n    precision lowp float;\n    varying vec2 vTextureCoord;\n    uniform sampler2D uSampler;\n\n    uniform float yPolPos[{yPolPosArrayLength}];\n\n    uniform float time;\n    uniform float windWidth;\n    uniform float aspectRatio;\n    uniform float cameraPosition;\n    uniform float cameraSize;\n    uniform float grassWidth;\n    uniform float curveStrength;\n    uniform float extraCurveStrength;\n    uniform float fadeSize;\n    uniform float MINGRASSHEIGHT;    \n\n    uniform float grassMaxHeight;\n\n    uniform vec2 collisionPoints[2];\n\n    const int grassPerLine = {grassPerLine};\n    const float SPACING = {spacing};\n    const float SPACEBETWEENEACHBLADE = {SPACEBETWEENEACHBLADE};\n\n    float randFromVec(vec2 co){\n        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);\n    }\n\n    float distSquared(vec2 A, vec2 B){\n        vec2 C = (A - B) * vec2(aspectRatio, 1.0);\n        return dot( C, C );\n    }\n\n    vec4 generateGrass(float polygonYPos, int lineIndex, float lineStart, float topYPos, float heightDifference){\n        if(abs(heightDifference) > 0.04){\n            return vec4(0.0, 0.0, 0.0, 0.0);\n        }\n        for(int b=0; b<grassPerLine; b++){\n            float grassBladeX = lineStart+(float(b)*SPACEBETWEENEACHBLADE);\n            if(vTextureCoord.x > grassBladeX-grassMaxHeight && vTextureCoord.x < grassBladeX+grassMaxHeight){\n                float grassBladeRandomVal = randFromVec(vec2(lineIndex, b));\n                float randomBladePosition = grassBladeRandomVal * SPACEBETWEENEACHBLADE;\n                grassBladeX += randomBladePosition;\n\n                float relativePosition = (grassBladeX - (float(lineIndex)*SPACING))/SPACING;\n                float grassBladeY = polygonYPos + (relativePosition*heightDifference);\n                \n                float collisionForce = 0.0;\n                for(int i=0; i<2; i++){\n                    \n                    float distanceFromGrassBladeToCollider = abs(grassBladeX - collisionPoints[i].x);\n                    \n                    //Alternative WIP formula for collision(go to desmos.com): 1-(cos(log((x+0.008)^3)*1)*0.5)-0.5\n                    if(distanceFromGrassBladeToCollider < grassMaxHeight/3.5){\n                        float distancePercentage = (distanceFromGrassBladeToCollider/(grassMaxHeight/3.5));\n                        float distanceToCollider = grassBladeX - collisionPoints[i].x;\n\n                        float distanceToColliderY = abs(grassBladeY - collisionPoints[i].y);\n                        float distanceToColliderYPercentage = 0.0;\n                        if(distanceToColliderY < 0.02){\n                            distanceToColliderYPercentage =  1.0-(distanceToColliderY / (0.02));\n                        }\n\n                        if(distanceToCollider < 0.0){\n                            collisionForce = -2.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }else{\n                            collisionForce = 1.0*(1.0-(cos(distancePercentage*6.3)*0.5)-0.5);\n                        }\n                        collisionForce = collisionForce * distanceToColliderYPercentage * (1.0+abs(heightDifference)*75.0);\n                        break;\n                    }\n                }\n                \n                \n                float grassBladeHeight = grassMaxHeight * grassBladeRandomVal;\n                if(grassBladeHeight < MINGRASSHEIGHT){\n                    grassBladeHeight += 0.01;\n                }\n                float grassHeightStrengthModify = grassBladeHeight/grassMaxHeight;\n                float grassTop = polygonYPos - grassBladeHeight + topYPos;\n    \n                \n                float yPosOfGras = ((vTextureCoord.y - grassTop)/(grassBladeHeight));\n                \n                //Apply wind effect\n                //Wave from top to right\n                float windStrength = collisionForce + pow(cos(time), 2.0);\n                float steepSlopeSwayLimit = 1.0;\n                if(heightDifference > 0.01){\n                    steepSlopeSwayLimit = 0.3;\n                }\n                float offsetCurve = (1.0-yPosOfGras) * curveStrength * (0.9+windStrength);\n\n\n                \n                vec2 grassBladePoint = vec2(grassBladeX, grassBladeY);\n                    \n                float distanceToBladeStartSquared = distSquared(grassBladePoint, vec2(vTextureCoord.x, vTextureCoord.y));\n                float extraCurve = (distanceToBladeStartSquared/(grassBladeHeight*grassBladeHeight)) * extraCurveStrength * windStrength *  grassHeightStrengthModify * steepSlopeSwayLimit;\n                \n\n                \n                \n                float bladePosition = lineStart+(float(b)*SPACEBETWEENEACHBLADE) + randomBladePosition;\n\n                float grassBladeLeftSideStart = bladePosition + offsetCurve + extraCurve;\n                float grassBladeRightSideStart = bladePosition + offsetCurve + extraCurve;\n\n                float alpha = 0.0;\n                \n                if((vTextureCoord.x) > grassBladeLeftSideStart - grassWidth\n                && (vTextureCoord.x) < grassBladeRightSideStart + grassWidth\n                && distanceToBladeStartSquared < (grassBladeHeight*grassBladeHeight)){\n                    alpha = 1.0;\n                }\n\n\n                if(alpha != 0.0){\n                    if(grassBladeRandomVal < 0.2){\n                        return vec4(0.12, 0.42, 0.01568627, alpha);\n                    }else if(grassBladeRandomVal < 0.4){\n                        return vec4(0.4196, 0.6078, 0.1176, alpha);\n                    }else if(grassBladeRandomVal < 0.6){\n                        return vec4(0.5529, 0.749, 0.2235, alpha);\n                    }else if(grassBladeRandomVal < 0.8){\n                        return vec4(0.448, 0.5509, 0.2019, alpha);\n                    }else if(grassBladeRandomVal <= 1.0){\n                        return vec4(0.425, 0.6509, 0.1019, alpha);\n                    }\n                }\n\n                /*if(distanceToBladeStartSquared < 0.000001){\n                    return vec4(0.0, 0.0, 1.0, 1.0);\n                }*/\n                \n            }\n            \n            \n        }\n\n        return vec4(0.0, 0.0, 0.0, 0.0);\n    }\n\n    void main(void)\n    {\n        /*float distToPlayer = distSquared(vTextureCoord, collisionPoints[0]);\n        if(distToPlayer < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer2 = distSquared(vTextureCoord, collisionPoints[1]);\n        if(distToPlayer2 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }\n\n        float distToPlayer3 = distSquared(vTextureCoord, collisionPoints[2]);\n        if(distToPlayer3 < 0.0001){\n            gl_FragColor = vec4(0.12, 0.42, 1.0, 1.0);\n        }*/\n\n        float distanceToCamera = abs(vTextureCoord.x - cameraPosition);\n        if(distanceToCamera < cameraSize){\n            for (int lineIndex = 0; lineIndex < {yPolPosArrayLength}; ++lineIndex){\n\n            \n                float heightDifference = yPolPos[lineIndex+1] - yPolPos[lineIndex];\n    \n                float relativePosition = (vTextureCoord.x - (float(lineIndex)*SPACING))/SPACING;\n    \n                float topYPos = (relativePosition*heightDifference);\n    \n                float grassTop = yPolPos[lineIndex] - grassMaxHeight - abs(heightDifference);\n                float groundY = yPolPos[lineIndex] + topYPos;\n                if(vTextureCoord.y > grassTop\n                && vTextureCoord.y < groundY){\n\n                    float lineStart = float(lineIndex)*SPACING;\n                    \n                    if(vTextureCoord.x > lineStart - SPACING && vTextureCoord.x < lineStart+SPACING*2.0){\n                        vec4 grassResult = generateGrass(yPolPos[lineIndex], lineIndex, lineStart, topYPos, heightDifference);\n\n                    \n                        if(grassResult != vec4(0.0, 0.0, 0.0, 0.0)){\n                            if(vTextureCoord.x < fadeSize){\n                                grassResult = vec4((grassResult.x), (grassResult.y), (grassResult.z), vTextureCoord.x/fadeSize);\n                            }\n                            gl_FragColor = grassResult;\n                        }else{\n                            //gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);\n                        }\n                    }\n                    \n                }\n\n            }\n        }\n        \n\n        \n        \n    }";
             this.grassFragment = { yPolPos: [1, 2, 3, 4], time: 1.0, windWidth: 0.4,
+                MINGRASSHEIGHT: 0.005,
                 aspectRatio: 4.0, cameraPosition: 0.0, cameraSize: 0.06,
                 grassMaxHeight: 0.02,
+                grassWidth: 0.00015,
+                curveStrength: 0.00008,
+                extraCurveStrength: 0.0015,
+                fadeSize: 0.01,
                 collisionPoints: [
                     -2, -2,
                     -2, -2
@@ -2531,22 +2671,34 @@
             this.filterAreaHeight = 0;
             this.mainCharacterFollow = [0, 0];
             this.mainCharacterFollow2 = [0, 0];
+            this.myLayerIndex = -1;
             this.polygonPosGlslAdapted = polygonPosGlslAdapted;
             this.filterAreaWidth = filterAreaWidth;
             this.filterAreaHeight = filterAreaHeight;
             this.filterAreaX = filterAreaX;
             this.filterAreaY = filterAreaY;
+            this.myLayerIndex = myLayerIndex;
+            var lineWidth = (width / polygonPosGlslAdapted.length) * 0.1;
+            console.log("lineWidth: ", lineWidth);
+            grassPerLine = Math.round(grassPerLine / lineWidth); ///Math.round(grassPerLine*(1-(windowWidth/width)));
+            if (grassPerLine <= 0)
+                grassPerLine = 1;
+            console.log("grassPerLine: ", grassPerLine);
             var movingGrassFragShaderParamsFixed = this.grassShader.replace(/{yPolPosArrayLength}/g, "" + polygonPosGlslAdapted.length);
             movingGrassFragShaderParamsFixed = movingGrassFragShaderParamsFixed.replace(/{spacing}/g, spacingConst + "");
             movingGrassFragShaderParamsFixed = movingGrassFragShaderParamsFixed.replace(/{grassPerLine}/g, grassPerLine + "");
-            movingGrassFragShaderParamsFixed = movingGrassFragShaderParamsFixed.replace(/{MINGRASSHEIGHT}/g, minGrassHeight);
             movingGrassFragShaderParamsFixed = movingGrassFragShaderParamsFixed.replace(/{SPACEBETWEENEACHBLADE}/g, "" + (spacingConst / grassPerLine));
             //Moving grass
+            this.grassFragment.MINGRASSHEIGHT = minGrassHeight * (windowHeight / height);
             this.grassFragment.yPolPos = polygonPosGlslAdapted;
             this.grassFragment.time = 0.0;
             this.grassFragment.aspectRatio = aspectRatio;
-            this.grassFragment.cameraSize = 0.078; //0.08;
-            this.grassFragment.grassMaxHeight = 0.0225;
+            this.grassFragment.cameraSize = 0.24 * (windowHeight / height); //0.078;//0.08;
+            this.grassFragment.grassMaxHeight = 0.064 * (windowHeight / height); //0.0225;
+            this.grassFragment.grassWidth = 0.0015 * (windowWidth / width);
+            this.grassFragment.curveStrength = 0.0085 * (windowWidth / width);
+            this.grassFragment.extraCurveStrength = 0.0105 * (windowWidth / width);
+            this.grassFragment.fadeSize = 98 / width;
             /*console.log("movingGrassFragShaderParamsFixed: ",movingGrassFragShaderParamsFixed);
             console.log("grassFragment: ", this.grassFragment);*/
             this.myFilter = new PIXI.Filter(undefined, movingGrassFragShaderParamsFixed, this.grassFragment);
@@ -2567,20 +2719,27 @@
             this.grassFragment.collisionPoints[0] = (primaryColliderX - this.filterAreaX) / this.filterAreaWidth;
             this.grassFragment.collisionPoints[1] = 1.0 - (((this.filterAreaY - primaryColliderY) / this.filterAreaHeight));
             //delayed follow
-            if (this.mainCharacterFollow[0] == 0 && this.mainCharacterFollow[1] == 0) {
-                this.mainCharacterFollow[0] = grassFilter.primaryCollider.g.x;
-                this.mainCharacterFollow[1] = grassFilter.primaryCollider.g.y;
+            if (grassFilter.primaryCollider.layerIndex > this.myLayerIndex) {
+                if (this.mainCharacterFollow[0] == 0 && this.mainCharacterFollow[1] == 0) {
+                    this.mainCharacterFollow[0] = grassFilter.primaryCollider.g.x;
+                    this.mainCharacterFollow[1] = grassFilter.primaryCollider.g.y;
+                }
+                else {
+                    var distanceToTarget = calculations.distanceBetweenPoints(this.mainCharacterFollow[0], this.mainCharacterFollow[1], grassFilter.primaryCollider.g.x, grassFilter.primaryCollider.g.y);
+                    var angleToTarget = calculations.angleBetweenPoints(this.mainCharacterFollow[0] - grassFilter.primaryCollider.g.x, this.mainCharacterFollow[1] - grassFilter.primaryCollider.g.y);
+                    this.mainCharacterFollow[0] += Math.cos(angleToTarget) * (distanceToTarget * 0.148);
+                    this.mainCharacterFollow[1] += Math.sin(angleToTarget) * (distanceToTarget * 0.148);
+                }
+                var primaryColliderXDelayed = this.mainCharacterFollow[0] + grassFilter.primaryCollider.collisionBox.x + (grassFilter.primaryCollider.collisionBox.width / 2);
+                var primaryColliderYDelayed = this.mainCharacterFollow[1] + grassFilter.primaryCollider.collisionBox.y + (grassFilter.primaryCollider.collisionBox.height);
+                this.grassFragment.collisionPoints[2] = (primaryColliderXDelayed - this.filterAreaX) / this.filterAreaWidth;
+                this.grassFragment.collisionPoints[3] = 1.0 - (((this.filterAreaY - primaryColliderYDelayed) / this.filterAreaHeight));
             }
             else {
-                var distanceToTarget = calculations.distanceBetweenPoints(this.mainCharacterFollow[0], this.mainCharacterFollow[1], grassFilter.primaryCollider.g.x, grassFilter.primaryCollider.g.y);
-                var angleToTarget = calculations.angleBetweenPoints(this.mainCharacterFollow[0] - grassFilter.primaryCollider.g.x, this.mainCharacterFollow[1] - grassFilter.primaryCollider.g.y);
-                this.mainCharacterFollow[0] += Math.cos(angleToTarget) * (distanceToTarget * 0.148);
-                this.mainCharacterFollow[1] += Math.sin(angleToTarget) * (distanceToTarget * 0.148);
+                this.mainCharacterFollow[0] = 0;
+                this.mainCharacterFollow[1] = 0;
+                this.myFilter.enabled = false;
             }
-            var primaryColliderXDelayed = this.mainCharacterFollow[0] + grassFilter.primaryCollider.collisionBox.x + (grassFilter.primaryCollider.collisionBox.width / 2);
-            var primaryColliderYDelayed = this.mainCharacterFollow[1] + grassFilter.primaryCollider.collisionBox.y + (grassFilter.primaryCollider.collisionBox.height);
-            this.grassFragment.collisionPoints[2] = (primaryColliderXDelayed - this.filterAreaX) / this.filterAreaWidth;
-            this.grassFragment.collisionPoints[3] = 1.0 - (((this.filterAreaY - primaryColliderYDelayed) / this.filterAreaHeight));
             //delayed follow 2
             /*if(this.mainCharacterFollow2[0] == 0 && this.mainCharacterFollow2[1] == 0){
                 this.mainCharacterFollow2[0] = grassFilter.primaryCollider.g.x;
@@ -2612,6 +2771,7 @@
             _this.weight = 0.017;
             _this.life = 1000;
             _this.collidesWithPolygonGeometry = true;
+            _this.sameLayerCollisionOnly = true;
             _this.attackTarget = null;
             _super.prototype.setCollision.call(_this, 0, 0, 64, 64);
             _super.prototype.style.call(_this, function (g) {
@@ -2638,6 +2798,23 @@
         return demonAi1;
     }(objectBase));
 
+    var upAir = /** @class */ (function (_super) {
+        __extends(upAir, _super);
+        function upAir(creator, direction, attackTargets) {
+            var _this = _super.call(this, creator, direction, attackTargets) || this;
+            var returnUserFacing = function () {
+                return creator.facingRight;
+            };
+            _this.attackSeries
+                .newAction().vector(90, 9)
+                .create(function () { return hitbox.new([90, 48], 85, 14, attackTargets, returnUserFacing); }).objOffset([0, -38]).objLife(60)
+                .startupWait(3)
+                .endWait(10);
+            return _this;
+        }
+        return upAir;
+    }(baseAttack));
+
     var player = /** @class */ (function (_super) {
         __extends(player, _super);
         function player(xp, yp, input) {
@@ -2646,6 +2823,7 @@
             _this.friction = 0.7;
             _this.gravity = new vectorFixedDelta(calculations.degreesToRadians(270), 0); //vector.fromAngleAndMagnitude(calculations.degreesToRadians(270), 0.6);
             _this.weight = 0.05;
+            _this.sameLayerCollisionOnly = true;
             _this.currentSprite = "warriorIdle";
             _this.currentSpriteObj = new spriteContainer();
             _this.collidesWithPolygonGeometry = true;
@@ -2680,6 +2858,9 @@
                 }
                 else if (l.checkKeyHeld("s")) {
                     return new downAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left, _this.attackTargets);
+                }
+                else if (l.checkKeyHeld("w")) {
+                    return new upAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left, _this.attackTargets);
                 }
                 else if (!l.checkKeyHeld("d") && !l.checkKeyHeld("d") && !l.checkKeyHeld("d") && !l.checkKeyHeld("d")) {
                     return new neutralAir(_this, (_this.facingRight) ? movementDirection.right : movementDirection.left, _this.attackTargets);
@@ -2717,7 +2898,7 @@
         player.prototype.logic = function (l) {
             _super.prototype.logic.call(this, l);
             //l.queryKey();
-            if (l.flags.has("freezeObjects")) {
+            if (l.flags().has("freezeObjects")) {
                 this.characterMoveBase.move(l, this);
             }
             l.setCameraTarget(this.g.x + this.collisionBox.x + (this.collisionBox.width / 2), this.g.y);
@@ -2983,20 +3164,22 @@
             _this.switch = false;
             return _this;
         }
-        handleRoomStartString.prototype.init = function (l) {
+        handleRoomStartString.prototype.afterInit = function (l) {
             var args = l.getRoomStartString();
             args.forEach(function (arg) {
                 if (arg == "dream_with_dad_1") {
-                    var p = new player(1187, 653, "");
+                    var p = new player(1187, 560, "");
                     l.addObjectLayerName(p, "Layer 1");
-                    l.flags.add("freezeObjects");
-                    var prompt_1 = new textPromptBox(0, 0, JSON.stringify(["Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
-                        "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat",
-                        "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-                        "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo"]));
+                    l.flags().add("freezeObjects");
+                    var prompt_1 = new textPromptBox(0, 0, JSON.stringify([
+                        "Hej och välkommen till denna demo! Jag kommer att gå igenom kontrollerna. Tryck enter för att gå vidare.",
+                        "Använd [WASD] för att gå med din karaktär, [W] för att hoppa. Håll in [CONTROL] för att springa.",
+                        "Håll ner [S] och tryck [J] för att gå ner till lägre mark. tryck [W] om du befinner dig på en grön rektangel för att gå upp högre mark.",
+                        "Använd [K] för att attackera. Du Kan kombinera [K] med olika rörelser för att få olika attacker.\nProva attackera den rosa lådan."
+                    ]));
                     prompt_1.setPromptCallback(function (l) {
-                        l.flags.remove("freezeObjects");
-                        l.flags.add("day");
+                        l.flags().remove("freezeObjects");
+                        l.flags().add("day");
                         l.goToRoom(scene_home, []);
                     });
                     l.addObjectLayerName(prompt_1, "GUILayer");
@@ -3206,26 +3389,26 @@
             });
             return _this;
         }
-        skyBackground.prototype.init = function (roomEvents) {
-            if (roomEvents.flags.has("dawn")) {
+        skyBackground.prototype.afterInit = function (roomEvents) {
+            if (roomEvents.flags().has("dawn")) {
                 this.timeOfDay = 0;
             }
-            else if (roomEvents.flags.has("sunrise")) {
+            else if (roomEvents.flags().has("sunrise")) {
                 this.timeOfDay = 1;
             }
-            else if (roomEvents.flags.has("morning")) {
+            else if (roomEvents.flags().has("morning")) {
                 this.timeOfDay = 2;
             }
-            else if (roomEvents.flags.has("afternoon")) {
+            else if (roomEvents.flags().has("afternoon")) {
                 this.timeOfDay = 3;
             }
-            else if (roomEvents.flags.has("sunset")) {
+            else if (roomEvents.flags().has("sunset")) {
                 this.timeOfDay = 4;
             }
-            else if (roomEvents.flags.has("dusk")) {
+            else if (roomEvents.flags().has("dusk")) {
                 this.timeOfDay = 5;
             }
-            else if (roomEvents.flags.has("night")) {
+            else if (roomEvents.flags().has("night")) {
                 this.timeOfDay = 6;
             }
             this.skyUniform.timeOfDay = this.timeOfDay;
@@ -3373,9 +3556,9 @@
             _super.prototype.setCollision.call(_this, 0, 0, 24, 24);
             _super.prototype.style.call(_this, function (g) {
                 var newGraphics = new PIXI.Graphics();
-                newGraphics.beginFill(0x00FF00);
-                newGraphics.drawRect(-12, 0, 24, 24);
-                newGraphics.endFill();
+                /*newGraphics.beginFill(0x00FF00);
+                newGraphics.drawRect(-12, 0, 24,24);
+                newGraphics.endFill();*/
                 g.addChild(newGraphics);
                 return g;
             });
@@ -3640,13 +3823,13 @@
             }
             this.treeLeavesFilterGraphics.x -= this.treeSquareSize / 2;
             roomEvents.addGraphicsDirectlyToLayer(this.treeLeavesFilterGraphics, "treeLeavesContainer");
-            var newGraphics = new PIXI.Graphics();
+            /*let newGraphics = new PIXI.Graphics();
             newGraphics.beginFill(0x00FF00);
-            newGraphics.drawRect(-2, -2, 4, 4);
+            newGraphics.drawRect(-2, -2, 4,4);
             newGraphics.endFill();
             newGraphics.x = this.leavesGroupX;
             newGraphics.y = this.leavesGroupY;
-            roomEvents.addGraphicsDirectlyToLayer(newGraphics, "treeLeavesContainer");
+            roomEvents.addGraphicsDirectlyToLayer(newGraphics, "treeLeavesContainer");*/
         };
         treeGen.prototype.logic = function (l) {
             if (this.hasFallingLeaves) {
@@ -4029,6 +4212,7 @@
                 function (xp, yp, input) { return new fallingLeavesParticles(xp, yp, input); },
                 function (xp, yp, input) { return new ladder(xp, yp, input); },
                 function (xp, yp, input) { return new textPrompt(xp, yp, input); },
+                function (xp, yp, input) { return new layerBridgeBack(xp, yp, input); },
                 function (xp, yp, input) { return new roomChanger(xp, yp, input); },
                 function (xp, yp, input) { return new skyBackground(xp, yp, input); },
                 function (xp, yp, input) { return new treeGen(xp, yp, input); },
@@ -5745,7 +5929,7 @@
             var _a;
             if (specificType === void 0) { specificType = null; }
             var foundObjects = [];
-            if (this.selectedLayer != null) {
+            if (this.selectedLayer != null && this.selectedLayer.hidden == false) {
                 for (var _i = 0, _b = (_a = this.selectedLayer) === null || _a === void 0 ? void 0 : _a.metaObjectsInLayer; _i < _b.length; _i++) {
                     var obj = _b[_i];
                     if (specificType == null) {
@@ -6201,19 +6385,19 @@
                 }
             }
             else if (cursorData.cursorType == cursorType.eraser && this.canvasRenderPart.layerHandler.selectedLayer != null) {
-                var objTarget_1 = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+                var objTarget_1 = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition, objectTypes.userObject);
                 if (objTarget_1.length != 0 && objTarget_1[0].type != objectTypes.geometry) {
                     this.canvasRenderPart.layerHandler.removeObject(objTarget_1[0]);
                 }
             }
             else if (cursorData.cursorType == cursorType.geometryRemove && this.canvasRenderPart.layerHandler.selectedLayer != null) {
-                var objTarget_2 = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+                var objTarget_2 = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition, objectTypes.geometry);
                 if (objTarget_2.length != 0 && objTarget_2[0].type == objectTypes.geometry) {
                     this.canvasRenderPart.layerHandler.removeObject(objTarget_2[0]);
                 }
             }
             else if (cursorData.cursorType == cursorType.editor && this.canvasRenderPart.layerHandler.selectedLayer != null) {
-                var objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition);
+                var objTarget = this.canvasRenderPart.layerHandler.getObjectsAtPos(this.mouseXPosition, this.mouseYPosition, objectTypes.userObject);
                 if (objTarget != null) {
                     var inputTemplate = this.genObj.generateObject(objTarget[0].name, 0, 0, null, "").inputTemplate;
                     var inputString = objTarget[0].inputString;

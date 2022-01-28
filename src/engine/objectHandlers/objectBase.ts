@@ -12,6 +12,7 @@ import { AnimatedSprite } from "pixi.js";
 import * as PIXI from 'pixi.js'
 import { objectGlobalData } from "./objectGlobalData";
 import { nullVector } from "../dataObjects/vector/nullVector";
+import { objectFunctions } from "./objectFunctions";
 
 
 export class objectBase implements iObject{
@@ -32,11 +33,11 @@ export class objectBase implements iObject{
     gravity: iVector = nullVector.null;
     weight: number = 0.4;
     _hasBeenMoved_Tick: number = 0;
-    _collidingWithPolygon: boolean = false;
-
+    _collidingWithPolygonTick: number = -1;
+    _targetLayerForPolygonCollision:string = "";
     collidesWithPolygonGeometry = false;
     _hasCollidedWithPolygon = false;
-
+    sameLayerCollisionOnly = false;
     inputTemplate: string = "";
     outputString: string = "";
     onLayer: number = 0;
@@ -84,11 +85,37 @@ export class objectBase implements iObject{
     }
 
     
-    afterInit(roomEvents: roomEvent): void {
+    changeLayer(roomEvents: roomEvent, newLayerName: string){
+        //THIS ISNT WORKING
+        console.log("Change layer: ",this.layerIndex);
+        let objectsInLayer = roomEvents.objContainer.getObjectsInLayerFromIndex(this.layerIndex);
+        console.log("objectsInLayer: ",objectsInLayer);
+        let indexOfObjInLayer = objectsInLayer.indexOf(this);
+        console.log("indexOfObjInLayer: ",indexOfObjInLayer);
+        if(indexOfObjInLayer != -1){
+            console.log("old obj.layerIndex: ",this.layerIndex);
+            objectsInLayer.splice(indexOfObjInLayer, 1);
+            console.log("roomEvents.objContainer.getLayerNamesMap(): ",roomEvents.objContainer.getLayerNamesMap());
+            let newLayerNumber = roomEvents.objContainer.getLayerNamesMap()[newLayerName];
+            /*console.log("this.layerNames: ",this.layerNames);
+            console.log("targetLayer: ",targetLayer);*/
+            this._layerIndex = newLayerNumber;
+            let netObjectContainer = roomEvents.objContainer.getObjectsInLayerFromIndex(this.layerIndex);
+            console.log("newLayerNumber: ",newLayerNumber);
+            netObjectContainer.push(this);
+
+            //Move pixijs graphics to new container here
+            this.g.parent.removeChild(this.g);
+            let newLayerGraphicsContainer = roomEvents.objContainer.getLayerGraphicsContainerFromIndex(this.layerIndex);
+            newLayerGraphicsContainer.addChild(this.g);
+        }
+    }
+
+    afterInit(roomEvents: objectFunctions): void {
         
     }
 
-    init(roomEvents: roomEvent){
+    init(roomEvents: objectFunctions){
         
     }
 
@@ -238,10 +265,12 @@ export class objectBase implements iObject{
         }
     }
 
-    
-
-    logic(l: roomEvent){
+    preLogicMovement(l: roomEvent){
         movementOperations.moveByForce(this, this._force, this.collisionTargets, l.objContainer, l.deltaTime);
+    }
+
+    logic(l: objectFunctions){
+        
     };
 
     

@@ -3,6 +3,7 @@ import { iVector } from "../dataObjects/vector/iVector";
 import { nullVector } from "../dataObjects/vector/nullVector";
 import { vectorFixedDelta } from "../dataObjects/vector/vectorFixedDelta";
 import { iObject } from "../objectHandlers/iObject";
+import { objectFunctions } from "../objectHandlers/objectFunctions";
 import { roomEvent } from "../roomEvent/roomEvent";
 import { actionContainer } from "./actionContainer";
 import { actionCreatedObject } from "./actionCreatedObject";
@@ -163,7 +164,7 @@ export class action implements IAction{
     }
 
     private delta = 0;
-    public play(user: iObject, l: roomEvent){
+    public play(user: iObject, l: objectFunctions){
         if(this.jobCompleted) return;
 
         if(this.firstTime){

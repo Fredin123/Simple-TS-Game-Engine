@@ -4,6 +4,7 @@ import { roomEvent } from "../roomEvent/roomEvent";
 import { resourcesHand } from "../preload sources/resourcesHand";
 import { subTileMeta } from "../../shared/tile/subTileMeta";
 import { tileAnimation } from "../../shared/tile/tileAnimation";
+import { objectFunctions } from "../objectHandlers/objectFunctions";
 
 export class tileMetaObj extends objectBase{
     static objectName = "tileMetaObj";
@@ -17,7 +18,7 @@ export class tileMetaObj extends objectBase{
         
     }
 
-    logic(l: roomEvent){
+    logic(l: objectFunctions){
         return;
     };
 

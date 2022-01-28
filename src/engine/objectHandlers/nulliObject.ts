@@ -5,6 +5,7 @@ import { vector } from "../dataObjects/vector/vector";
 import { resourceMeta } from "../preload sources/resourceMeta";
 import { boxCollider } from "./collision/boxCollider";
 import * as PIXI from 'pixi.js'
+import { objectFunctions } from "./objectFunctions";
 
 export class nulliObject implements iObject{
     isTile = false;
@@ -27,7 +28,9 @@ export class nulliObject implements iObject{
     force: vector = new vector(0, 0);
     exportedString: string = "";
     _hasBeenMoved_Tick: number = 0;
-    _collidingWithPolygon: boolean = false;
+    _collidingWithPolygonTick: number = 0;
+    _targetLayerForPolygonCollision:string = "";
+    sameLayerCollisionOnly = false;
     collidesWithPolygonGeometry = false;
     onLayer: number = 0;
     outputString: string = "";
@@ -37,7 +40,13 @@ export class nulliObject implements iObject{
     constructor(xp: number, yp: number) {
 
     }
-    afterInit(roomEvents: roomEvent): void {
+    changeLayer(roomEvents: roomEvent, newLayerName: string): void {
+        
+    }
+    preLogicMovement(l: roomEvent): void {
+        
+    }
+    afterInit(roomEvents: objectFunctions): void {
         
     }
     layerIndex: number = 0;
@@ -45,7 +54,7 @@ export class nulliObject implements iObject{
     _hasCollidedWithPolygon: boolean = false;
 
         
-    init(roomEvents: roomEvent){
+    init(roomEvents: objectFunctions){
 
     }
     
@@ -80,7 +89,7 @@ export class nulliObject implements iObject{
         
     }
 
-    logic(l: roomEvent){
+    logic(l: objectFunctions){
 
     };
 

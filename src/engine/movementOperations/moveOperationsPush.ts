@@ -2,6 +2,7 @@ import { internalFunction } from "../internalFunctions";
 import { iObject } from "../objectHandlers/iObject";
 import { objectContainer } from "../objectHandlers/objectContainer";
 import { objectGlobalData } from "../objectHandlers/objectGlobalData";
+import { ticker } from "../ticker";
 
 export class moveOperationsPush{
 
@@ -15,6 +16,7 @@ export class moveOperationsPush{
             objectBeingPushed.g.x += sign;
             objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
                 if(testCollision.objectName != pusher.objectName && 
+                    (objectBeingPushed.sameLayerCollisionOnly == false || (objectBeingPushed.sameLayerCollisionOnly == true && objectBeingPushed.layerIndex == testCollision.layerIndex)) &&
                     internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
                     && this.pushObjectHorizontal(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null){
                         objectBeingPushed.g.x += sign*-1;
@@ -37,13 +39,14 @@ export class moveOperationsPush{
             }
             
             objectBeingPushed.g.y += sign;
-            if(objectBeingPushed._collidingWithPolygon){
+            if(ticker.getTicks() - objectBeingPushed._collidingWithPolygonTick < ticker.shortWindow){
                 objectBeingPushed.g.y += sign*-1;
                 this.collided = true;
                 return objectBeingPushed;
             }else{
                 objContainer.loopThroughObjectsUntilCondition(objectBeingPushed.collisionTargets, (testCollision: iObject)=>{
                     if(testCollision.objectName != pusher.objectName && 
+                        (objectBeingPushed.sameLayerCollisionOnly == false || (objectBeingPushed.sameLayerCollisionOnly == true && objectBeingPushed.layerIndex == testCollision.layerIndex)) &&
                         internalFunction.intersecting(objectBeingPushed, objectBeingPushed.collisionBox, testCollision)
                         && this.pushObjectVertical(objectBeingPushed, testCollision, sign, objContainer) != objectGlobalData.null){
                             objectBeingPushed.g.y += sign*-1;
