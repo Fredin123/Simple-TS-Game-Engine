@@ -5,7 +5,6 @@ import { iObject } from "../../iObject";
 import { vector } from "../../../dataObjects/vector/vector";
 import { nullVector } from "../../../dataObjects/vector/nullVector";
 import { iVector } from "../../../dataObjects/vector/iVector";
-import { player } from "../../../../objects/player";
 import { grassFilter } from "../../../engineFilters/groundFilters/grassFilter";
 import { groundGrassFilter } from "../../../engineFilters/groundFilters/groundGrassFilter";
 import { objectFunctions } from "../../objectFunctions";

@@ -20,10 +20,25 @@ export class resourcesHand{
     constructor(app: PIXI.Application, onCompleteCallback: ()=>void, alternativePath: string = ""){
         resourcesHand.app = app;
         //webfontloader.load
-        let font = new FontFaceObserver.default('CrimsonPro-Black');
+
+        try{
+            let font = new FontFaceObserver.default('CrimsonPro-Black');
  
-        font.load().then(function () {
-            console.log('smallburg-Regular has loaded');
+            font.load().then(function () {
+                resourcesHand.initResources(onCompleteCallback, alternativePath);
+            });
+        }catch(err){
+            resourcesHand.initResources(onCompleteCallback, alternativePath);
+        }
+        
+
+        
+
+        
+    }
+
+    private static initResources(onCompleteCallback: ()=>void, alternativePath: string){
+        console.log('smallburg-Regular has loaded');
             fetch(alternativePath+'/assets/resources.txt', {
                 method: 'get'
             })
@@ -32,11 +47,6 @@ export class resourcesHand{
             .catch(err => {
                 console.log("err: "+err);
             });
-        });
-
-        
-
-        
     }
 
     static loadFromResources(loadedResources: string[], onCompleteCallback: ()=>void, alternativePath: string){
