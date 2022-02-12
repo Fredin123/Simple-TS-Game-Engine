@@ -216,7 +216,7 @@ export class action implements IAction{
                     let newObj = new actionCreatedObject(this.objToCreateLife, this.objCreatorFunc(), this.objToCreateOffset[0], this.objToCreateOffset[1]);
                     this._actionContainer.objectsCreated.push(newObj);
                     this._actionContainer.positionCreatedObject(user, newObj);
-                    l.addObject(newObj.obj(), user.onLayer);
+                    l.addObject(newObj.obj(), user.layerIndex);
                 }
                 this.payloadDone = true;
             }

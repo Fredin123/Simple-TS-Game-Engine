@@ -21,7 +21,7 @@ export class resourcesHand{
         resourcesHand.app = app;
         //webfontloader.load
 
-        try{
+        /*try{
             let font = new FontFaceObserver.default('CrimsonPro-Black');
  
             font.load().then(function () {
@@ -29,9 +29,9 @@ export class resourcesHand{
             });
         }catch(err){
             resourcesHand.initResources(onCompleteCallback, alternativePath);
-        }
+        }*/
         
-
+        resourcesHand.initResources(onCompleteCallback, alternativePath);
         
 
         

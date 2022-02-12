@@ -18,7 +18,6 @@ import { calculations } from '../calculations';
 import { layer } from '../../shared/layer';
 import { roomEventFlags } from './roomEventFlags';
 import { objectFunctions } from '../objectHandlers/objectFunctions';
-import { player } from '../../objects/player';
 
 declare var LZString: any;
 
@@ -28,6 +27,11 @@ export class roomEvent {
     private app: PIXI.Application;
     private mouseXPosition:number = 0;
     private mouseYPosition:number = 0;
+    private bufferedMouseDown: boolean = false;
+    private bufferedMouseUp: boolean = false;
+    private mouseUp: boolean = false;
+    private mouseDown: boolean = false;
+    
     container: HTMLElement;
     private keysDown: Record<string, boolean> = {};
     public objContainer: objectContainer;
@@ -67,6 +71,8 @@ export class roomEvent {
         this.functionsForObjects = new objectFunctions(this);
 
         this.container.addEventListener("mousemove", this.mouseMoveListener.bind(this));
+        this.container.addEventListener("mousedown", this.mouseDownListener.bind(this));
+        this.container.addEventListener("mouseup", this.mouseUpListener.bind(this));
         document.addEventListener("keydown", this.keyDownListener.bind(this), false);
         document.addEventListener("keyup", this.keyUpListener.bind(this), false);
     }
@@ -149,6 +155,20 @@ export class roomEvent {
                 }
             }
         }
+
+        if(this.bufferedMouseDown){
+            this.bufferedMouseDown = false;
+            this.mouseDown = true;
+        }else{
+            this.mouseDown = false;
+        }
+
+        if(this.bufferedMouseUp){
+            this.bufferedMouseUp = false;
+            this.mouseUp = true;
+        }else{
+            this.mouseUp = false;
+        }
     }
 
     private mouseXPre = 0;
@@ -165,6 +185,14 @@ export class roomEvent {
 
         this.mouseXPosition = this.mouseXPre;
         this.mouseYPosition = this.mouseYPre;
+    }
+
+    mouseDownListener(e: MouseEvent){
+        this.bufferedMouseDown = true;
+    }
+
+    mouseUpListener(e: MouseEvent){
+        this.bufferedMouseUp = true;
     }
 
     keyDownListener(e: KeyboardEvent){
@@ -199,6 +227,14 @@ export class roomEvent {
 
     mouseY(){
         return this.mouseYPosition;
+    }
+
+    checkMouseDown(){
+        return this.mouseDown;
+    }
+
+    checkMouseUp(){
+        return this.mouseUp;
     }
 
     keepObjectsWithinArea(objects: iObject[], originX: number, originY: number, radius: number){

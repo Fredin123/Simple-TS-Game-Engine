@@ -109,6 +109,14 @@ export class objectFunctions{
         return this.roomEvents.checkKeyHeld(keyCheck);
     }
 
+    checkMouseDown(){
+        return this.roomEvents.checkMouseDown();
+    }
+    
+    checkMouseUp(){
+        return this.roomEvents.checkMouseUp();
+    }
+    
     mouseX(){
         return this.roomEvents.mouseX();
     }

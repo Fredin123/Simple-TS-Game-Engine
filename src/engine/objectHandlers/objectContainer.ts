@@ -12,8 +12,6 @@ import { internalFunction } from "../internalFunctions";
 import { boxCollider } from "./collision/boxCollider";
 import { objectFunctions } from "./objectFunctions";
 import { polygonCollisionX } from "./collision/polygonCollision/polygonCollisionX";
-import { player } from "../../objects/player";
-
 
 export class objectContainer{
     private specificObjects: {[key: string]: Array<iObject>};
@@ -68,7 +66,8 @@ export class objectContainer{
         init: boolean){
         //Add specific classes
         
-        obj.onLayer = targetlayer;
+        obj.layerIndex = targetlayer;
+        console.log("Set object layer: ",targetlayer);
         let objName = tools.getClassNameFromConstructorName(obj.constructor.toString());
         if(this.specificObjects[objName] == null){
             this.specificObjects[objName] = new Array<objectBase>();
@@ -96,7 +95,10 @@ export class objectContainer{
     }
 
     addObjectLayerName(obj: iObject, layerString:string){
+        console.log("Created object for layer: ",layerString);
+        console.log("we can  layers: ",this.layerNames);
         let layerIndex = this.layerNames[layerString];
+        console.log("Target layer index: ",layerIndex);
         this.objectToAddBuffer.push([obj, layerIndex]);
     }
 
@@ -177,6 +179,7 @@ export class objectContainer{
 
 
     loopThroughObjectsUntilCondition(targets: string[], func:(arg:iObject)=>boolean): iObject{
+        if(targets == undefined) return objectGlobalData.null;
         var i=0;
         for(;i<targets.length; i++){
             if(this.specificObjects[targets[i]] != null){
@@ -303,10 +306,13 @@ export class objectContainer{
     public setTargetPolygonCollisionLayer(obj: iObject){
         let allLayers = this.getLayerNames();
         let passedMyLayer = false;
+        console.log("allLayers: ",allLayers);
         for(var i=0; i<allLayers.length; i++){
             let layer = allLayers[i];
 
-            if(passedMyLayer){
+            console.log("obj.sameLayerCollisionOnly: ",obj.sameLayerCollisionOnly);
+            console.log("if ",obj.layerIndex," == ", this.layerNames[layer]);
+            if((passedMyLayer && obj.sameLayerCollisionOnly == false) || (obj.sameLayerCollisionOnly && obj.layerIndex == this.layerNames[layer])){
                 let foundPolygons = this.getSpecificObjectsInLayer(allLayers[i], polygonCollisionX.objectName) as polygonCollisionX[];
                 
                 if(foundPolygons.length > 0){

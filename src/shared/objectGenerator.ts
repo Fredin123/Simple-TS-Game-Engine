@@ -1,4 +1,8 @@
 //{NEW IMPORTS START HERE}
+import { block1 } from "../objects/block1";
+import { normalBullet } from "../objects/bullets/normalBullet";
+import { human } from "../objects/human";
+import { socketHandler } from "../objects/socketHandler";
 //{NEW IMPORTS END HERE}
 
 
@@ -14,6 +18,10 @@ import { tileMetaObj } from "../engine/Tile/tileMeteObj";
 export class objectGenerator{
     private availibleObjects: Array<(xp: number, yp: number, input: string) => objectBase> = [
         //{NEW OBJECT HERE START} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
+		(xp: number, yp: number, input: string)=>{return new block1(xp, yp, input);},
+		(xp: number, yp: number, input: string)=>{return new normalBullet(xp, yp, input);},
+		(xp: number, yp: number, input: string)=>{return new human(xp, yp, input);},
+		(xp: number, yp: number, input: string)=>{return new socketHandler(xp, yp, input);},
 //{NEW OBJECT HERE END} (COMMENT USED AS ANCHOR BY populateObjectGenerator.js)
 
     ];
