@@ -11,8 +11,7 @@ import { objectGlobalData } from "./objectGlobalData";
 import { internalFunction } from "../internalFunctions";
 import { boxCollider } from "./collision/boxCollider";
 import { objectFunctions } from "./objectFunctions";
-import { polygonCollisionX } from "./collision/polygonCollision/polygonCollisionX";
-import { player } from "../../objects/player";
+import { polygonCollisionX } from "./collision/polygonCollision/polygonCollisionX"; 
 
 
 export class objectContainer{
@@ -177,6 +176,7 @@ export class objectContainer{
 
 
     loopThroughObjectsUntilCondition(targets: string[], func:(arg:iObject)=>boolean): iObject{
+        if(targets == undefined) return objectGlobalData.null;
         var i=0;
         for(;i<targets.length; i++){
             if(this.specificObjects[targets[i]] != null){
@@ -306,7 +306,7 @@ export class objectContainer{
         for(var i=0; i<allLayers.length; i++){
             let layer = allLayers[i];
 
-            if(passedMyLayer){
+            if((passedMyLayer && obj.sameLayerCollisionOnly == false) || (obj.sameLayerCollisionOnly && obj.layerIndex == this.layerNames[layer])){
                 let foundPolygons = this.getSpecificObjectsInLayer(allLayers[i], polygonCollisionX.objectName) as polygonCollisionX[];
                 
                 if(foundPolygons.length > 0){
