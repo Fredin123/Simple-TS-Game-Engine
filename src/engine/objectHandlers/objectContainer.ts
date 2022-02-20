@@ -67,7 +67,8 @@ export class objectContainer{
         init: boolean){
         //Add specific classes
         
-        obj.onLayer = targetlayer;
+        obj.layerIndex = targetlayer;
+        console.log("Set object layer: ",targetlayer);
         let objName = tools.getClassNameFromConstructorName(obj.constructor.toString());
         if(this.specificObjects[objName] == null){
             this.specificObjects[objName] = new Array<objectBase>();
@@ -95,7 +96,10 @@ export class objectContainer{
     }
 
     addObjectLayerName(obj: iObject, layerString:string){
+        console.log("Created object for layer: ",layerString);
+        console.log("we can  layers: ",this.layerNames);
         let layerIndex = this.layerNames[layerString];
+        console.log("Target layer index: ",layerIndex);
         this.objectToAddBuffer.push([obj, layerIndex]);
     }
 
@@ -303,6 +307,7 @@ export class objectContainer{
     public setTargetPolygonCollisionLayer(obj: iObject){
         let allLayers = this.getLayerNames();
         let passedMyLayer = false;
+        console.log("allLayers: ",allLayers);
         for(var i=0; i<allLayers.length; i++){
             let layer = allLayers[i];
 

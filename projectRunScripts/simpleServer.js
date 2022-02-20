@@ -1,26 +1,21 @@
-const express = require('express');
-path = require('path');
-const open = require('open');
-const app = express();
-const port = 8080;
+var express = require('express')
+var path = require('path')
+var app = express()
+var http = require('http').createServer(app);
+var io = require('socket.io')(http);
+var socketIo = require('./../../server/serverSocket');
 
-app.get('/', (req, res) => {
-  //res.send('Hello World!')
-  res.sendFile(path.join(__dirname, '../')+'/dist/index.html');
-})
+app.use(express.static(path.join(__dirname, '../') + 'dist/'))
 
-app.use(express.static(path.join(__dirname, '../') + '/dist'));
+app.get('/', function (req, res) {
+  //console.log("Try get: ",path.join(__dirname, '../') + 'dist/');
+  res.sendFile(path.join(__dirname, '../') + 'dist');
+});
 
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`);
-  //open(`http://localhost:${port}`);
-})
+http.listen(3000, function() {
+  var host = http.address().address
+  var port = http.address().port
+  console.log('App listening at http://%s:%s', host, port)
+});
 
-
-
-/*const express = require('express');
-const app = new express();
-
-app.get('/', function(request, response){
-    response.sendFile('./dist/index.html');
-});*/
+socketIo.socketServerPart(io);

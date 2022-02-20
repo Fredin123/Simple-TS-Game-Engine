@@ -4,7 +4,6 @@ import { roomEvent } from "./roomEvent/roomEvent";
 import { task } from './tools/task';
 import {GodrayFilter} from '@pixi/filter-godray';
 import { ticker } from './ticker';
-import { scene_home } from '../scenes/scene_home';
 import { gameStartRoom } from '../scenes/gameStartRoom';
 
 declare var LZString: any;

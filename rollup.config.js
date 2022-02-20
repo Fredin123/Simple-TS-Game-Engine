@@ -27,7 +27,8 @@ const config = {
         '@pixi/constants': 'PIXI',
         '@pixi/display': 'PIXI',
         '@pixi/runner': 'PIXI',
-        'pixi-particles': 'PIXI.particles'
+        'pixi-particles': 'PIXI.particles',
+        'socket.io-client': 'io'
         //'@pixi/particle-emitter': 'PIXI.particles'
       }
     },

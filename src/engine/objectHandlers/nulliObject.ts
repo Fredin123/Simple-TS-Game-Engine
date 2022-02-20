@@ -32,7 +32,7 @@ export class nulliObject implements iObject{
     _targetLayerForPolygonCollision:string = "";
     sameLayerCollisionOnly = false;
     collidesWithPolygonGeometry = false;
-    onLayer: number = 0;
+    layerIndex: number = 0;
     outputString: string = "";
     horizontalCollision: number = 0;
     verticalCollision: number = 0;
@@ -49,7 +49,7 @@ export class nulliObject implements iObject{
     afterInit(roomEvents: objectFunctions): void {
         
     }
-    layerIndex: number = 0;
+    
     
     _hasCollidedWithPolygon: boolean = false;
 

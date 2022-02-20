@@ -18,7 +18,7 @@ import { objectFunctions } from "./objectFunctions";
 export class objectBase implements iObject{
     isTile = false;
     tileStepTime: number = -1;
-    readonly ID: string =  uidGen.new();
+    ID: string =  uidGen.new();
     private _g: PIXI.Container = new PIXI.Container();
     private gSprites : {[key: string]: PIXI.AnimatedSprite} = {};
     friction: number = 0.98;

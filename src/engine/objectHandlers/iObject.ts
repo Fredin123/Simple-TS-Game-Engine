@@ -31,7 +31,6 @@ export interface iObject{
     sameLayerCollisionOnly: boolean;
     collidesWithPolygonGeometry: boolean;
 
-    onLayer: number;
     layerIndex: number;
     outputString: string;
 
