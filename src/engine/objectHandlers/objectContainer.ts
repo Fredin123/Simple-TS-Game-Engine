@@ -311,7 +311,8 @@ export class objectContainer{
         for(var i=0; i<allLayers.length; i++){
             let layer = allLayers[i];
 
-            if((passedMyLayer && obj.sameLayerCollisionOnly == false) || (obj.sameLayerCollisionOnly && obj.layerIndex == this.layerNames[layer])){
+            //if((passedMyLayer && obj.sameLayerCollisionOnly == false) || (obj.sameLayerCollisionOnly && obj.layerIndex == this.layerNames[layer])){
+            if(passedMyLayer){
                 let foundPolygons = this.getSpecificObjectsInLayer(allLayers[i], polygonCollisionX.objectName) as polygonCollisionX[];
                 
                 if(foundPolygons.length > 0){

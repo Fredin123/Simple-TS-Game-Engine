@@ -3,7 +3,6 @@ var path = require('path')
 var app = express()
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
-var socketIo = require('./../../server/serverSocket');
 
 app.use(express.static(path.join(__dirname, '../') + 'dist/'))
 
@@ -17,5 +16,3 @@ http.listen(3000, function() {
   var port = http.address().port
   console.log('App listening at http://%s:%s', host, port)
 });
-
-socketIo.socketServerPart(io);

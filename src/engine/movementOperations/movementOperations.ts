@@ -27,7 +27,6 @@ export class movementOperations{
         
         target.gravity.increaseMagnitude(target.weight);
         
-        
         this.polygonCollisionTest = polygonCollision.collisionTest(target, Math.round(this.xdiff), Math.round(this.ydiff), 
                                 objContainer);
 

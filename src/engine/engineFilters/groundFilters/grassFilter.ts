@@ -174,7 +174,7 @@ export class grassFilter{
 
         float distanceToCamera = abs(vTextureCoord.x - cameraPosition);
         if(distanceToCamera < cameraSize){
-            for (int lineIndex = 0; lineIndex < {yPolPosArrayLength}; ++lineIndex){
+            for (int lineIndex = 0; lineIndex < {yPolPosArrayLength}-1; ++lineIndex){
 
             
                 float heightDifference = yPolPos[lineIndex+1] - yPolPos[lineIndex];

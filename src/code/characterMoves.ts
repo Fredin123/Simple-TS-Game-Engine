@@ -4,12 +4,14 @@ import { IBaseAttack } from "../engine/hitboxes/baseAttack/IBaseAttack";
 import { iObject } from "../engine/objectHandlers/iObject";
 import { objectFunctions } from "../engine/objectHandlers/objectFunctions";
 import { ticker } from "../engine/ticker";
+import { layerBridgeBack } from "../objects/environment/layerBridgeBack";
+
 
 export class characterMoves{
     public maxRunSpeed = 6;
-    private superRunSpeed = 6;
-    private normalRunSpeed = 4;
-    private jumpStrength = 8;
+    private superRunSpeed = 8;
+    private normalRunSpeed = 5;
+    private jumpStrength = 9;
 
     private jumpButtonReleased = false;
 
@@ -49,34 +51,73 @@ export class characterMoves{
     }
 
     private movement(l: objectFunctions, character: iObject){
+        if(this.walkingBridge == true){
+            if(l.isCollidingWith(character, character.collisionBox, [layerBridgeBack.objectName])){
+                character.g.y -= 8;
+                character.force.Dy = 0;
+                character.force.Dx = 0;
+                character.gravity.magnitude = 0;
+            }else{
+                character.g.y -= 8;
+                this.walkingBridge = false;
+
+                l.tryStepBetweenLayers(character, false);
+            }
+            return;
+        }
+
         if(l.checkKeyHeld("Control")){
             this.maxRunSpeed = this.superRunSpeed;
         }else{
-            this.maxRunSpeed = this.normalRunSpeed;
+            if(character.verticalCollision > 0){
+                //REstore run speed only if we're on ground
+                this.maxRunSpeed = this.normalRunSpeed;   
+            }
         }
 
         if(l.checkKeyHeld("a") || l.checkKeyHeld("A")){
-            character.addForceAngleMagnitude(calculations.degreesToRadians(180), (10/13)*this.maxRunSpeed * l.deltaTime());
+            if(character.verticalCollision > 0){
+                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/13)*this.maxRunSpeed * l.deltaTime());
+            }else{
+                character.addForceAngleMagnitude(calculations.degreesToRadians(180), (1/32)*this.maxRunSpeed * l.deltaTime());
+            }
         }
-        if(l.checkKeyHeld("d") || l.checkKeyHeld("D")){
-            character.addForceAngleMagnitude(calculations.degreesToRadians(0), (10/13)*this.maxRunSpeed * l.deltaTime());
+
+
+        if(l.checkKeyHeld("d") || l.checkKeyHeld("D")){
+            if(character.verticalCollision > 0){
+                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/13)*this.maxRunSpeed * l.deltaTime());
+            }else{
+                character.addForceAngleMagnitude(calculations.degreesToRadians(0), (1/32)*this.maxRunSpeed * l.deltaTime());
+            }
         }
-        
+
+
         if(l.checkKeyHeld("w") || l.checkKeyHeld("W")){
-            character.addForceAngleMagnitude(calculations.degreesToRadians(90), (10/13)*this.maxRunSpeed * l.deltaTime());
+            if(l.isCollidingWith(character, character.collisionBox, [layerBridgeBack.objectName])){
+                this.walkingBridge = true;
+            }else{
+                this.jumpButtonReleased = true;
+            }
         }
-        if(l.checkKeyHeld("s") || l.checkKeyHeld("S")){
-            character.addForceAngleMagnitude(calculations.degreesToRadians(270), (10/13)*this.maxRunSpeed * l.deltaTime());
+
+        if(this.jumpButtonReleased == true){
+            if((character.verticalCollision > 0 || ticker.getTicks() - character._collidingWithPolygonTick < ticker.shortWindow)){
+                console.log("character._collidingWithPolygon: ",ticker.getTicks() - character._collidingWithPolygonTick);
+                character.addForceAngleMagnitude(calculations.degreesToRadians(90), this.jumpStrength * l.deltaTime());
+                character._collidingWithPolygonTick = 0;
+            }
+            this.jumpButtonReleased = false;            
         }
 
-        
-        
-       
-
-
+        if((l.checkKeyHeld("s") || l.checkKeyHeld("S")) && (l.checkKeyReleased("j") || l.checkKeyReleased("J"))){
+            l.tryStepBetweenLayers(character);
+        }
 
         character.force.limitHorizontalMagnitude(this.maxRunSpeed);
         character.force.limitVerticalMagnitude(this.maxRunSpeed);
+
+
     }
 
     private CL_collisionWith: iObject | null = null;
